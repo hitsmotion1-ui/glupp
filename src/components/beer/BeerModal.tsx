@@ -68,7 +68,7 @@ export function BeerModal() {
           Chargement...
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start gap-4">
             <span className="text-5xl">{beerEmoji(beer.style)}</span>
@@ -85,7 +85,7 @@ export function BeerModal() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {[
               {
                 label: "Alcool",

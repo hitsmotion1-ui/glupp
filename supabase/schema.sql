@@ -438,8 +438,9 @@ ALTER TABLE crew_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE moment_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_trophies ENABLE ROW LEVEL SECURITY;
 
--- Profils : visible par tous, modifiable par soi-même
+-- Profils : visible par tous, modifiable par soi-même, insertion par soi-même
 CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
+CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Bières : lisibles par tous (pas de RLS sur beers, bars, trophies, glupp_of_week)

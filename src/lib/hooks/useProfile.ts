@@ -21,13 +21,44 @@ export function useProfile() {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
 
-    if (data) setProfile(data as Profile);
+    if (data) {
+      setProfile(data as Profile);
+    } else if (error?.code === "PGRST116") {
+      // Profil absent (inscription avant schema) → auto-creation
+      const username =
+        user.user_metadata?.username ||
+        user.email?.split("@")[0] ||
+        "user";
+      const displayName =
+        user.user_metadata?.display_name || username;
+
+      const { error: insertError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          username,
+          display_name: displayName,
+          avatar_url: user.user_metadata?.avatar_url || null,
+        });
+
+      if (!insertError) {
+        // Re-fetch apres insertion
+        const { data: retryData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (retryData) setProfile(retryData as Profile);
+      }
+    }
+
     setLoading(false);
   }, []);
 

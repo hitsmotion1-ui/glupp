@@ -42,7 +42,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-glupp-card rounded-t-glupp-xl max-h-[85vh] overflow-y-auto"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-glupp-card rounded-t-glupp-xl max-h-[92vh] overflow-y-auto"
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-2">
