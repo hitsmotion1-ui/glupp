@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-glupp-bg text-glupp-cream font-body antialiased;
+}
+
+:root {
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3A3530;
+  border-radius: 4px;
+}

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(npx create-next-app:*)",
+      "Bash(cmd.exe /c \"where node\")",
+      "Bash(cmd.exe /c \"where npm\")",
+      "Bash(cmd.exe /c \"where npx\")",
+      "Bash(powershell.exe:*)",
+      "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
+      "Bash(node:*)",
+      "Bash(npm --version)",
+      "Bash(npx:*)",
+      "Bash(npm install)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
