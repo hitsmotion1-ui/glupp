@@ -15,7 +15,7 @@ export default function ProfilePage() {
   const { signOut } = useAuth();
   const { profile, loading, level, nextLevel, progress } = useProfile();
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="px-4 py-6 space-y-4">
         <div className="flex flex-col items-center gap-3">
@@ -29,6 +29,28 @@ export default function ProfilePage() {
           <Skeleton className="h-20" />
           <Skeleton className="h-20" />
         </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="py-16 px-4 text-center space-y-4">
+        <p className="text-5xl">😕</p>
+        <h2 className="font-display text-lg font-bold text-glupp-cream">
+          Profil introuvable
+        </h2>
+        <p className="text-sm text-glupp-text-muted">
+          Ton profil n&apos;a pas pu etre charge. Verifie que la base de donnees est configuree.
+        </p>
+        <Button
+          variant="ghost"
+          className="text-glupp-error"
+          onClick={signOut}
+        >
+          <LogOut size={16} className="mr-2" />
+          Se deconnecter
+        </Button>
       </div>
     );
   }

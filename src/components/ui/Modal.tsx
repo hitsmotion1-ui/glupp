@@ -65,7 +65,9 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             )}
 
             {/* Content */}
-            <div className="px-5 pb-8">{children}</div>
+            <div className="px-5 pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
+              {children}
+            </div>
           </motion.div>
         </>
       )}
