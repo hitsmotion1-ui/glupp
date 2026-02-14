@@ -32,7 +32,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60"
+            className="fixed inset-0 z-[60] bg-black/60"
             onClick={onClose}
           />
 
@@ -42,7 +42,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-glupp-card rounded-t-glupp-xl max-h-[92vh] overflow-y-auto"
+            className="fixed bottom-0 left-0 right-0 z-[60] bg-glupp-card rounded-t-glupp-xl max-h-[92vh] overflow-y-auto"
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-2">
@@ -65,7 +65,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             )}
 
             {/* Content */}
-            <div className="px-5 pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
+            <div className="px-5 pb-[calc(5rem+env(safe-area-inset-bottom,0px))]">
               {children}
             </div>
           </motion.div>

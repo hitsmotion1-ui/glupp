@@ -254,7 +254,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public SET row_security = off;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
