@@ -14,8 +14,8 @@ services:
       - traefik.http.services.glupp.loadbalancer.server.port=3000
     env_file: .env.production
     networks:
-      - proxy
+      - web
 
 networks:
-  proxy:
+  web:
     external: true
