@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store/useAppStore";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import type { Beer } from "@/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -24,8 +24,6 @@ export function BeerModal() {
 
     const fetchBeer = async () => {
       setLoading(true);
-      const supabase = createClient();
-
       const { data: beerData } = await supabase
         .from("beers")
         .select("*")

@@ -9,20 +9,16 @@ import { XPToast } from "@/components/gamification/XPToast";
 import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
 
-const STYLE_FILTERS = [
-  "All",
-  "IPA",
-  "Stout",
-  "Tripel",
-  "Lager",
-  "Belgian",
-  "Saison",
-  "Hefeweizen",
-  "Pale Ale",
-];
-
 export default function RankingPage() {
-  const { rankings, loading, filterStyle, setFilterStyle } = useRanking();
+  const {
+    rankings,
+    loading,
+    filterStyle,
+    setFilterStyle,
+    sortBy,
+    setSortBy,
+    availableStyles,
+  } = useRanking();
   const openBeerModal = useAppStore((s) => s.openBeerModal);
 
   if (loading) {
@@ -45,22 +41,44 @@ export default function RankingPage() {
           Classement Mondial
         </h2>
         <p className="text-xs text-glupp-text-muted mt-1">
-          {rankings.length} bieres classees par ELO
+          {rankings.length} bieres classees par {sortBy === "elo" ? "ELO" : sortBy === "name" ? "nom" : "votes"}
         </p>
+      </div>
+
+      {/* Sort buttons */}
+      <div className="flex gap-2 px-4 pb-3">
+        {([
+          { key: "elo" as const, label: "ELO" },
+          { key: "name" as const, label: "Nom" },
+          { key: "votes" as const, label: "Votes" },
+        ]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setSortBy(key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-glupp transition-colors ${
+              sortBy === key
+                ? "bg-glupp-accent text-glupp-bg"
+                : "bg-glupp-card text-glupp-text-soft border border-glupp-border hover:border-glupp-accent"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Style filters */}
       <div className="flex gap-2 px-4 pb-4 overflow-x-auto scrollbar-hide">
-        {STYLE_FILTERS.map((style) => (
+        <Pill
+          label="Tous"
+          active={!filterStyle}
+          onClick={() => setFilterStyle(null)}
+        />
+        {availableStyles.map((style) => (
           <Pill
             key={style}
             label={style}
-            active={
-              style === "All" ? !filterStyle : filterStyle === style
-            }
-            onClick={() =>
-              setFilterStyle(style === "All" ? null : style)
-            }
+            active={filterStyle === style}
+            onClick={() => setFilterStyle(style)}
           />
         ))}
       </div>

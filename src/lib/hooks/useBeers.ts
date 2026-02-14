@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import type { Beer } from "@/types";
 
 export function useBeers() {
   const [beers, setBeers] = useState<Beer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = createClient();
 
   const fetchBeers = useCallback(async () => {
     setLoading(true);
@@ -28,7 +26,7 @@ export function useBeers() {
     }
 
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchBeers();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { useAppStore } from "@/lib/store/useAppStore";
 import type { Beer, UserBeer, Rarity } from "@/types";
 
@@ -19,7 +19,6 @@ export function useCollection() {
     search: "",
   });
 
-  const supabase = createClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
 
   const fetchData = useCallback(async () => {
@@ -50,7 +49,7 @@ export function useCollection() {
     }
 
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchData();

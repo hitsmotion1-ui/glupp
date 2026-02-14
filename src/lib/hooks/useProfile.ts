@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { getLevel, getNextLevel, getLevelProgress } from "@/lib/utils/xp";
 import type { Profile } from "@/types";
 
 export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const supabase = createClient();
 
   const fetchProfile = useCallback(async () => {
     setLoading(true);
@@ -31,7 +29,7 @@ export function useProfile() {
 
     if (data) setProfile(data as Profile);
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchProfile();

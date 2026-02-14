@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { useAppStore } from "@/lib/store/useAppStore";
 import type { Beer } from "@/types";
 
@@ -20,7 +20,6 @@ export function useDuel() {
   const [canDuel, setCanDuel] = useState(false);
   const [tastedBeers, setTastedBeers] = useState<Beer[]>([]);
 
-  const supabase = createClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
 
   const fetchTastedBeers = useCallback(async () => {
@@ -48,7 +47,7 @@ export function useDuel() {
     }
 
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchTastedBeers();

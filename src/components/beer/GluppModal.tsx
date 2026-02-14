@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store/useAppStore";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import type { Beer } from "@/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -28,7 +28,6 @@ export function GluppModal({ onGlupped }: GluppModalProps) {
     }
 
     const fetchBeer = async () => {
-      const supabase = createClient();
       const { data } = await supabase
         .from("beers")
         .select("*")
@@ -46,7 +45,6 @@ export function GluppModal({ onGlupped }: GluppModalProps) {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

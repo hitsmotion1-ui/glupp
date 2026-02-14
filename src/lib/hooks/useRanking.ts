@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import type { Beer } from "@/types";
 
 type SortBy = "elo" | "name" | "votes";
@@ -11,8 +11,6 @@ export function useRanking() {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortBy>("elo");
   const [filterStyle, setFilterStyle] = useState<string | null>(null);
-
-  const supabase = createClient();
 
   const fetchBeers = useCallback(async () => {
     setLoading(true);
@@ -25,7 +23,7 @@ export function useRanking() {
 
     if (data) setBeers(data as Beer[]);
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchBeers();
