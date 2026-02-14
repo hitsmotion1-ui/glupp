@@ -39,8 +39,9 @@ export function useDuel() {
       .eq("user_id", user.id);
 
     if (data) {
-      const beers = data
-        .map((ub: { beers: Beer | null }) => ub.beers)
+      const beers = (data as any[])
+        .map((ub) => ub.beers)
+        .flat()
         .filter((b): b is Beer => b !== null);
       setTastedBeers(beers);
       setCanDuel(beers.length >= 2);

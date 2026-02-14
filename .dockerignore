@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.*
+!.env.production.example
+supabase/
+coverage/
+*.md
+.claude/
+.vscode/

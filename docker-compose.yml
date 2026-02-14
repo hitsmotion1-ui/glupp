@@ -1,0 +1,21 @@
+services:
+  glupp:
+    build:
+      context: .
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.glupp.rule=Host(`glupp.amithome.ovh`)
+      - traefik.http.routers.glupp.entrypoints=websecure
+      - traefik.http.routers.glupp.tls.certresolver=letsencrypt
+      - traefik.http.services.glupp.loadbalancer.server.port=3000
+    env_file: .env.production
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

@@ -235,7 +235,61 @@ typographie Bricolage Grotesque, coins arrondis 16-20px, ombres subtiles.
 
 ---
 
-## 📊 Coûts estimés
+## 🐳 Deploiement Docker + Traefik
+
+### Pre-requis serveur
+
+- Docker + Docker Compose
+- Traefik deja en place avec reseau `proxy` et certresolver `letsencrypt`
+- DNS `glupp.amithome.ovh` pointe vers le serveur
+
+### 1. Cloner le repo
+
+```bash
+git clone https://github.com/hitsmotion1-ui/glupp.git
+cd glupp
+```
+
+### 2. Configurer les variables d'environnement
+
+```bash
+cp .env.production.example .env.production
+nano .env.production   # remplir les vraies cles Supabase
+```
+
+### 3. Lancer
+
+```bash
+docker compose up -d --build
+```
+
+### 4. Verifier
+
+```bash
+docker compose logs -f glupp
+# Attendre "Ready on http://0.0.0.0:3000"
+```
+
+Puis ouvrir `https://glupp.amithome.ovh` dans le navigateur.
+
+### Commandes utiles
+
+```bash
+docker compose logs -f glupp      # Logs en direct
+docker compose restart glupp      # Redemarrer
+docker compose up -d --build      # Rebuilder apres un changement
+docker compose down               # Arreter
+```
+
+### Dev avec VS Code Remote-SSH
+
+1. Se connecter au serveur via VS Code Remote-SSH
+2. Ouvrir le dossier du projet
+3. Editer les fichiers, puis `docker compose up -d --build` pour tester
+
+---
+
+## 📊 Couts estimes
 
 | Service | Gratuit jusqu'à | Coût après |
 |---------|----------------|------------|
