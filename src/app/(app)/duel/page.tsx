@@ -2,9 +2,6 @@
 
 import { useDuel } from "@/lib/hooks/useDuel";
 import { DuelCards } from "@/components/beer/DuelCards";
-import { BeerModal } from "@/components/beer/BeerModal";
-import { GluppModal } from "@/components/beer/GluppModal";
-import { XPToast } from "@/components/gamification/XPToast";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Swords, ArrowRight } from "lucide-react";
@@ -89,10 +86,6 @@ export default function DuelPage() {
         </Button>
       </div>
 
-      {/* Modals */}
-      <BeerModal />
-      <GluppModal onGlupped={refreshTasted} />
-      <XPToast />
     </div>
   );
 }

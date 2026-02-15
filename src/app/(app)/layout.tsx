@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/navigation/Header";
 import { TabBar } from "@/components/navigation/TabBar";
+import { GlobalModals } from "@/components/global/GlobalModals";
 
 export default async function AppLayout({
   children,
@@ -22,6 +23,7 @@ export default async function AppLayout({
       <Header />
       <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
       <TabBar />
+      <GlobalModals />
     </div>
   );
 }

@@ -3,9 +3,6 @@
 import { useRanking } from "@/lib/hooks/useRanking";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { BeerRow } from "@/components/beer/BeerRow";
-import { BeerModal } from "@/components/beer/BeerModal";
-import { GluppModal } from "@/components/beer/GluppModal";
-import { XPToast } from "@/components/gamification/XPToast";
 import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -101,10 +98,6 @@ export default function RankingPage() {
         </div>
       )}
 
-      {/* Modals */}
-      <BeerModal />
-      <GluppModal />
-      <XPToast />
     </div>
   );
 }
