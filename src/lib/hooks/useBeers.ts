@@ -1,36 +1,29 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/queries/queryKeys";
 import type { Beer } from "@/types";
 
 export function useBeers() {
-  const [beers, setBeers] = useState<Beer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: beers = [],
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: queryKeys.beers.all,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("beers")
+        .select("*")
+        .eq("is_active", true)
+        .order("elo", { ascending: false });
 
-  const fetchBeers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    const { data, error: fetchError } = await supabase
-      .from("beers")
-      .select("*")
-      .eq("is_active", true)
-      .order("elo", { ascending: false });
-
-    if (fetchError) {
-      setError(fetchError.message);
-    } else {
-      setBeers((data as Beer[]) || []);
-    }
-
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchBeers();
-  }, [fetchBeers]);
+      if (error) throw new Error(error.message);
+      return (data as Beer[]) || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const search = async (query: string): Promise<Beer[]> => {
     const { data } = await supabase.rpc("search_beers", {
@@ -45,5 +38,11 @@ export function useBeers() {
     return beers.find((b) => b.id === id);
   };
 
-  return { beers, loading, error, search, getBeer, refetch: fetchBeers };
+  return {
+    beers,
+    loading,
+    error: error?.message || null,
+    search,
+    getBeer,
+  };
 }

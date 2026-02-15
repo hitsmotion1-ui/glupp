@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { RarityBadge } from "./RarityBadge";
 import { TasteProfile } from "./TasteProfile";
 import { beerEmoji, formatNumber } from "@/lib/utils/xp";
+import { Lock } from "lucide-react";
 
 export function BeerModal() {
   const { selectedBeerId, closeBeerModal, openGluppModal } = useAppStore();
@@ -61,13 +62,40 @@ export function BeerModal() {
     <Modal
       isOpen={!!selectedBeerId}
       onClose={closeBeerModal}
-      title={beer.name}
+      title={tasted ? beer.name : "Biere non debloquee"}
     >
       {loading ? (
         <div className="py-8 text-center text-glupp-text-muted">
           Chargement...
         </div>
+      ) : !tasted ? (
+        // LOCKED STATE
+        <div className="flex flex-col items-center text-center py-4 space-y-4">
+          <div className="w-20 h-20 rounded-full bg-glupp-card-alt flex items-center justify-center">
+            <Lock size={32} className="text-glupp-text-muted" />
+          </div>
+          <div>
+            <p className="text-glupp-cream font-semibold mb-1">
+              Biere mysterieuse
+            </p>
+            <p className="text-xs text-glupp-text-muted max-w-xs">
+              Gluppe cette biere pour debloquer toutes ses informations et gagner de l&apos;XP !
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={() => {
+              closeBeerModal();
+              openGluppModal(beer.id);
+            }}
+          >
+            Glupper cette biere !
+          </Button>
+        </div>
       ) : (
+        // UNLOCKED STATE — full detail
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start gap-4">
@@ -139,28 +167,12 @@ export function BeerModal() {
             </div>
           )}
 
-          {/* CTA */}
-          {!tasted && (
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              onClick={() => {
-                closeBeerModal();
-                openGluppModal(beer.id);
-              }}
-            >
-              Glupper cette biere !
-            </Button>
-          )}
-
-          {tasted && (
-            <div className="text-center py-2">
-              <span className="text-glupp-success text-sm">
-                Deja dans ta collection
-              </span>
-            </div>
-          )}
+          {/* Already tasted badge */}
+          <div className="text-center py-2">
+            <span className="text-glupp-success text-sm">
+              Deja dans ta collection
+            </span>
+          </div>
         </div>
       )}
     </Modal>

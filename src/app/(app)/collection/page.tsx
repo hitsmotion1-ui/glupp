@@ -17,6 +17,8 @@ const RARITY_FILTERS: { key: Rarity | "all"; label: string }[] = [
   { key: "legendary", label: "Legendaires" },
 ];
 
+const RARITY_ORDER: Rarity[] = ["common", "rare", "epic", "legendary"];
+
 export default function CollectionPage() {
   const {
     filteredBeers,
@@ -60,6 +62,39 @@ export default function CollectionPage() {
           label={`${stats.percentage}% complete`}
           subLabel={`${stats.tasted} bieres gluppees`}
         />
+      </div>
+
+      {/* Rarity counters */}
+      <div className="grid grid-cols-4 gap-2 px-4 mb-4">
+        {RARITY_ORDER.map((rarity) => {
+          const config = RARITY_CONFIG[rarity];
+          const data = stats.byRarity[rarity];
+          return (
+            <button
+              key={rarity}
+              onClick={() =>
+                setFilter({
+                  ...filter,
+                  rarity: filter.rarity === rarity ? "all" : rarity,
+                })
+              }
+              className={`rounded-glupp p-2 text-center transition-all border ${
+                filter.rarity === rarity
+                  ? "border-current"
+                  : "border-transparent"
+              }`}
+              style={{ backgroundColor: `${config.color}18`, color: config.color }}
+            >
+              <p className="text-lg font-bold leading-tight">
+                {data?.tasted || 0}
+                <span className="text-xs font-normal opacity-60">
+                  /{data?.total || 0}
+                </span>
+              </p>
+              <p className="text-[9px] opacity-80">{config.label}</p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Search bar */}

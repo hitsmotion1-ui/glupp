@@ -1,33 +1,33 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/queries/queryKeys";
 import type { Beer } from "@/types";
 
 type SortBy = "elo" | "name" | "votes";
 
 export function useRanking() {
-  const [beers, setBeers] = useState<Beer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortBy>("elo");
   const [filterStyle, setFilterStyle] = useState<string | null>(null);
 
-  const fetchBeers = useCallback(async () => {
-    setLoading(true);
+  const {
+    data: beers = [],
+    isLoading: loading,
+  } = useQuery({
+    queryKey: queryKeys.ranking.all,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("beers")
+        .select("*")
+        .eq("is_active", true)
+        .order("elo", { ascending: false });
 
-    const { data } = await supabase
-      .from("beers")
-      .select("*")
-      .eq("is_active", true)
-      .order("elo", { ascending: false });
-
-    if (data) setBeers(data as Beer[]);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchBeers();
-  }, [fetchBeers]);
+      return (data as Beer[]) || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const availableStyles = useMemo(() => {
     const styles = new Set(beers.map((b) => b.style));
@@ -66,6 +66,5 @@ export function useRanking() {
     filterStyle,
     setFilterStyle,
     availableStyles,
-    refetch: fetchBeers,
   };
 }

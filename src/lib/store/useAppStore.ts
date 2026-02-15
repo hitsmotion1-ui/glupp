@@ -20,6 +20,17 @@ interface AppState {
   gluppModalBeerId: string | null;
   openGluppModal: (beerId: string) => void;
   closeGluppModal: () => void;
+
+  // Scanner & Search (shared between Header and FAB)
+  showScanner: boolean;
+  setShowScanner: (show: boolean) => void;
+  showSearch: boolean;
+  setShowSearch: (show: boolean) => void;
+
+  // Celebration overlay
+  showCelebration: boolean;
+  triggerCelebration: () => void;
+  clearCelebration: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -34,4 +45,13 @@ export const useAppStore = create<AppState>((set) => ({
   gluppModalBeerId: null,
   openGluppModal: (beerId) => set({ gluppModalBeerId: beerId }),
   closeGluppModal: () => set({ gluppModalBeerId: null }),
+
+  showScanner: false,
+  setShowScanner: (show) => set({ showScanner: show }),
+  showSearch: false,
+  setShowSearch: (show) => set({ showSearch: show }),
+
+  showCelebration: false,
+  triggerCelebration: () => set({ showCelebration: true }),
+  clearCelebration: () => set({ showCelebration: false }),
 }));

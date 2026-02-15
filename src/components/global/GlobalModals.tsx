@@ -7,9 +7,10 @@ import { BeerModal } from "@/components/beer/BeerModal";
 import { GluppModal } from "@/components/beer/GluppModal";
 import { BarcodeScanner } from "@/components/beer/BarcodeScanner";
 import { XPToast } from "@/components/gamification/XPToast";
+import { CelebrationOverlay } from "@/components/gamification/CelebrationOverlay";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
-import { Plus, ScanLine, Search, X } from "lucide-react";
+import { Plus, ScanLine, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { beerEmoji } from "@/lib/utils/xp";
 import type { Beer } from "@/types";
@@ -18,14 +19,16 @@ export function GlobalModals() {
   const openBeerModal = useAppStore((s) => s.openBeerModal);
   const openGluppModal = useAppStore((s) => s.openGluppModal);
 
+  // Scanner & Search from store (shared with Header)
+  const showScanner = useAppStore((s) => s.showScanner);
+  const setShowScanner = useAppStore((s) => s.setShowScanner);
+  const showSearch = useAppStore((s) => s.showSearch);
+  const setShowSearch = useAppStore((s) => s.setShowSearch);
+
   // FAB menu
   const [fabOpen, setFabOpen] = useState(false);
 
-  // Scanner
-  const [showScanner, setShowScanner] = useState(false);
-
-  // Search modal
-  const [showSearch, setShowSearch] = useState(false);
+  // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Beer[]>([]);
   const [searching, setSearching] = useState(false);
@@ -134,6 +137,7 @@ export function GlobalModals() {
       <BeerModal />
       <GluppModal />
       <XPToast />
+      <CelebrationOverlay />
 
       {/* FAB (Floating Action Button) */}
       <div className="fixed bottom-20 right-4 z-50 pb-[env(safe-area-inset-bottom,0px)]">

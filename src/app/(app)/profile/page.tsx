@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { Avatar } from "@/components/ui/Avatar";
@@ -7,13 +8,15 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { LevelBadge } from "@/components/gamification/LevelBadge";
+import { ProgressionTree } from "@/components/gamification/ProgressionTree";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Swords, Beer, Camera, LogOut } from "lucide-react";
+import { Swords, Beer, Camera, LogOut, ChevronDown, ChevronUp } from "lucide-react";
 import { formatNumber } from "@/lib/utils/xp";
 
 export default function ProfilePage() {
   const { signOut } = useAuth();
   const { profile, loading, level, nextLevel, progress } = useProfile();
+  const [showProgression, setShowProgression] = useState(false);
 
   if (loading) {
     return (
@@ -56,7 +59,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="py-6 px-4 space-y-6">
+    <div className="py-6 px-4 space-y-6 pb-24">
       {/* Avatar + Info */}
       <div className="flex flex-col items-center text-center">
         <Avatar
@@ -75,15 +78,23 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* XP Progress */}
-      <div>
+      {/* XP Progress — enhanced */}
+      <div className="bg-glupp-card rounded-glupp-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-glupp-cream">
+            {level.icon} {level.title}
+          </span>
+          <span className="text-xs text-glupp-text-muted">
+            {formatNumber(profile.xp)} XP
+          </span>
+        </div>
         <ProgressBar
           value={progress}
-          label={`${level.icon} ${level.title}`}
+          label=""
           subLabel={
             nextLevel
-              ? `${formatNumber(profile.xp)} / ${formatNumber(nextLevel.min)} XP`
-              : `${formatNumber(profile.xp)} XP (MAX)`
+              ? `${formatNumber(profile.xp)} / ${formatNumber(nextLevel.min)} XP pour le prochain niveau`
+              : "Niveau maximum atteint !"
           }
         />
       </div>
@@ -113,16 +124,39 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      {/* Sign Out */}
-      <div className="pt-4">
-        <Button
-          variant="ghost"
-          className="w-full text-glupp-error"
-          onClick={signOut}
+      {/* Progression Tree — collapsible */}
+      <div>
+        <button
+          onClick={() => setShowProgression(!showProgression)}
+          className="w-full flex items-center justify-between py-2 text-sm font-semibold text-glupp-cream"
         >
-          <LogOut size={16} className="mr-2" />
+          <span>Progression</span>
+          {showProgression ? (
+            <ChevronUp size={18} className="text-glupp-text-muted" />
+          ) : (
+            <ChevronDown size={18} className="text-glupp-text-muted" />
+          )}
+        </button>
+        {showProgression && <ProgressionTree xp={profile.xp} />}
+      </div>
+
+      {/* Trophies placeholder */}
+      <div className="bg-glupp-card rounded-glupp p-4 text-center">
+        <p className="text-sm text-glupp-text-soft mb-1">🏆 Trophees</p>
+        <p className="text-xs text-glupp-text-muted">
+          Bientot disponible — continue a glupper !
+        </p>
+      </div>
+
+      {/* Sign Out — small, at the bottom */}
+      <div className="pt-8">
+        <button
+          onClick={signOut}
+          className="flex items-center justify-center gap-2 mx-auto text-xs text-glupp-text-muted hover:text-glupp-error transition-colors"
+        >
+          <LogOut size={14} />
           Se deconnecter
-        </Button>
+        </button>
       </div>
     </div>
   );

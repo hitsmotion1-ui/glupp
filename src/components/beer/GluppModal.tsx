@@ -1,20 +1,19 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { supabase } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/queries/queryKeys";
 import type { Beer, Bar } from "@/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { beerEmoji } from "@/lib/utils/xp";
 import { Camera, X, MapPin, Plus, ChevronDown } from "lucide-react";
 
-interface GluppModalProps {
-  onGlupped?: () => void;
-}
-
-export function GluppModal({ onGlupped }: GluppModalProps) {
-  const { gluppModalBeerId, closeGluppModal, showXPToast } = useAppStore();
+export function GluppModal() {
+  const queryClient = useQueryClient();
+  const { gluppModalBeerId, closeGluppModal, showXPToast, triggerCelebration } = useAppStore();
   const [beer, setBeer] = useState<Beer | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,8 +186,15 @@ export function GluppModal({ onGlupped }: GluppModalProps) {
 
       const result = data as { xp_gained: number; rarity: string };
       showXPToast(result.xp_gained, "Glupp !");
+      triggerCelebration();
       closeGluppModal();
-      onGlupped?.();
+
+      // Cascade invalidation
+      queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
+      queryClient.invalidateQueries({ queryKey: queryKeys.duel.tastedBeers });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
     } catch (err) {
       setError("Une erreur est survenue.");
     } finally {

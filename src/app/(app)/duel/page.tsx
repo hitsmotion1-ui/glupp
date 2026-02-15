@@ -4,7 +4,8 @@ import { useDuel } from "@/lib/hooks/useDuel";
 import { DuelCards } from "@/components/beer/DuelCards";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Swords, ArrowRight } from "lucide-react";
+import { Swords, ArrowRight, Beer } from "lucide-react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function DuelPage() {
@@ -16,7 +17,6 @@ export default function DuelPage() {
     canDuel,
     generatePair,
     submitVote,
-    refreshTasted,
   } = useDuel();
 
   if (loading) {
@@ -34,13 +34,18 @@ export default function DuelPage() {
   if (!canDuel) {
     return (
       <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-        <Swords size={48} className="text-glupp-text-muted mb-4" />
+        <motion.div
+          animate={{ rotate: [0, -10, 10, -10, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}
+        >
+          <Swords size={56} className="text-glupp-accent mb-4" />
+        </motion.div>
         <h2 className="font-display text-xl font-bold text-glupp-cream mb-2">
-          Pas encore pret pour le duel !
+          L&apos;arene t&apos;attend !
         </h2>
         <p className="text-glupp-text-soft text-sm mb-6 max-w-xs">
-          Tu dois d&apos;abord gouter au moins 2 bieres.
-          Va dans ta collection pour ajouter tes premieres bieres.
+          Tu dois d&apos;abord gouter au moins 2 bieres pour lancer des duels.
+          Va glupper tes premieres bieres !
         </p>
         <Link href="/collection">
           <Button variant="primary" size="lg">
@@ -60,7 +65,7 @@ export default function DuelPage() {
           Laquelle tu preferes ?
         </h2>
         <p className="text-xs text-glupp-text-muted mt-1">
-          Choisis ta biere preferee
+          Choisis ta biere preferee pour mettre a jour le classement
         </p>
       </div>
 
@@ -86,6 +91,19 @@ export default function DuelPage() {
         </Button>
       </div>
 
+      {/* Suggestion link */}
+      <div className="mt-8 mx-4 p-3 bg-glupp-card-alt border border-glupp-border rounded-glupp text-center">
+        <p className="text-xs text-glupp-text-soft mb-2">
+          <Beer size={14} className="inline mr-1 text-glupp-accent" />
+          Envie de plus de duels ?
+        </p>
+        <Link
+          href="/collection"
+          className="text-xs text-glupp-accent font-medium hover:underline"
+        >
+          Gluppe de nouvelles bieres !
+        </Link>
+      </div>
     </div>
   );
 }

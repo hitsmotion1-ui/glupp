@@ -40,14 +40,18 @@ export function DuelCards({
         onClick={() => handleSelect(beer.id)}
         disabled={disabled || !!selected}
         animate={{
-          scale: isWinner ? 1.05 : isLoser ? 0.95 : 1,
-          opacity: isLoser ? 0.4 : 1,
+          scale: isWinner ? 1.08 : isLoser ? 0.9 : 1,
+          opacity: isLoser ? 0.35 : 1,
         }}
         transition={{ duration: 0.3 }}
-        className="flex-1 bg-glupp-card border border-glupp-border rounded-glupp-xl p-4 flex flex-col items-center text-center transition-all hover:border-glupp-accent/50 active:scale-[0.97] disabled:cursor-default"
+        className={`flex-1 bg-glupp-card rounded-glupp-xl p-4 flex flex-col items-center text-center transition-all active:scale-[0.97] disabled:cursor-default ${
+          isWinner
+            ? "border-2 border-glupp-gold shadow-lg shadow-glupp-gold/20"
+            : "border border-glupp-border hover:border-glupp-accent/50"
+        } ${isLoser ? "blur-[1px]" : ""}`}
       >
         {/* Emoji */}
-        <span className="text-5xl mb-3">{beerEmoji(beer.style)}</span>
+        <span className="text-6xl mb-3">{beerEmoji(beer.style)}</span>
 
         {/* Name */}
         <p className="font-display font-semibold text-glupp-cream text-sm leading-tight mb-1">
@@ -81,7 +85,7 @@ export function DuelCards({
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="mt-3 text-glupp-accent font-display font-bold text-sm"
+            className="mt-3 text-glupp-gold font-display font-bold text-sm"
           >
             Victoire !
           </motion.div>
@@ -98,9 +102,17 @@ export function DuelCards({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
-        className="flex gap-3 px-4"
+        className="relative flex gap-3 px-4"
       >
         {renderCard(beerA)}
+
+        {/* VS badge */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+          <div className="w-10 h-10 rounded-full bg-glupp-bg border-2 border-glupp-accent flex items-center justify-center shadow-lg">
+            <span className="text-xs font-bold text-glupp-accent">VS</span>
+          </div>
+        </div>
+
         {renderCard(beerB)}
       </motion.div>
     </AnimatePresence>

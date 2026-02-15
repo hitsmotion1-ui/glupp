@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Inter } from "next/font/google";
+import { QueryProvider } from "@/lib/providers/QueryProvider";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -33,7 +34,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className={`${bricolage.variable} ${inter.variable}`}>
-      <body>{children}</body>
+      <body>
+        <QueryProvider>{children}</QueryProvider>
+      </body>
     </html>
   );
 }

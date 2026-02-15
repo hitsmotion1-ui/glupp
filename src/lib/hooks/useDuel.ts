@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/queries/queryKeys";
 import { useAppStore } from "@/lib/store/useAppStore";
 import type { Beer } from "@/types";
 
@@ -12,46 +14,43 @@ interface DuelResult {
 }
 
 export function useDuel() {
-  const [beerA, setBeerA] = useState<Beer | null>(null);
-  const [beerB, setBeerB] = useState<Beer | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
-  const [canDuel, setCanDuel] = useState(false);
-  const [tastedBeers, setTastedBeers] = useState<Beer[]>([]);
-
+  const queryClient = useQueryClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
 
-  const fetchTastedBeers = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const [beerA, setBeerA] = useState<Beer | null>(null);
+  const [beerB, setBeerB] = useState<Beer | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
 
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  // Fetch tasted beers via React Query
+  const {
+    data: tastedBeers = [],
+    isLoading: loading,
+  } = useQuery({
+    queryKey: queryKeys.duel.tastedBeers,
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    const { data } = await supabase
-      .from("user_beers")
-      .select("beer_id, beers(*)")
-      .eq("user_id", user.id);
+      if (!user) return [];
 
-    if (data) {
-      const beers = (data as any[])
+      const { data } = await supabase
+        .from("user_beers")
+        .select("beer_id, beers(*)")
+        .eq("user_id", user.id);
+
+      if (!data) return [];
+
+      return (data as any[])
         .map((ub) => ub.beers)
         .flat()
         .filter((b): b is Beer => b !== null);
-      setTastedBeers(beers);
-      setCanDuel(beers.length >= 2);
-    }
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchTastedBeers();
-  }, [fetchTastedBeers]);
+  const canDuel = tastedBeers.length >= 2;
 
   const generatePair = useCallback(() => {
     if (tastedBeers.length < 2) return;
@@ -62,48 +61,58 @@ export function useDuel() {
     setDuelResult(null);
   }, [tastedBeers]);
 
+  // Auto-generate pair when tasted beers are loaded
   useEffect(() => {
-    if (tastedBeers.length >= 2) {
+    if (tastedBeers.length >= 2 && !beerA && !beerB) {
       generatePair();
     }
-  }, [tastedBeers, generatePair]);
+  }, [tastedBeers, generatePair, beerA, beerB]);
+
+  // Vote mutation
+  const voteMutation = useMutation({
+    mutationFn: async (winnerId: string) => {
+      if (!beerA || !beerB) throw new Error("Pas de duel en cours");
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) throw new Error("Non connecte");
+
+      const { data, error } = await supabase.rpc("process_duel", {
+        p_user_id: user.id,
+        p_beer_a_id: beerA.id,
+        p_beer_b_id: beerB.id,
+        p_winner_id: winnerId,
+      });
+
+      if (error) throw new Error(error.message);
+      return data as DuelResult;
+    },
+    onSuccess: (result) => {
+      setDuelResult(result);
+      showXPToast(result.xp_gained, "Duel");
+
+      // Invalidate ranking since ELOs changed
+      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
+      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
+
+      // Generate next pair after animation
+      setTimeout(() => {
+        generatePair();
+        setSubmitting(false);
+      }, 800);
+    },
+    onError: (err) => {
+      console.error("Duel error:", err.message);
+      setSubmitting(false);
+    },
+  });
 
   const submitVote = async (winnerId: string) => {
-    if (!beerA || !beerB) return;
-
     setSubmitting(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setSubmitting(false);
-      return;
-    }
-
-    const { data, error } = await supabase.rpc("process_duel", {
-      p_user_id: user.id,
-      p_beer_a_id: beerA.id,
-      p_beer_b_id: beerB.id,
-      p_winner_id: winnerId,
-    });
-
-    if (error) {
-      console.error("Duel error:", error.message);
-      setSubmitting(false);
-      return;
-    }
-
-    const result = data as DuelResult;
-    setDuelResult(result);
-    showXPToast(result.xp_gained, "Duel");
-
-    // Generate next pair after animation
-    setTimeout(() => {
-      generatePair();
-      setSubmitting(false);
-    }, 800);
+    voteMutation.mutate(winnerId);
   };
 
   return {
@@ -115,6 +124,7 @@ export function useDuel() {
     canDuel,
     generatePair,
     submitVote,
-    refreshTasted: fetchTastedBeers,
+    refreshTasted: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.duel.tastedBeers }),
   };
 }

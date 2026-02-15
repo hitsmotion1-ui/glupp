@@ -10,25 +10,37 @@ interface BeerRowProps {
   onClick: () => void;
 }
 
-const rankStyles: Record<number, string> = {
-  1: "text-glupp-gold",
-  2: "text-glupp-text-soft",
-  3: "text-glupp-accent",
+const MEDALS: Record<number, string> = {
+  1: "\u{1F947}",
+  2: "\u{1F948}",
+  3: "\u{1F949}",
 };
 
 export function BeerRow({ beer, rank, onClick }: BeerRowProps) {
+  const isTop3 = rank <= 3;
+
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-glupp-card/50 active:bg-glupp-card transition-colors border-b border-glupp-border/50 text-left"
+      className={`w-full flex items-center gap-3 px-4 py-3 transition-colors border-b border-glupp-border/50 text-left ${
+        isTop3
+          ? "bg-glupp-warm/15 hover:bg-glupp-warm/25"
+          : "hover:bg-glupp-card/50 active:bg-glupp-card"
+      }`}
     >
       {/* Rank */}
       <span
         className={`w-8 text-center font-display font-bold text-sm ${
-          rankStyles[rank] || "text-glupp-text-muted"
+          rank === 1
+            ? "text-glupp-gold"
+            : rank === 2
+            ? "text-glupp-text-soft"
+            : rank === 3
+            ? "text-glupp-accent"
+            : "text-glupp-text-muted"
         }`}
       >
-        {rank <= 3 ? ["", "👑", "🥈", "🥉"][rank] : `#${rank}`}
+        {MEDALS[rank] || `#${rank}`}
       </span>
 
       {/* Emoji */}

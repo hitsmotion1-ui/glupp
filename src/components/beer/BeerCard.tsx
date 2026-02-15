@@ -1,7 +1,7 @@
 "use client";
 
 import type { Beer } from "@/types";
-import { beerEmoji } from "@/lib/utils/xp";
+import { beerEmoji, RARITY_CONFIG, type Rarity } from "@/lib/utils/xp";
 import { RarityBadge } from "./RarityBadge";
 import { Lock } from "lucide-react";
 
@@ -12,38 +12,53 @@ interface BeerCardProps {
 }
 
 export function BeerCard({ beer, tasted, onClick }: BeerCardProps) {
+  const rarityColor = RARITY_CONFIG[beer.rarity as Rarity]?.color;
+
   return (
     <button
       onClick={onClick}
       className={`relative flex flex-col items-center p-3 rounded-glupp-lg border transition-all text-center ${
         tasted
           ? "bg-glupp-card border-glupp-border hover:border-glupp-text-muted active:scale-[0.97]"
-          : "bg-glupp-card/50 border-glupp-border/50 opacity-60 grayscale hover:opacity-80"
+          : "bg-glupp-card/40 border-glupp-border/40 hover:bg-glupp-card/60"
       }`}
+      style={
+        tasted && rarityColor
+          ? { backgroundColor: `${rarityColor}12` }
+          : undefined
+      }
     >
       {/* Emoji */}
-      <span className="text-3xl mb-2">{beerEmoji(beer.style)}</span>
+      <span className={`text-3xl mb-2 ${!tasted ? "grayscale opacity-40" : ""}`}>
+        {beerEmoji(beer.style)}
+      </span>
 
-      {/* Name */}
+      {/* Name — hidden for untasted */}
       <p className="text-xs font-semibold text-glupp-cream leading-tight line-clamp-2 mb-1">
-        {beer.name}
+        {tasted ? beer.name : "???"}
       </p>
 
-      {/* Brewery */}
+      {/* Brewery — hidden for untasted */}
       <p className="text-[10px] text-glupp-text-muted leading-tight line-clamp-1 mb-2">
-        {beer.brewery}
+        {tasted ? beer.brewery : "???"}
       </p>
 
-      {/* Country + Rarity */}
-      <div className="flex items-center gap-1">
-        <span className="text-xs">{beer.country}</span>
-        <RarityBadge rarity={beer.rarity} />
-      </div>
+      {/* Country + Rarity — only visible when tasted */}
+      {tasted ? (
+        <div className="flex items-center gap-1">
+          <span className="text-xs">{beer.country}</span>
+          <RarityBadge rarity={beer.rarity} />
+        </div>
+      ) : (
+        <div className="h-4" />
+      )}
 
       {/* Lock overlay for untasted */}
       {!tasted && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-glupp-lg">
-          <Lock size={16} className="text-glupp-text-muted" />
+        <div className="absolute inset-0 flex items-center justify-center rounded-glupp-lg pointer-events-none">
+          <div className="w-8 h-8 rounded-full bg-glupp-bg/80 flex items-center justify-center">
+            <Lock size={14} className="text-glupp-text-muted" />
+          </div>
         </div>
       )}
     </button>

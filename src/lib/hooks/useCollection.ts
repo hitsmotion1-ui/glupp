@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/queries/queryKeys";
 import { useAppStore } from "@/lib/store/useAppStore";
 import type { Beer, UserBeer, Rarity } from "@/types";
 
@@ -10,50 +12,58 @@ interface CollectionFilter {
   search: string;
 }
 
+interface CollectionData {
+  allBeers: Beer[];
+  collection: UserBeer[];
+}
+
 export function useCollection() {
-  const [collection, setCollection] = useState<UserBeer[]>([]);
-  const [allBeers, setAllBeers] = useState<Beer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const showXPToast = useAppStore((s) => s.showXPToast);
+
   const [filter, setFilter] = useState<CollectionFilter>({
     rarity: "all",
     search: "",
   });
 
-  const showXPToast = useAppStore((s) => s.showXPToast);
+  const {
+    data,
+    isLoading: loading,
+  } = useQuery({
+    queryKey: queryKeys.collection.all,
+    queryFn: async (): Promise<CollectionData> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+      // Fetch all beers
+      const { data: beersData } = await supabase
+        .from("beers")
+        .select("*")
+        .eq("is_active", true)
+        .order("rarity")
+        .order("name");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      const allBeers = (beersData as Beer[]) || [];
 
-    // Fetch all beers
-    const { data: beersData } = await supabase
-      .from("beers")
-      .select("*")
-      .eq("is_active", true)
-      .order("rarity")
-      .order("name");
+      // Fetch user's collection
+      let collection: UserBeer[] = [];
+      if (user) {
+        const { data: collectionData } = await supabase
+          .from("user_beers")
+          .select("*, beers(*)")
+          .eq("user_id", user.id);
 
-    if (beersData) setAllBeers(beersData as Beer[]);
+        if (collectionData) collection = collectionData as UserBeer[];
+      }
 
-    // Fetch user's collection
-    if (user) {
-      const { data: collectionData } = await supabase
-        .from("user_beers")
-        .select("*, beers(*)")
-        .eq("user_id", user.id);
+      return { allBeers, collection };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (collectionData) setCollection(collectionData as UserBeer[]);
-    }
-
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const allBeers = data?.allBeers || [];
+  const collection = data?.collection || [];
 
   const tastedIds = useMemo(
     () => new Set(collection.map((ub) => ub.beer_id)),
@@ -100,28 +110,43 @@ export function useCollection() {
     };
   }, [allBeers, tastedIds]);
 
+  // Glupp mutation with cascade invalidation
+  const gluppMutation = useMutation({
+    mutationFn: async ({
+      beerId,
+      barName,
+    }: {
+      beerId: string;
+      barName?: string;
+    }) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) throw new Error("Non connecte");
+
+      const { data, error } = await supabase.rpc("register_glupp", {
+        p_user_id: user.id,
+        p_beer_id: beerId,
+        p_bar_name: barName || null,
+      });
+
+      if (error) throw new Error(error.message);
+      return data as { xp_gained: number };
+    },
+    onSuccess: (result) => {
+      showXPToast(result.xp_gained, "Glupp !");
+      // Cascade invalidation: all related data
+      queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
+      queryClient.invalidateQueries({ queryKey: queryKeys.duel.tastedBeers });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
+    },
+  });
+
   const registerGlupp = async (beerId: string, barName?: string) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { data, error } = await supabase.rpc("register_glupp", {
-      p_user_id: user.id,
-      p_beer_id: beerId,
-      p_bar_name: barName || null,
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const result = data as { xp_gained: number };
-    showXPToast(result.xp_gained, "Glupp !");
-
-    // Refetch
-    await fetchData();
+    await gluppMutation.mutateAsync({ beerId, barName });
   };
 
   return {
@@ -134,6 +159,5 @@ export function useCollection() {
     filter,
     setFilter,
     registerGlupp,
-    refetch: fetchData,
   };
 }

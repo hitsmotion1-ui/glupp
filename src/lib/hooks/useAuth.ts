@@ -1,58 +1,73 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/queries/queryKeys";
 import type { User } from "@supabase/supabase-js";
 import type { Profile } from "@/types";
 
+interface AuthData {
+  user: User | null;
+  profile: Profile | null;
+}
+
 export function useAuth() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    if (data) setProfile(data as Profile);
-  }, []);
-
-  useEffect(() => {
-    const init = async () => {
+  const {
+    data,
+    isLoading: loading,
+  } = useQuery({
+    queryKey: queryKeys.auth.user,
+    queryFn: async (): Promise<AuthData> => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      setUser(user);
-      if (user) await fetchProfile(user.id);
-      setLoading(false);
-    };
+      if (!user) return { user: null, profile: null };
 
-    init();
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
+      return {
+        user,
+        profile: profileData ? (profileData as Profile) : null,
+      };
+    },
+    staleTime: Infinity,
+  });
+
+  // Listen for auth state changes and invalidate
+  useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
+    } = supabase.auth.onAuthStateChange(async () => {
+      // Invalidate auth query to trigger refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.user });
+      // Also invalidate profile since user changed
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
     });
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [queryClient]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Clear all queries on sign out
+    queryClient.clear();
     router.push("/login");
   };
 
-  return { user, profile, loading, signOut };
+  return {
+    user: data?.user ?? null,
+    profile: data?.profile ?? null,
+    loading,
+    signOut,
+  };
 }
