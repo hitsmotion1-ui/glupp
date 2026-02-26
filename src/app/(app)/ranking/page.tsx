@@ -1,7 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRanking } from "@/lib/hooks/useRanking";
 import { useAppStore } from "@/lib/store/useAppStore";
+import { supabase } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/queries/queryKeys";
 import { BeerRow } from "@/components/beer/BeerRow";
 import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -17,6 +21,27 @@ export default function RankingPage() {
     availableStyles,
   } = useRanking();
   const openBeerModal = useAppStore((s) => s.openBeerModal);
+
+  // Fetch user's tasted beer IDs
+  const { data: tastedIds } = useQuery({
+    queryKey: [...queryKeys.collection.all, "tasted-ids"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return new Set<string>();
+
+      const { data } = await supabase
+        .from("user_beers")
+        .select("beer_id")
+        .eq("user_id", user.id);
+
+      return new Set((data || []).map((ub) => ub.beer_id));
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const tastedSet = useMemo(() => tastedIds || new Set<string>(), [tastedIds]);
 
   if (loading) {
     return (
@@ -88,6 +113,7 @@ export default function RankingPage() {
             beer={beer}
             rank={index + 1}
             onClick={() => openBeerModal(beer.id)}
+            tasted={tastedSet.has(beer.id)}
           />
         ))}
       </div>

@@ -3,11 +3,13 @@
 import type { Beer } from "@/types";
 import { beerEmoji, formatNumber } from "@/lib/utils/xp";
 import { RarityBadge } from "./RarityBadge";
+import { Check } from "lucide-react";
 
 interface BeerRowProps {
   beer: Beer;
   rank: number;
   onClick: () => void;
+  tasted?: boolean;
 }
 
 const MEDALS: Record<number, string> = {
@@ -16,7 +18,7 @@ const MEDALS: Record<number, string> = {
   3: "\u{1F949}",
 };
 
-export function BeerRow({ beer, rank, onClick }: BeerRowProps) {
+export function BeerRow({ beer, rank, onClick, tasted }: BeerRowProps) {
   const isTop3 = rank <= 3;
 
   return (
@@ -24,7 +26,7 @@ export function BeerRow({ beer, rank, onClick }: BeerRowProps) {
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-3 transition-colors border-b border-glupp-border/50 text-left ${
         isTop3
-          ? "bg-glupp-warm/15 hover:bg-glupp-warm/25"
+          ? "bg-glupp-warm/15 hover:bg-glupp-warm/25 active:bg-glupp-warm/35"
           : "hover:bg-glupp-card/50 active:bg-glupp-card"
       }`}
     >
@@ -48,9 +50,16 @@ export function BeerRow({ beer, rank, onClick }: BeerRowProps) {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-glupp-cream truncate">
-          {beer.name}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-semibold text-glupp-cream truncate">
+            {beer.name}
+          </p>
+          {tasted && (
+            <span className="shrink-0 w-4 h-4 rounded-full bg-glupp-success/20 flex items-center justify-center">
+              <Check size={10} className="text-glupp-success" />
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-glupp-text-muted truncate">
             {beer.brewery}

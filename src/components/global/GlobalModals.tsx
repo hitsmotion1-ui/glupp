@@ -139,49 +139,72 @@ export function GlobalModals() {
       <XPToast />
       <CelebrationOverlay />
 
+      {/* Close FAB backdrop */}
+      <AnimatePresence>
+        {fabOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/30"
+            onClick={() => setFabOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* FAB (Floating Action Button) */}
       <div className="fixed bottom-20 right-4 z-50 pb-[env(safe-area-inset-bottom,0px)]">
         <AnimatePresence>
           {fabOpen && (
             <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.9 }}
-              className="flex flex-col gap-2 mb-3"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col gap-2.5 mb-3 items-end"
             >
               {/* Scanner option */}
-              <button
+              <motion.button
+                initial={{ opacity: 0, y: 15, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 15, scale: 0.8 }}
+                transition={{ delay: 0.05 }}
                 onClick={() => {
                   setFabOpen(false);
                   setShowScanner(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-glupp-card border border-glupp-border rounded-full shadow-glupp text-sm text-glupp-cream hover:border-glupp-accent transition-colors whitespace-nowrap ml-auto"
+                className="flex items-center gap-2.5 px-4 py-2.5 bg-glupp-card/90 backdrop-blur-sm border border-glupp-accent/30 rounded-full shadow-lg text-sm text-glupp-cream hover:border-glupp-accent transition-colors whitespace-nowrap"
               >
                 <ScanLine className="w-4 h-4 text-glupp-accent" />
-                Scanner
-              </button>
+                Scanner une etiquette
+              </motion.button>
 
-              {/* Search option */}
-              <button
+              {/* Glupper option — slightly bigger, primary action */}
+              <motion.button
+                initial={{ opacity: 0, y: 15, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 15, scale: 0.8 }}
+                transition={{ delay: 0 }}
                 onClick={() => {
                   setFabOpen(false);
                   setShowSearch(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-glupp-card border border-glupp-border rounded-full shadow-glupp text-sm text-glupp-cream hover:border-glupp-accent transition-colors whitespace-nowrap ml-auto"
+                className="flex items-center gap-2.5 px-5 py-3 bg-glupp-card/90 backdrop-blur-sm border border-glupp-accent/30 rounded-full shadow-lg text-sm font-medium text-glupp-cream hover:border-glupp-accent transition-colors whitespace-nowrap"
               >
-                <Search className="w-4 h-4 text-glupp-accent" />
-                Chercher
-              </button>
+                <span className="text-base">🍺</span>
+                Glupper une biere
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* FAB button */}
-        <button
+        {/* FAB button with rotation animation */}
+        <motion.button
           onClick={() => setFabOpen(!fabOpen)}
-          className={`flex items-center justify-center w-14 h-14 rounded-full shadow-glupp-accent transition-all ml-auto ${
+          animate={{ rotate: fabOpen ? 45 : 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className={`flex items-center justify-center w-14 h-14 rounded-full shadow-glupp-accent transition-colors ml-auto ${
             fabOpen
-              ? "bg-glupp-card border border-glupp-border rotate-45"
+              ? "bg-glupp-card border border-glupp-border"
               : "bg-glupp-accent"
           }`}
         >
@@ -190,16 +213,8 @@ export function GlobalModals() {
               fabOpen ? "text-glupp-cream" : "text-glupp-bg"
             }`}
           />
-        </button>
+        </motion.button>
       </div>
-
-      {/* Close FAB when clicking elsewhere */}
-      {fabOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setFabOpen(false)}
-        />
-      )}
 
       {/* Scanner overlay */}
       {showScanner && (
@@ -217,7 +232,7 @@ export function GlobalModals() {
           setSearchQuery("");
           setSearchResults([]);
         }}
-        title="Chercher une biere"
+        title="Glupper une biere"
       >
         <div className="space-y-3">
           {/* Search input */}
