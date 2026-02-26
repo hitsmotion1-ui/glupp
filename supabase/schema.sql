@@ -424,9 +424,10 @@ BEGIN
     RAISE EXCEPTION 'Tu n''as pas encore gluppé cette bière !';
   END IF;
 
-  -- XP dégressif : 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 0...
-  IF v_count <= 1 THEN v_xp_gain := 3;
-  ELSIF v_count <= 3 THEN v_xp_gain := 2;
+  -- XP dégressif : 5, 3, 3, 2, 2, 2, 1, 1, 1, 1, 0...
+  IF v_count <= 1 THEN v_xp_gain := 5;
+  ELSIF v_count <= 3 THEN v_xp_gain := 3;
+  ELSIF v_count <= 6 THEN v_xp_gain := 2;
   ELSIF v_count <= 10 THEN v_xp_gain := 1;
   ELSE v_xp_gain := 0;
   END IF;

@@ -123,10 +123,11 @@ export function BeerModal() {
     setRegluppLoading(false);
   };
 
-  // XP for next re-glupp
+  // XP for next re-glupp (aligned with SQL: 5, 3, 2, 1, 0)
   const regluppXP = (count: number): number => {
-    if (count <= 1) return 3;
-    if (count <= 3) return 2;
+    if (count <= 1) return 5;
+    if (count <= 3) return 3;
+    if (count <= 6) return 2;
     if (count <= 10) return 1;
     return 0;
   };
