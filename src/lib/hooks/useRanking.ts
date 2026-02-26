@@ -18,13 +18,26 @@ export function useRanking() {
   } = useQuery({
     queryKey: queryKeys.ranking.all,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("beers")
-        .select("*")
-        .eq("is_active", true)
-        .order("elo", { ascending: false });
+      // Fetch ALL beers with pagination (Supabase default limit = 1000)
+      let allBeers: Beer[] = [];
+      const PAGE_SIZE = 1000;
+      let page = 0;
 
-      return (data as Beer[]) || [];
+      while (true) {
+        const { data } = await supabase
+          .from("beers")
+          .select("*")
+          .eq("is_active", true)
+          .order("elo", { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (!data || data.length === 0) break;
+        allBeers = allBeers.concat(data as Beer[]);
+        if (data.length < PAGE_SIZE) break;
+        page++;
+      }
+
+      return allBeers;
     },
     staleTime: 5 * 60 * 1000,
   });

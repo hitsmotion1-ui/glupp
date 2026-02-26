@@ -36,25 +36,41 @@ export function useCollection() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      // Fetch all beers
-      const { data: beersData } = await supabase
-        .from("beers")
-        .select("*")
-        .eq("is_active", true)
-        .order("rarity")
-        .order("name");
+      // Fetch ALL beers with pagination (Supabase default limit = 1000)
+      let allBeers: Beer[] = [];
+      const PAGE_SIZE = 1000;
+      let page = 0;
 
-      const allBeers = (beersData as Beer[]) || [];
+      while (true) {
+        const { data: beersData } = await supabase
+          .from("beers")
+          .select("*")
+          .eq("is_active", true)
+          .order("name")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      // Fetch user's collection
+        if (!beersData || beersData.length === 0) break;
+        allBeers = allBeers.concat(beersData as Beer[]);
+        if (beersData.length < PAGE_SIZE) break;
+        page++;
+      }
+
+      // Fetch user's collection (also paginated)
       let collection: UserBeer[] = [];
       if (user) {
-        const { data: collectionData } = await supabase
-          .from("user_beers")
-          .select("*, beers(*)")
-          .eq("user_id", user.id);
+        let collPage = 0;
+        while (true) {
+          const { data: collectionData } = await supabase
+            .from("user_beers")
+            .select("*, beers(*)")
+            .eq("user_id", user.id)
+            .range(collPage * PAGE_SIZE, (collPage + 1) * PAGE_SIZE - 1);
 
-        if (collectionData) collection = collectionData as UserBeer[];
+          if (!collectionData || collectionData.length === 0) break;
+          collection = collection.concat(collectionData as UserBeer[]);
+          if (collectionData.length < PAGE_SIZE) break;
+          collPage++;
+        }
       }
 
       return { allBeers, collection };
