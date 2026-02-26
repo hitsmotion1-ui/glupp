@@ -43,6 +43,7 @@ export interface UserBeer {
   bar_name: string | null;
   notes: string | null;
   rating: number | null;
+  glupp_count: number;
   // Joined
   beer?: Beer;
 }

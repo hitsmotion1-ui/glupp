@@ -79,6 +79,7 @@ CREATE TABLE user_beers (
   bar_name TEXT,                -- Où la bière a été bue
   notes TEXT,                   -- Note personnelle
   rating INTEGER CHECK (rating BETWEEN 1 AND 5),  -- Note perso (pas ELO)
+  glupp_count INTEGER DEFAULT 1, -- Nombre de fois bue
   UNIQUE(user_id, beer_id)
 );
 
@@ -400,6 +401,57 @@ BEGIN
     'xp_gained', v_xp_gain,
     'rarity', v_beer_rarity,
     'tags_count', COALESCE(array_length(p_tagged_users, 1), 0)
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─── Re-Glupp (bière déjà dans la collection) ───
+CREATE OR REPLACE FUNCTION register_reglupp(
+  p_user_id UUID,
+  p_beer_id UUID,
+  p_bar_name TEXT DEFAULT NULL,
+  p_geo_lat DECIMAL DEFAULT NULL,
+  p_geo_lng DECIMAL DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_count INTEGER;
+  v_xp_gain INTEGER;
+BEGIN
+  -- Vérifier que la bière est dans la collection
+  SELECT glupp_count INTO v_count FROM user_beers WHERE user_id = p_user_id AND beer_id = p_beer_id;
+  IF v_count IS NULL THEN
+    RAISE EXCEPTION 'Tu n''as pas encore gluppé cette bière !';
+  END IF;
+
+  -- XP dégressif : 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 0...
+  IF v_count <= 1 THEN v_xp_gain := 3;
+  ELSIF v_count <= 3 THEN v_xp_gain := 2;
+  ELSIF v_count <= 10 THEN v_xp_gain := 1;
+  ELSE v_xp_gain := 0;
+  END IF;
+
+  -- Incrémenter le compteur
+  UPDATE user_beers SET
+    glupp_count = glupp_count + 1,
+    bar_name = COALESCE(p_bar_name, bar_name),
+    geo_lat = COALESCE(p_geo_lat, geo_lat),
+    geo_lng = COALESCE(p_geo_lng, geo_lng)
+  WHERE user_id = p_user_id AND beer_id = p_beer_id;
+
+  -- XP
+  IF v_xp_gain > 0 THEN
+    UPDATE profiles SET xp = xp + v_xp_gain, updated_at = NOW() WHERE id = p_user_id;
+  END IF;
+
+  -- Activité
+  INSERT INTO activities (user_id, type, beer_id, geo_lat, geo_lng, metadata)
+  VALUES (p_user_id, 'glupp', p_beer_id, p_geo_lat, p_geo_lng,
+    jsonb_build_object('xp', v_xp_gain, 'bar', p_bar_name, 'reglupp', true, 'count', v_count + 1));
+
+  RETURN jsonb_build_object(
+    'xp_gained', v_xp_gain,
+    'glupp_count', v_count + 1
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

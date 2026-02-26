@@ -33,9 +33,13 @@ export function BeerCard({ beer, tasted, onClick }: BeerCardProps) {
         {beerEmoji(beer.style)}
       </span>
 
-      {/* Name — hidden for untasted */}
-      <p className="text-xs font-semibold text-glupp-cream leading-tight line-clamp-2 mb-1">
-        {tasted ? beer.name : "???"}
+      {/* Name — always visible now */}
+      <p
+        className={`text-xs font-semibold leading-tight line-clamp-2 mb-1 ${
+          tasted ? "text-glupp-cream" : "text-glupp-text-muted"
+        }`}
+      >
+        {beer.name}
       </p>
 
       {/* Brewery — hidden for untasted */}
@@ -43,21 +47,17 @@ export function BeerCard({ beer, tasted, onClick }: BeerCardProps) {
         {tasted ? beer.brewery : "???"}
       </p>
 
-      {/* Country + Rarity — only visible when tasted */}
-      {tasted ? (
-        <div className="flex items-center gap-1">
-          <span className="text-xs">{beer.country}</span>
-          <RarityBadge rarity={beer.rarity} />
-        </div>
-      ) : (
-        <div className="h-4" />
-      )}
+      {/* Country + Rarity — rarity always visible, country only when tasted */}
+      <div className="flex items-center gap-1">
+        {tasted && <span className="text-xs">{beer.country}</span>}
+        <RarityBadge rarity={beer.rarity} />
+      </div>
 
-      {/* Lock overlay for untasted */}
+      {/* Lock overlay for untasted — smaller, bottom-right */}
       {!tasted && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-glupp-lg pointer-events-none">
-          <div className="w-8 h-8 rounded-full bg-glupp-bg/80 flex items-center justify-center">
-            <Lock size={14} className="text-glupp-text-muted" />
+        <div className="absolute top-2 right-2">
+          <div className="w-5 h-5 rounded-full bg-glupp-bg/80 flex items-center justify-center">
+            <Lock size={10} className="text-glupp-text-muted" />
           </div>
         </div>
       )}

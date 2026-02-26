@@ -18,8 +18,11 @@ import {
   Navigation,
   Zap,
   CheckCircle,
+  Home,
 } from "lucide-react";
 import { motion } from "framer-motion";
+
+type LocationType = "bar" | "home" | "other" | null;
 
 export function GluppModal() {
   const queryClient = useQueryClient();
@@ -39,6 +42,10 @@ export function GluppModal() {
   const [geoLng, setGeoLng] = useState<number | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoCity, setGeoCity] = useState<string | null>(null);
+
+  // Location state (where did you drink it?)
+  const [locationType, setLocationType] = useState<LocationType>(null);
 
   // Bar state
   const [bars, setBars] = useState<Bar[]>([]);
@@ -47,6 +54,9 @@ export function GluppModal() {
   const [newBarName, setNewBarName] = useState("");
   const [newBarCity, setNewBarCity] = useState("");
   const [barsLoading, setBarsLoading] = useState(false);
+
+  // Home city
+  const [homeCity, setHomeCity] = useState("");
 
   // Fetch beer + bars when modal opens
   useEffect(() => {
@@ -61,6 +71,9 @@ export function GluppModal() {
       setGeoLat(null);
       setGeoLng(null);
       setGeoError(null);
+      setGeoCity(null);
+      setLocationType(null);
+      setHomeCity("");
       setError(null);
       return;
     }
@@ -120,10 +133,35 @@ export function GluppModal() {
     setGeoLoading(true);
     setGeoError(null);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setGeoLat(position.coords.latitude);
-        setGeoLng(position.coords.longitude);
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setGeoLat(lat);
+        setGeoLng(lng);
         setGeoLoading(false);
+
+        // Reverse geocode to get city name
+        try {
+          const resp = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`
+          );
+          const data = await resp.json();
+          const city =
+            data?.address?.city ||
+            data?.address?.town ||
+            data?.address?.village ||
+            data?.address?.municipality ||
+            null;
+          if (city) {
+            setGeoCity(city);
+            // Auto-fill home city if location is "home"
+            if (locationType === "home" && !homeCity) {
+              setHomeCity(city);
+            }
+          }
+        } catch {
+          // Reverse geocode failed — no biggie
+        }
       },
       () => {
         setGeoError("Position refusee");
@@ -138,6 +176,7 @@ export function GluppModal() {
     setGeoLat(null);
     setGeoLng(null);
     setGeoError(null);
+    setGeoCity(null);
   };
 
   // Handle bar selection
@@ -154,19 +193,21 @@ export function GluppModal() {
     }
   };
 
-  // XP preview calculation
-  const computeXPPreview = () => {
-    let xp = 5; // base scan
-    if (photoFile && geoLat) xp = 40; // photo + geo
-    else if (photoFile) xp = 20; // photo only
-
-    // Rarity bonus
+  // XP calculation — clear breakdown
+  const computeXP = () => {
+    // Base XP (always earned)
     const rarity = beer?.rarity as Rarity;
-    if (rarity === "rare") xp += 10;
-    else if (rarity === "epic") xp += 30;
-    else if (rarity === "legendary") xp += 50;
+    let base = 5;
+    if (rarity === "rare") base += 10;
+    else if (rarity === "epic") base += 30;
+    else if (rarity === "legendary") base += 50;
 
-    return xp;
+    // Photo bonus
+    const photoBonus = photoFile ? 15 : 0;
+    // Geo bonus (only if photo taken too)
+    const geoBonus = photoFile && geoLat ? 20 : 0;
+
+    return { base, photoBonus, geoBonus, total: base + photoBonus + geoBonus };
   };
 
   // Main submit
@@ -202,7 +243,6 @@ export function GluppModal() {
           });
 
         if (uploadError) {
-          // Storage bucket might not exist yet — continue without photo
           console.warn("Photo upload failed:", uploadError.message);
         } else {
           const {
@@ -212,25 +252,29 @@ export function GluppModal() {
         }
       }
 
-      // 2. Create new bar if needed
+      // 2. Determine bar name
       let barName: string | null = null;
 
-      if (showNewBar && newBarName.trim()) {
-        const { data: newBar, error: barError } = await supabase
-          .from("bars")
-          .insert({
-            name: newBarName.trim(),
-            city: newBarCity.trim() || null,
-          })
-          .select()
-          .single();
+      if (locationType === "bar") {
+        if (showNewBar && newBarName.trim()) {
+          const { data: newBar, error: barError } = await supabase
+            .from("bars")
+            .insert({
+              name: newBarName.trim(),
+              city: newBarCity.trim() || null,
+            })
+            .select()
+            .single();
 
-        if (!barError && newBar) {
-          barName = (newBar as Bar).name;
+          if (!barError && newBar) {
+            barName = (newBar as Bar).name;
+          }
+        } else if (selectedBarId) {
+          const selectedBar = bars.find((b) => b.id === selectedBarId);
+          barName = selectedBar?.name || null;
         }
-      } else if (selectedBarId) {
-        const selectedBar = bars.find((b) => b.id === selectedBarId);
-        barName = selectedBar?.name || null;
+      } else if (locationType === "home") {
+        barName = `Chez moi${homeCity ? ` (${homeCity})` : geoCity ? ` (${geoCity})` : ""}`;
       }
 
       // 3. Register glupp
@@ -270,7 +314,7 @@ export function GluppModal() {
   if (!beer) return null;
 
   const rarityConfig = RARITY_CONFIG[beer.rarity as Rarity];
-  const xpPreview = computeXPPreview();
+  const xp = computeXP();
 
   return (
     <Modal
@@ -293,39 +337,109 @@ export function GluppModal() {
           <RarityBadge rarity={beer.rarity} />
         </div>
 
-        {/* XP Preview */}
-        <motion.div
-          key={xpPreview}
-          initial={{ scale: 0.95 }}
-          animate={{ scale: 1 }}
-          className="flex items-center justify-center gap-2 py-2 px-3 rounded-glupp text-sm font-semibold"
-          style={{
-            backgroundColor: `${rarityConfig.color}15`,
-            color: rarityConfig.color,
-          }}
-        >
-          <Zap size={16} />
-          <span>+{xpPreview} XP</span>
-          {!photoFile && (
-            <span className="text-xs font-normal opacity-70">
-              (+{geoLat ? 35 : 15} avec photo)
-            </span>
-          )}
-          {photoFile && !geoLat && (
-            <span className="text-xs font-normal opacity-70">
-              (+20 avec position)
-            </span>
-          )}
-        </motion.div>
+        {/* ── Où tu l'as bue ? ── */}
+        <div>
+          <label className="block text-sm text-glupp-text-soft mb-2">
+            <MapPin className="inline w-3.5 h-3.5 mr-1" />
+            Ou tu l&apos;as bue ?
+          </label>
 
-        {/* Photo section — optional */}
+          {/* Location type selector */}
+          <div className="flex gap-2 mb-2">
+            {[
+              { type: "bar" as LocationType, label: "Dans un bar", icon: "🍻" },
+              { type: "home" as LocationType, label: "Chez moi", icon: "🏠" },
+            ].map((opt) => (
+              <button
+                key={opt.type}
+                onClick={() =>
+                  setLocationType(locationType === opt.type ? null : opt.type)
+                }
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-glupp border text-sm transition-all ${
+                  locationType === opt.type
+                    ? "border-glupp-accent bg-glupp-accent/10 text-glupp-cream"
+                    : "border-glupp-border bg-glupp-bg text-glupp-text-muted hover:border-glupp-accent/50"
+                }`}
+              >
+                <span>{opt.icon}</span>
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Bar selector — only when "Dans un bar" selected */}
+          {locationType === "bar" && (
+            <div className="space-y-2">
+              <div className="relative">
+                <select
+                  value={showNewBar ? "__new__" : selectedBarId || ""}
+                  onChange={(e) => handleBarChange(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream appearance-none focus:outline-none focus:border-glupp-accent transition-colors"
+                >
+                  <option value="">-- Choisir un bar --</option>
+                  {bars.map((bar) => (
+                    <option key={bar.id} value={bar.id}>
+                      {bar.name}
+                      {bar.city ? ` (${bar.city})` : ""}
+                    </option>
+                  ))}
+                  <option value="__new__">+ Ajouter un bar</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-glupp-text-muted pointer-events-none" />
+              </div>
+
+              {/* New bar form */}
+              {showNewBar && (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={newBarName}
+                    onChange={(e) => setNewBarName(e.target.value)}
+                    placeholder="Nom du bar"
+                    className="w-full px-4 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
+                  />
+                  <input
+                    type="text"
+                    value={newBarCity}
+                    onChange={(e) => setNewBarCity(e.target.value)}
+                    placeholder="Ville"
+                    className="w-full px-4 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Home city — when "Chez moi" selected */}
+          {locationType === "home" && (
+            <div className="flex items-center gap-2">
+              <Home size={14} className="text-glupp-text-muted shrink-0" />
+              <input
+                type="text"
+                value={homeCity || geoCity || ""}
+                onChange={(e) => setHomeCity(e.target.value)}
+                placeholder="Ville (optionnel)"
+                className="flex-1 px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
+              />
+              {geoCity && !homeCity && (
+                <span className="text-[10px] text-glupp-success whitespace-nowrap">
+                  Auto
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Photo section — optional ── */}
         <div>
           <label className="flex items-center justify-between text-sm text-glupp-text-soft mb-2">
             <span>
               <Camera size={14} className="inline mr-1.5" />
               Photo
             </span>
-            <span className="text-[10px] text-glupp-accent">+15 XP</span>
+            <span className="text-[10px] text-glupp-accent font-medium">
+              +15 XP
+            </span>
           </label>
 
           {photoPreview ? (
@@ -343,7 +457,7 @@ export function GluppModal() {
               </button>
               <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 bg-glupp-success/80 rounded-full text-white text-[10px]">
                 <CheckCircle size={10} />
-                Photo ajoutee
+                +15 XP
               </div>
             </div>
           ) : (
@@ -354,7 +468,9 @@ export function GluppModal() {
               <Camera size={22} />
               <div className="text-left">
                 <p className="text-sm">Prendre une photo</p>
-                <p className="text-[10px] opacity-60">Optionnel mais recommande</p>
+                <p className="text-[10px] opacity-60">
+                  Optionnel mais recommande
+                </p>
               </div>
             </button>
           )}
@@ -369,15 +485,15 @@ export function GluppModal() {
           />
         </div>
 
-        {/* Geolocation — optional */}
+        {/* ── Geolocation — optional, requires photo for XP ── */}
         <div>
           <label className="flex items-center justify-between text-sm text-glupp-text-soft mb-2">
             <span>
               <Navigation size={14} className="inline mr-1.5" />
               Position
             </span>
-            <span className="text-[10px] text-glupp-accent">
-              {photoFile ? "+20 XP" : "+0 XP"}
+            <span className="text-[10px] text-glupp-accent font-medium">
+              {photoFile ? "+20 XP" : "+20 XP avec photo"}
             </span>
           </label>
 
@@ -385,7 +501,14 @@ export function GluppModal() {
             <div className="flex items-center justify-between px-4 py-2.5 bg-glupp-success/10 border border-glupp-success/30 rounded-glupp">
               <div className="flex items-center gap-2 text-sm text-glupp-success">
                 <CheckCircle size={14} />
-                <span>Position enregistree</span>
+                <span>
+                  Position enregistree
+                  {geoCity && (
+                    <span className="text-glupp-text-muted ml-1">
+                      ({geoCity})
+                    </span>
+                  )}
+                </span>
               </div>
               <button
                 onClick={removeGeo}
@@ -410,58 +533,60 @@ export function GluppModal() {
           )}
         </div>
 
-        {/* Bar selection */}
-        <div>
-          <label className="block text-sm text-glupp-text-soft mb-2">
-            <MapPin className="inline w-3.5 h-3.5 mr-1" />
-            Ou tu l&apos;as bue ? (optionnel)
-          </label>
-
-          <div className="relative">
-            <select
-              value={showNewBar ? "__new__" : selectedBarId || ""}
-              onChange={(e) => handleBarChange(e.target.value)}
-              className="w-full px-4 py-2.5 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream appearance-none focus:outline-none focus:border-glupp-accent transition-colors"
+        {/* ── XP Summary bar ── */}
+        <motion.div
+          key={xp.total}
+          initial={{ scale: 0.95 }}
+          animate={{ scale: 1 }}
+          className="rounded-glupp p-3"
+          style={{
+            backgroundColor: `${rarityConfig.color}12`,
+            borderLeft: `3px solid ${rarityConfig.color}`,
+          }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span
+              className="text-xs font-medium"
+              style={{ color: rarityConfig.color }}
             >
-              <option value="">-- Aucun bar --</option>
-              {bars.map((bar) => (
-                <option key={bar.id} value={bar.id}>
-                  {bar.name}
-                  {bar.city ? ` (${bar.city})` : ""}
-                </option>
-              ))}
-              <option value="__new__">+ Ajouter un bar</option>
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-glupp-text-muted pointer-events-none" />
+              <Zap size={12} className="inline mr-1" />
+              XP total
+            </span>
+            <span
+              className="text-lg font-bold font-mono"
+              style={{ color: rarityConfig.color }}
+            >
+              +{xp.total}
+            </span>
           </div>
-
-          {/* New bar form */}
-          {showNewBar && (
-            <div className="mt-2 space-y-2">
-              <input
-                type="text"
-                value={newBarName}
-                onChange={(e) => setNewBarName(e.target.value)}
-                placeholder="Nom du bar"
-                className="w-full px-4 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-              />
-              <input
-                type="text"
-                value={newBarCity}
-                onChange={(e) => setNewBarCity(e.target.value)}
-                placeholder="Ville (optionnel)"
-                className="w-full px-4 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-              />
-            </div>
-          )}
-        </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-glupp-text-muted">
+            <span>Base : +5</span>
+            {beer.rarity !== "common" && (
+              <span style={{ color: rarityConfig.color }}>
+                Rarete : +{xp.base - 5}
+              </span>
+            )}
+            {xp.photoBonus > 0 && (
+              <span className="text-glupp-success">Photo : +15</span>
+            )}
+            {xp.geoBonus > 0 && (
+              <span className="text-glupp-success">Position : +20</span>
+            )}
+            {!photoFile && (
+              <span className="opacity-50">Photo : +15</span>
+            )}
+            {!(photoFile && geoLat) && (
+              <span className="opacity-50">Pos. : +20</span>
+            )}
+          </div>
+        </motion.div>
 
         {/* Error */}
         {error && (
           <p className="text-glupp-error text-sm text-center">{error}</p>
         )}
 
-        {/* Confirm button */}
+        {/* Confirm button — shows only base XP */}
         <Button
           variant="primary"
           size="lg"
@@ -470,7 +595,7 @@ export function GluppModal() {
           onClick={handleGlupp}
           disabled={loading}
         >
-          Confirmer le Glupp ! (+{xpPreview} XP)
+          Confirmer le Glupp ! (+{xp.total} XP)
         </Button>
       </div>
     </Modal>
