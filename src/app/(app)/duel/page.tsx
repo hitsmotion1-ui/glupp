@@ -4,7 +4,7 @@ import { useDuel } from "@/lib/hooks/useDuel";
 import { DuelCards } from "@/components/beer/DuelCards";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Swords, ArrowRight, Beer } from "lucide-react";
+import { Swords, ArrowRight, Beer, Flame } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -15,6 +15,10 @@ export default function DuelPage() {
     loading,
     submitting,
     canDuel,
+    duelCount,
+    tastedCount,
+    winnerId,
+    eloDeltas,
     generatePair,
     submitVote,
   } = useDuel();
@@ -59,7 +63,7 @@ export default function DuelPage() {
 
   return (
     <div className="py-6">
-      {/* Title */}
+      {/* Header with stats */}
       <div className="text-center mb-6">
         <h2 className="font-display text-xl font-bold text-glupp-cream">
           Laquelle tu preferes ?
@@ -67,6 +71,26 @@ export default function DuelPage() {
         <p className="text-xs text-glupp-text-muted mt-1">
           Choisis ta biere preferee pour mettre a jour le classement
         </p>
+
+        {/* Session counter */}
+        {duelCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-center gap-3 mt-3"
+          >
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-glupp-accent/10 text-glupp-accent text-xs font-medium">
+              <Swords size={12} />
+              {duelCount} duel{duelCount > 1 ? "s" : ""}
+            </div>
+            {duelCount >= 3 && (
+              <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-glupp-gold/10 text-glupp-gold text-xs font-medium">
+                <Flame size={12} />
+                En feu !
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
 
       {/* Duel Cards */}
@@ -76,6 +100,8 @@ export default function DuelPage() {
           beerB={beerB}
           onSelect={submitVote}
           disabled={submitting}
+          winnerId={winnerId}
+          eloDeltas={eloDeltas}
         />
       )}
 
@@ -91,17 +117,17 @@ export default function DuelPage() {
         </Button>
       </div>
 
-      {/* Suggestion link */}
+      {/* Pool info + suggestion */}
       <div className="mt-8 mx-4 p-3 bg-glupp-card-alt border border-glupp-border rounded-glupp text-center">
-        <p className="text-xs text-glupp-text-soft mb-2">
-          <Beer size={14} className="inline mr-1 text-glupp-accent" />
-          Envie de plus de duels ?
+        <p className="text-xs text-glupp-text-soft mb-1">
+          {tastedCount} biere{tastedCount > 1 ? "s" : ""} dans ton pool de duels
         </p>
         <Link
           href="/collection"
-          className="text-xs text-glupp-accent font-medium hover:underline"
+          className="text-xs text-glupp-accent font-medium hover:underline inline-flex items-center gap-1"
         >
-          Gluppe de nouvelles bieres !
+          <Beer size={12} />
+          Gluppe de nouvelles bieres pour plus de duels !
         </Link>
       </div>
     </div>

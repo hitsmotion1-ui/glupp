@@ -7,7 +7,7 @@ import { queryKeys } from "@/lib/queries/queryKeys";
 import { useAppStore } from "@/lib/store/useAppStore";
 import type { Beer } from "@/types";
 
-interface DuelResult {
+export interface DuelResult {
   beer_a_elo: number;
   beer_b_elo: number;
   xp_gained: number;
@@ -21,6 +21,12 @@ export function useDuel() {
   const [beerB, setBeerB] = useState<Beer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
+  const [winnerId, setWinnerId] = useState<string | null>(null);
+  const [duelCount, setDuelCount] = useState(0);
+
+  // Store previous ELOs to compute delta
+  const [prevEloA, setPrevEloA] = useState(0);
+  const [prevEloB, setPrevEloB] = useState(0);
 
   // Fetch tasted beers via React Query
   const {
@@ -47,7 +53,7 @@ export function useDuel() {
         .flat()
         .filter((b): b is Beer => b !== null);
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
   const canDuel = tastedBeers.length >= 2;
@@ -58,7 +64,10 @@ export function useDuel() {
     const shuffled = [...tastedBeers].sort(() => Math.random() - 0.5);
     setBeerA(shuffled[0]);
     setBeerB(shuffled[1]);
+    setPrevEloA(shuffled[0].elo);
+    setPrevEloB(shuffled[1].elo);
     setDuelResult(null);
+    setWinnerId(null);
   }, [tastedBeers]);
 
   // Auto-generate pair when tasted beers are loaded
@@ -70,7 +79,7 @@ export function useDuel() {
 
   // Vote mutation
   const voteMutation = useMutation({
-    mutationFn: async (winnerId: string) => {
+    mutationFn: async (selectedWinnerId: string) => {
       if (!beerA || !beerB) throw new Error("Pas de duel en cours");
 
       const {
@@ -83,14 +92,16 @@ export function useDuel() {
         p_user_id: user.id,
         p_beer_a_id: beerA.id,
         p_beer_b_id: beerB.id,
-        p_winner_id: winnerId,
+        p_winner_id: selectedWinnerId,
       });
 
       if (error) throw new Error(error.message);
-      return data as DuelResult;
+      return { result: data as DuelResult, winnerId: selectedWinnerId };
     },
-    onSuccess: (result) => {
+    onSuccess: ({ result, winnerId: wId }) => {
       setDuelResult(result);
+      setWinnerId(wId);
+      setDuelCount((c) => c + 1);
       showXPToast(result.xp_gained, "Duel");
 
       // Invalidate ranking since ELOs changed
@@ -102,7 +113,7 @@ export function useDuel() {
       setTimeout(() => {
         generatePair();
         setSubmitting(false);
-      }, 800);
+      }, 1200);
     },
     onError: (err) => {
       console.error("Duel error:", err.message);
@@ -110,10 +121,18 @@ export function useDuel() {
     },
   });
 
-  const submitVote = async (winnerId: string) => {
+  const submitVote = async (selectedWinnerId: string) => {
     setSubmitting(true);
-    voteMutation.mutate(winnerId);
+    voteMutation.mutate(selectedWinnerId);
   };
+
+  // Compute ELO deltas
+  const eloDeltas = duelResult && beerA && beerB
+    ? {
+        a: duelResult.beer_a_elo - prevEloA,
+        b: duelResult.beer_b_elo - prevEloB,
+      }
+    : null;
 
   return {
     beerA,
@@ -121,7 +140,11 @@ export function useDuel() {
     loading,
     submitting,
     duelResult,
+    winnerId,
+    eloDeltas,
     canDuel,
+    duelCount,
+    tastedCount: tastedBeers.length,
     generatePair,
     submitVote,
     refreshTasted: () =>
