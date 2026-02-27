@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Swords, Trophy, Map, Users, User } from "lucide-react";
+import { Swords, Trophy, Map, Users, User, Beer } from "lucide-react";
 import { motion } from "framer-motion";
 
 const tabs = [
   { href: "/duel", label: "Duel", icon: Swords },
   { href: "/ranking", label: "Classement", icon: Trophy },
-  { href: "/collection", label: "Collection", icon: Map },
+  { href: "/collection", label: "Collection", icon: Beer },
+  { href: "/map", label: "Carte", icon: Map },
   { href: "/social", label: "Social", icon: Users },
   { href: "/profile", label: "Profil", icon: User },
 ];
@@ -32,8 +33,8 @@ export function TabBar() {
                   : "text-glupp-text-muted hover:text-glupp-text-soft"
               }`}
             >
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">{tab.label}</span>
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <span className="text-[9px] font-medium">{tab.label}</span>
               {isActive && (
                 <motion.div
                   layoutId="tab-indicator"

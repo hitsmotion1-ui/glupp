@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/navigation/Header";
 import { TabBar } from "@/components/navigation/TabBar";
 import { GlobalModals } from "@/components/global/GlobalModals";
+import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
+import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 
 export default async function AppLayout({
   children,
@@ -24,6 +26,8 @@ export default async function AppLayout({
       <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
       <TabBar />
       <GlobalModals />
+      <PWAInstallPrompt />
+      <OnboardingFlow />
     </div>
   );
 }
