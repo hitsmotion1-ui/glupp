@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { X, Camera, AlertTriangle, Bug, ChevronUp, ChevronDown } from "lucide-react";
+import { X, Camera, AlertTriangle, Bug, Flashlight, FlashlightOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* ─── Log system ─── */
+/* --- Log system --- */
 type LogLevel = "info" | "warn" | "error" | "success";
 
 interface ScanLog {
@@ -24,13 +24,13 @@ const LOG_COLORS: Record<LogLevel, string> = {
 };
 
 const LOG_ICONS: Record<LogLevel, string> = {
-  info: "ℹ️",
-  warn: "⚠️",
-  error: "❌",
-  success: "✅",
+  info: "\u2139\ufe0f",
+  warn: "\u26a0\ufe0f",
+  error: "\u274c",
+  success: "\u2705",
 };
 
-/* ─── Component ─── */
+/* --- Component --- */
 interface BarcodeScannerProps {
   onScan: (barcode: string) => void;
   onClose: () => void;
@@ -52,7 +52,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
 
   const addLog = useCallback((level: LogLevel, message: string) => {
     const id = ++logIdRef.current;
-    setLogs((prev) => [...prev.slice(-30), { id, level, message, timestamp: new Date() }]);
+    setLogs((prev) => [...prev.slice(-50), { id, level, message, timestamp: new Date() }]);
   }, []);
 
   useEffect(() => {
@@ -61,8 +61,8 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
 
     // Check browser support
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      addLog("error", "API MediaDevices non supportée par ce navigateur");
-      setError("Ton navigateur ne supporte pas l'accès à la caméra.");
+      addLog("error", "API MediaDevices non supportee par ce navigateur");
+      setError("Ton navigateur ne supporte pas l'acces a la camera.");
       setStarting(false);
       return;
     }
@@ -70,10 +70,14 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
 
     // Check HTTPS
     if (location.protocol !== "https:" && location.hostname !== "localhost") {
-      addLog("warn", `Protocole: ${location.protocol} — HTTPS requis pour la caméra`);
+      addLog("warn", `Protocole: ${location.protocol} -- HTTPS requis pour la camera`);
     } else {
       addLog("info", `Protocole: ${location.protocol} OK`);
     }
+
+    // Check native BarcodeDetector API
+    const hasBarcodeDetector = "BarcodeDetector" in window;
+    addLog("info", `BarcodeDetector API native: ${hasBarcodeDetector ? "OUI" : "NON (fallback ZXing)"}`);
 
     const timer = setTimeout(() => {
       if (!mountedRef.current) return;
@@ -81,12 +85,12 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       const scannerId = "barcode-reader";
       const el = document.getElementById(scannerId);
       if (!el) {
-        addLog("error", "Élément DOM #barcode-reader introuvable");
+        addLog("error", "Element DOM #barcode-reader introuvable");
         setError("Erreur d'initialisation du scanner.");
         setStarting(false);
         return;
       }
-      addLog("info", `Élément DOM trouvé (${el.offsetWidth}x${el.offsetHeight}px)`);
+      addLog("info", `Element DOM trouve (${el.offsetWidth}x${el.offsetHeight}px)`);
 
       const formats = [
         Html5QrcodeSupportedFormats.EAN_13,
@@ -97,22 +101,26 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         Html5QrcodeSupportedFormats.CODE_39,
         Html5QrcodeSupportedFormats.QR_CODE,
       ];
-      addLog("info", `Formats supportés: EAN-13, EAN-8, UPC-A, UPC-E, CODE-128, CODE-39, QR`);
+      addLog("info", `Formats: EAN-13, EAN-8, UPC-A, UPC-E, CODE-128, CODE-39, QR`);
 
       const scanner = new Html5Qrcode(scannerId, {
         formatsToSupport: formats,
         verbose: false,
+        useBarCodeDetectorIfSupported: true,
       });
       scannerRef.current = scanner;
-      addLog("info", "Instance Html5Qrcode créée");
+      addLog("info", "Instance Html5Qrcode creee (useBarCodeDetector: true)");
 
-      // Responsive qrbox
-      const viewportWidth = window.innerWidth;
-      const qrboxWidth = Math.min(280, viewportWidth - 60);
-      const qrboxHeight = Math.round(qrboxWidth * 0.55);
-      addLog("info", `QR box: ${qrboxWidth}x${qrboxHeight}px (viewport: ${viewportWidth}px)`);
+      // Use a function for qrbox that returns dimensions based on viewport
+      // Scan a LARGE area — almost the entire viewport
+      const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
+        const width = Math.floor(viewfinderWidth * 0.9);
+        const height = Math.floor(viewfinderHeight * 0.7);
+        return { width, height };
+      };
+      addLog("info", `QR box: 90% x 70% du viewfinder (zone large)`);
 
-      addLog("info", "Demande d'accès caméra...");
+      addLog("info", "Demande d'acces camera...");
 
       let scanFrameCount = 0;
 
@@ -120,8 +128,9 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         .start(
           { facingMode: "environment" },
           {
-            fps: 15,
-            qrbox: { width: qrboxWidth, height: qrboxHeight },
+            fps: 30,
+            qrbox: qrboxFunction,
+            aspectRatio: 1.0,
             disableFlip: false,
           },
           (decodedText, result) => {
@@ -129,7 +138,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
             hasScanned.current = true;
 
             const format = result?.result?.format?.formatName || "inconnu";
-            addLog("success", `Code détecté! Format: ${format}, Valeur: ${decodedText}`);
+            addLog("success", `Code detecte! Format: ${format}, Valeur: ${decodedText}`);
 
             if (navigator.vibrate) {
               navigator.vibrate(100);
@@ -138,7 +147,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
             scanner
               .stop()
               .then(() => {
-                addLog("info", "Scanner arrêté après détection");
+                addLog("info", "Scanner arrete apres detection");
                 if (mountedRef.current) onScan(decodedText);
               })
               .catch(() => {
@@ -148,11 +157,11 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           () => {
             // Count scan attempts (called each frame where no code is found)
             scanFrameCount++;
-            if (scanFrameCount % 150 === 0) {
-              // Log every ~10 seconds (15fps * 10s)
+            if (scanFrameCount % 300 === 0) {
+              // Log every ~10 seconds (30fps * 10s)
               if (mountedRef.current) {
                 setScanAttempts(scanFrameCount);
-                addLog("info", `${scanFrameCount} frames analysées, aucun code détecté`);
+                addLog("info", `${scanFrameCount} frames analysees, aucun code detecte`);
               }
             }
           }
@@ -161,7 +170,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           if (mountedRef.current) {
             setStarting(false);
             setCameraReady(true);
-            addLog("success", "Caméra activée et scanner prêt");
+            addLog("success", "Camera activee et scanner pret (30fps, zone large)");
 
             // Log camera info
             try {
@@ -169,8 +178,13 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
               if (videoEl && videoEl.videoWidth) {
                 addLog(
                   "info",
-                  `Résolution vidéo: ${videoEl.videoWidth}x${videoEl.videoHeight}`
+                  `Resolution video: ${videoEl.videoWidth}x${videoEl.videoHeight}`
                 );
+
+                // Check actual scan region vs video resolution
+                const scanW = Math.floor(videoEl.videoWidth * 0.9);
+                const scanH = Math.floor(videoEl.videoHeight * 0.7);
+                addLog("info", `Zone de scan effective: ${scanW}x${scanH}px`);
               }
             } catch {
               // ignore
@@ -181,36 +195,36 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           if (!mountedRef.current) return;
           setStarting(false);
           const errStr = err.toString();
-          addLog("error", `Échec démarrage caméra: ${errStr}`);
+          addLog("error", `Echec demarrage camera: ${errStr}`);
 
           if (
             errStr.includes("NotAllowedError") ||
             errStr.includes("Permission")
           ) {
-            addLog("error", "Permission caméra refusée par l'utilisateur ou le navigateur");
+            addLog("error", "Permission camera refusee par l'utilisateur ou le navigateur");
             setError(
-              "Accès à la caméra refusé. Autorise la caméra dans les paramètres de ton navigateur."
+              "Acces a la camera refuse. Autorise la camera dans les parametres de ton navigateur."
             );
           } else if (
             errStr.includes("NotFoundError") ||
             errStr.includes("device")
           ) {
-            addLog("error", "Aucun périphérique caméra trouvé");
-            setError("Aucune caméra trouvée sur cet appareil.");
+            addLog("error", "Aucun peripherique camera trouve");
+            setError("Aucune camera trouvee sur cet appareil.");
           } else if (errStr.includes("NotReadableError")) {
-            addLog("error", "Caméra en cours d'utilisation par une autre application");
+            addLog("error", "Camera en cours d'utilisation par une autre application");
             setError(
-              "La caméra est utilisée par une autre application. Ferme les autres apps et réessaie."
+              "La camera est utilisee par une autre application. Ferme les autres apps et reessaie."
             );
           } else if (errStr.includes("OverconstrainedError")) {
-            addLog("error", "Contraintes caméra non satisfaites (facingMode: environment)");
+            addLog("error", "Contraintes camera non satisfaites (facingMode: environment)");
             setError(
-              "La caméra arrière n'est pas disponible. Essaie avec un autre appareil."
+              "La camera arriere n'est pas disponible. Essaie avec un autre appareil."
             );
           } else {
             addLog("error", `Erreur inconnue: ${errStr}`);
             setError(
-              "Impossible de démarrer la caméra. Vérifie les permissions."
+              "Impossible de demarrer la camera. Verifie les permissions."
             );
           }
         });
@@ -290,7 +304,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
             <div className="text-center text-white">
               <div className="animate-spin w-8 h-8 border-2 border-glupp-accent border-t-transparent rounded-full mx-auto mb-3" />
-              <p className="text-sm">Activation de la caméra...</p>
+              <p className="text-sm">Activation de la camera...</p>
             </div>
           </div>
         )}
@@ -317,7 +331,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                 }`}
               />
               <span className="text-[10px] text-white/80 font-medium">
-                {cameraReady ? "Caméra active" : "En attente"}
+                {cameraReady ? "Camera active" : "En attente"}
               </span>
             </div>
             {scanAttempts > 0 && (
@@ -327,6 +341,25 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                 </span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Scan guide overlay - thin horizontal line to show scan area */}
+        {!error && !starting && cameraReady && (
+          <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+            <div className="w-[85%] relative">
+              {/* Animated scan line */}
+              <motion.div
+                animate={{ y: [-30, 30] }}
+                transition={{ duration: 2, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+                className="h-0.5 bg-glupp-accent/80 shadow-[0_0_8px_rgba(224,136,64,0.5)]"
+              />
+              {/* Corner markers */}
+              <div className="absolute -top-16 -left-2 w-6 h-6 border-t-2 border-l-2 border-glupp-accent/60 rounded-tl-lg" />
+              <div className="absolute -top-16 -right-2 w-6 h-6 border-t-2 border-r-2 border-glupp-accent/60 rounded-tr-lg" />
+              <div className="absolute top-12 -left-2 w-6 h-6 border-b-2 border-l-2 border-glupp-accent/60 rounded-bl-lg" />
+              <div className="absolute top-12 -right-2 w-6 h-6 border-b-2 border-r-2 border-glupp-accent/60 rounded-br-lg" />
+            </div>
           </div>
         )}
       </div>
@@ -400,10 +433,15 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           >
             {!error && (
               <p className="text-white/70 text-sm">
-                Place le code-barres de la bière dans le cadre
+                Place le code-barres de la biere dans le cadre
               </p>
             )}
             {/* Mini status */}
+            {!error && scanAttempts > 200 && (
+              <p className="mt-1.5 text-[10px] text-yellow-400/70">
+                Essaie de rapprocher ou eloigner la camera du code-barres
+              </p>
+            )}
             {!error && logs.length > 0 && (
               <button
                 onClick={() => setShowDebug(true)}
@@ -433,6 +471,13 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           display: none !important;
         }
         #barcode-reader img[alt="Info icon"] {
+          display: none !important;
+        }
+        /* Hide the shaded region to make the scan area cleaner */
+        #barcode-reader__scan_region {
+          min-height: 0 !important;
+        }
+        #barcode-reader__scan_region > br {
           display: none !important;
         }
       `}</style>

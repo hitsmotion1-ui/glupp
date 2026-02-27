@@ -65,4 +65,9 @@ export const queryKeys = {
   passport: {
     all: ["passport", "all"] as const,
   },
+
+  barReviews: {
+    bar: (barId: string) => ["barReviews", "bar", barId] as const,
+    user: (barId: string) => ["barReviews", "user", barId] as const,
+  },
 } as const;

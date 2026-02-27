@@ -199,6 +199,35 @@ export interface PassportRegion {
   tasted: number;
 }
 
+// ─── Bar Reviews ───
+export type BarCriteria = "ambiance" | "beer_selection" | "price" | "service";
+
+export interface BarReview {
+  id: string;
+  user_id: string;
+  bar_id: string;
+  ambiance: number;        // 1-5
+  beer_selection: number;  // 1-5
+  price: number;           // 1-5
+  service: number;         // 1-5
+  comment: string | null;
+  created_at: string;
+  // Joined
+  user?: Profile;
+}
+
+export interface BarWithReviews extends Bar {
+  distance?: number;
+  glupp_rating: number;
+  glupp_total_reviews: number;
+  avg_ambiance: number;
+  avg_beer_selection: number;
+  avg_price: number;
+  avg_service: number;
+  google_rating?: number;
+  google_place_id?: string;
+}
+
 // ─── Moment Voting ───
 export type Moment = "barbecue" | "hiver" | "apero" | "rdv" | "soiree" | "brunch";
 
