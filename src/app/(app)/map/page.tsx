@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useMap } from "@/lib/hooks/useMap";
 import { BarReviewPanel } from "@/components/map/BarReviewPanel";
@@ -46,6 +47,12 @@ export default function MapPage() {
   const [search, setSearch] = useState("");
   const [selectedBarId, setSelectedBarId] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+
+  // Mount portal container for the bottom sheet (renders outside <main> overflow)
+  useEffect(() => {
+    setPortalContainer(document.body);
+  }, []);
 
   // The bars to display (with distance if available)
   const displayBars = useMemo(() => {
@@ -291,94 +298,100 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Bottom sheet — FIXED position, outside map container, above Leaflet z-indexes */}
-      <AnimatePresence>
-        {selectedBar && viewMode === "map" && (
-          <>
-            {/* Backdrop tap to close */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleCloseSheet}
-              className="fixed inset-0 z-[60] bg-transparent"
-              style={{ pointerEvents: "auto" }}
-            />
+      {/* Bottom sheet — Portal to body so it escapes <main overflow-y-auto> */}
+      {portalContainer && createPortal(
+        <AnimatePresence>
+          {selectedBar && viewMode === "map" && (
+            <>
+              {/* Backdrop — semi-transparent so user sees it */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={handleCloseSheet}
+                className="fixed inset-0 bg-black/40"
+                style={{ zIndex: 9998 }}
+              />
 
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className={`fixed bottom-0 left-0 right-0 z-[61] bg-glupp-bg border-t border-glupp-border rounded-t-2xl shadow-2xl ${
-                sheetExpanded ? "max-h-[80vh]" : "max-h-[40vh]"
-              } flex flex-col`}
-            >
-              {/* Drag handle */}
-              <button
-                onClick={() => setSheetExpanded(!sheetExpanded)}
-                className="w-full pt-3 pb-2 flex justify-center shrink-0"
+              {/* Sheet — stops event propagation so buttons inside work */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`fixed bottom-0 left-0 right-0 bg-glupp-bg border-t border-glupp-border rounded-t-2xl shadow-2xl ${
+                  sheetExpanded ? "max-h-[80vh]" : "max-h-[45vh]"
+                } flex flex-col`}
+                style={{ zIndex: 9999 }}
               >
-                <div className="w-10 h-1 bg-glupp-border rounded-full" />
-              </button>
+                {/* Drag handle */}
+                <button
+                  onClick={() => setSheetExpanded(!sheetExpanded)}
+                  className="w-full pt-3 pb-2 flex justify-center shrink-0"
+                >
+                  <div className="w-10 h-1 bg-glupp-border rounded-full" />
+                </button>
 
-              {/* Bar header */}
-              <div className="px-4 pb-3 shrink-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-display font-bold text-glupp-cream text-base truncate">
-                        {selectedBar.name}
-                      </h3>
-                      {selectedBar.is_verified && (
-                        <span className="shrink-0 text-[9px] px-1.5 py-0.5 bg-glupp-accent/15 text-glupp-accent rounded-full font-medium">
-                          Verifie
-                        </span>
-                      )}
-                    </div>
-                    {selectedBar.address && (
-                      <p className="text-[11px] text-glupp-text-muted mt-0.5 truncate">
-                        <MapPin size={10} className="inline mr-1" />
-                        {selectedBar.address}
-                        {selectedBar.city && `, ${selectedBar.city}`}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1">
-                      {"distance" in selectedBar &&
-                        typeof (selectedBar as Bar & { distance?: number }).distance ===
-                          "number" && (
-                          <span className="flex items-center gap-1 text-xs text-glupp-accent font-medium">
-                            <Navigation size={10} />
-                            {formatDistance(
-                              (selectedBar as Bar & { distance: number }).distance
-                            )}
+                {/* Bar header */}
+                <div className="px-4 pb-3 shrink-0">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-display font-bold text-glupp-cream text-base truncate">
+                          {selectedBar.name}
+                        </h3>
+                        {selectedBar.is_verified && (
+                          <span className="shrink-0 text-[9px] px-1.5 py-0.5 bg-glupp-accent/15 text-glupp-accent rounded-full font-medium">
+                            Verifie
                           </span>
                         )}
-                      {selectedBar.rating > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-glupp-gold">
-                          <Star size={10} fill="currentColor" />
-                          {selectedBar.rating.toFixed(1)}
-                        </span>
+                      </div>
+                      {selectedBar.address && (
+                        <p className="text-[11px] text-glupp-text-muted mt-0.5 truncate">
+                          <MapPin size={10} className="inline mr-1" />
+                          {selectedBar.address}
+                          {selectedBar.city && `, ${selectedBar.city}`}
+                        </p>
                       )}
+                      <div className="flex items-center gap-3 mt-1">
+                        {"distance" in selectedBar &&
+                          typeof (selectedBar as Bar & { distance?: number }).distance ===
+                            "number" && (
+                            <span className="flex items-center gap-1 text-xs text-glupp-accent font-medium">
+                              <Navigation size={10} />
+                              {formatDistance(
+                                (selectedBar as Bar & { distance: number }).distance
+                              )}
+                            </span>
+                          )}
+                        {selectedBar.rating > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-glupp-gold">
+                            <Star size={10} fill="currentColor" />
+                            {selectedBar.rating.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <button
+                      onClick={handleCloseSheet}
+                      className="p-1.5 rounded-full bg-glupp-card hover:bg-glupp-card-alt transition-colors"
+                    >
+                      <X size={16} className="text-glupp-text-muted" />
+                    </button>
                   </div>
-                  <button
-                    onClick={handleCloseSheet}
-                    className="p-1.5 rounded-full bg-glupp-card hover:bg-glupp-card-alt transition-colors"
-                  >
-                    <X size={16} className="text-glupp-text-muted" />
-                  </button>
                 </div>
-              </div>
 
-              {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto px-4 pb-[calc(80px+env(safe-area-inset-bottom,0px))]">
-                <BarReviewPanel bar={selectedBar} onClose={handleCloseSheet} />
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto px-4 pb-[calc(80px+env(safe-area-inset-bottom,0px))]">
+                  <BarReviewPanel bar={selectedBar} onClose={handleCloseSheet} />
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        portalContainer
+      )}
     </>
   );
 }
