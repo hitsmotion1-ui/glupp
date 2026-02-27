@@ -29,67 +29,77 @@ export function useLiveFeed() {
   }, []);
 
   useEffect(() => {
-    const channel = supabase
-      .channel("glupp-live", {
-        config: { broadcast: { self: true } },
-      })
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "activities",
-        },
-        async (payload) => {
-          const activity = payload.new;
-          if (!activity) return;
+    let channel: RealtimeChannel | null = null;
 
-          // Fetch user data
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("username, display_name, avatar_url")
-            .eq("id", activity.user_id)
-            .single();
+    try {
+      channel = supabase
+        .channel("glupp-live", {
+          config: { broadcast: { self: true } },
+        })
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "activities",
+          },
+          async (payload) => {
+            try {
+              const activity = payload.new;
+              if (!activity) return;
 
-          // Fetch beer data if available
-          let beerName: string | null = null;
-          let beerStyle: string | null = null;
-          if (activity.beer_id) {
-            const { data: beer } = await supabase
-              .from("beers")
-              .select("name, style")
-              .eq("id", activity.beer_id)
-              .single();
-            if (beer) {
-              beerName = beer.name;
-              beerStyle = beer.style;
+              const { data: profile } = await supabase
+                .from("profiles")
+                .select("username, display_name, avatar_url")
+                .eq("id", activity.user_id)
+                .single();
+
+              let beerName: string | null = null;
+              let beerStyle: string | null = null;
+              if (activity.beer_id) {
+                const { data: beer } = await supabase
+                  .from("beers")
+                  .select("name, style")
+                  .eq("id", activity.beer_id)
+                  .single();
+                if (beer) {
+                  beerName = beer.name;
+                  beerStyle = beer.style;
+                }
+              }
+
+              const event: LiveEvent = {
+                id: activity.id,
+                type: activity.type,
+                userId: activity.user_id,
+                username: profile?.username || "?",
+                displayName: profile?.display_name || profile?.username || "?",
+                avatarUrl: profile?.avatar_url || null,
+                beerName,
+                beerStyle,
+                metadata: activity.metadata || {},
+                timestamp: new Date(activity.created_at),
+              };
+
+              addEvent(event);
+            } catch (err) {
+              console.error("LiveFeed event processing error:", err);
             }
           }
+        )
+        .subscribe((status) => {
+          setConnected(status === "SUBSCRIBED");
+        });
 
-          const event: LiveEvent = {
-            id: activity.id,
-            type: activity.type,
-            userId: activity.user_id,
-            username: profile?.username || "?",
-            displayName: profile?.display_name || profile?.username || "?",
-            avatarUrl: profile?.avatar_url || null,
-            beerName,
-            beerStyle,
-            metadata: activity.metadata || {},
-            timestamp: new Date(activity.created_at),
-          };
-
-          addEvent(event);
-        }
-      )
-      .subscribe((status) => {
-        setConnected(status === "SUBSCRIBED");
-      });
-
-    channelRef.current = channel;
+      channelRef.current = channel;
+    } catch (err) {
+      console.error("LiveFeed init error:", err);
+    }
 
     return () => {
-      channel.unsubscribe();
+      if (channel) {
+        try { channel.unsubscribe(); } catch { /* ignore */ }
+      }
     };
   }, [addEvent]);
 
