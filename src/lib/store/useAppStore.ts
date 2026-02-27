@@ -31,6 +31,24 @@ interface AppState {
   showCelebration: boolean;
   triggerCelebration: () => void;
   clearCelebration: () => void;
+
+  // Sprint 3 — Social
+  notificationCount: number;
+  setNotificationCount: (count: number) => void;
+
+  showFriendSearch: boolean;
+  setShowFriendSearch: (show: boolean) => void;
+
+  showNotifications: boolean;
+  setShowNotifications: (show: boolean) => void;
+
+  selectedTrophyId: string | null;
+  openTrophyModal: (trophyId: string) => void;
+  closeTrophyModal: () => void;
+
+  selectedUserId: string | null;
+  openUserProfileModal: (userId: string) => void;
+  closeUserProfileModal: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -54,4 +72,22 @@ export const useAppStore = create<AppState>((set) => ({
   showCelebration: false,
   triggerCelebration: () => set({ showCelebration: true }),
   clearCelebration: () => set({ showCelebration: false }),
+
+  // Sprint 3 — Social
+  notificationCount: 0,
+  setNotificationCount: (count) => set({ notificationCount: count }),
+
+  showFriendSearch: false,
+  setShowFriendSearch: (show) => set({ showFriendSearch: show }),
+
+  showNotifications: false,
+  setShowNotifications: (show) => set({ showNotifications: show }),
+
+  selectedTrophyId: null,
+  openTrophyModal: (trophyId) => set({ selectedTrophyId: trophyId }),
+  closeTrophyModal: () => set({ selectedTrophyId: null }),
+
+  selectedUserId: null,
+  openUserProfileModal: (userId) => set({ selectedUserId: userId }),
+  closeUserProfileModal: () => set({ selectedUserId: null }),
 }));

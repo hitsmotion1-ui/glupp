@@ -8,6 +8,9 @@ import { GluppModal } from "@/components/beer/GluppModal";
 import { BarcodeScanner } from "@/components/beer/BarcodeScanner";
 import { XPToast } from "@/components/gamification/XPToast";
 import { CelebrationOverlay } from "@/components/gamification/CelebrationOverlay";
+import { TrophyDetailModal } from "@/components/social/TrophyDetailModal";
+import { NotificationModal } from "@/components/social/NotificationModal";
+import { UserProfileModal } from "@/components/social/UserProfileModal";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import { Plus, ScanLine, Search } from "lucide-react";
@@ -138,6 +141,11 @@ export function GlobalModals() {
       <GluppModal />
       <XPToast />
       <CelebrationOverlay />
+
+      {/* Sprint 3 — Social Modals */}
+      <TrophyDetailModal />
+      <NotificationModal />
+      <UserProfileModal />
 
       {/* Close FAB backdrop */}
       <AnimatePresence>
