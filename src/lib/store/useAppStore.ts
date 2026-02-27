@@ -1,8 +1,17 @@
 import { create } from "zustand";
+import type { Beer } from "@/types";
 
 interface XPToast {
   amount: number;
   label: string;
+}
+
+interface DuelState {
+  beerA: Beer | null;
+  beerB: Beer | null;
+  winnerId: string | null;
+  prevEloA: number;
+  prevEloB: number;
 }
 
 interface AppState {
@@ -49,6 +58,13 @@ interface AppState {
   selectedUserId: string | null;
   openUserProfileModal: (userId: string) => void;
   closeUserProfileModal: () => void;
+
+  // Duel persistence
+  duel: DuelState;
+  setDuel: (duel: DuelState) => void;
+  clearDuel: () => void;
+  duelSessionCount: number;
+  incrementDuelCount: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -90,4 +106,13 @@ export const useAppStore = create<AppState>((set) => ({
   selectedUserId: null,
   openUserProfileModal: (userId) => set({ selectedUserId: userId }),
   closeUserProfileModal: () => set({ selectedUserId: null }),
+
+  // Duel persistence
+  duel: { beerA: null, beerB: null, winnerId: null, prevEloA: 0, prevEloB: 0 },
+  setDuel: (duel) => set({ duel }),
+  clearDuel: () =>
+    set({ duel: { beerA: null, beerB: null, winnerId: null, prevEloA: 0, prevEloB: 0 } }),
+  duelSessionCount: 0,
+  incrementDuelCount: () =>
+    set((s) => ({ duelSessionCount: s.duelSessionCount + 1 })),
 }));
