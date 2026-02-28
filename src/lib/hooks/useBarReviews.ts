@@ -36,16 +36,36 @@ export function useBarReviews(barId: string | null) {
       if (!barId) return [];
       const { data, error } = await supabase
         .from("bar_reviews")
-        .select("*, user:profiles(*)")
+        .select("*")
         .eq("bar_id", barId)
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (error) throw new Error(error.message);
-      return (data as BarReview[]) || [];
+      if (error) {
+        console.error("Error fetching bar reviews:", error.message);
+        return [];
+      }
+
+      if (!data || data.length === 0) return [];
+
+      // Fetch profiles for all reviewers
+      const userIds = [...new Set(data.map((r) => r.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, avatar_url")
+        .in("id", userIds);
+
+      const profileMap = new Map(
+        (profiles || []).map((p) => [p.id, p])
+      );
+
+      return data.map((r) => ({
+        ...r,
+        user: profileMap.get(r.user_id) || null,
+      })) as BarReview[];
     },
     enabled: !!barId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   // Fetch user's review for this bar
@@ -66,11 +86,14 @@ export function useBarReviews(barId: string | null) {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("Error fetching user review:", error.message);
+        return null;
+      }
       return data as BarReview | null;
     },
     enabled: !!barId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   // Compute stats from reviews
@@ -149,8 +172,9 @@ export function useBarReviews(barId: string | null) {
     },
     onSuccess: () => {
       if (barId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.barReviews.bar(barId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.barReviews.user(barId) });
+        // Force immediate refetch (not just invalidation)
+        queryClient.refetchQueries({ queryKey: queryKeys.barReviews.bar(barId) });
+        queryClient.refetchQueries({ queryKey: queryKeys.barReviews.user(barId) });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.bars.all });
     },

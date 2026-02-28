@@ -180,8 +180,8 @@ export default function MapPage() {
           </div>
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 relative overflow-hidden">
+        {/* Main content — isolate creates a stacking context so Leaflet z-indexes stay contained */}
+        <div className="flex-1 relative overflow-hidden" style={{ isolation: "isolate", zIndex: 0 }}>
           {viewMode === "map" ? (
             <LeafletMap
               bars={displayBars}

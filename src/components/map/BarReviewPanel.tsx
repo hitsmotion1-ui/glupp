@@ -76,6 +76,7 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
 
   const [showForm, setShowForm] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState({
     ambiance: userReview?.ambiance || 3,
     beer_selection: userReview?.beer_selection || 3,
@@ -98,6 +99,7 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
   }, [userReview]);
 
   const handleSubmit = async () => {
+    setSubmitError(null);
     try {
       await submitReview({
         bar_id: bar.id,
@@ -105,7 +107,9 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
       });
       setShowForm(false);
     } catch (err) {
-      console.error("Review submit failed:", err);
+      const msg = err instanceof Error ? err.message : "Erreur lors de l'envoi";
+      console.error("Review submit failed:", msg);
+      setSubmitError(msg);
     }
   };
 
@@ -197,7 +201,11 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
       <Button
         variant={userReview ? "ghost" : "primary"}
         className="w-full"
-        onClick={() => setShowForm(!showForm)}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setShowForm(!showForm);
+        }}
       >
         {userReview ? (
           <>
@@ -253,6 +261,13 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
                   className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors resize-none"
                 />
               </div>
+
+              {/* Error message */}
+              {submitError && (
+                <p className="text-xs text-red-400 bg-red-400/10 px-3 py-2 rounded-glupp">
+                  {submitError}
+                </p>
+              )}
 
               {/* Submit */}
               <div className="flex gap-2">
