@@ -4,6 +4,7 @@ import { Header } from "@/components/navigation/Header";
 import { TabBar } from "@/components/navigation/TabBar";
 import { GlobalModals } from "@/components/global/GlobalModals";
 import { ErrorBoundary } from "@/components/global/ErrorBoundary";
+import { AuthGuard } from "@/components/global/AuthGuard";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 
@@ -22,15 +23,17 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="min-h-screen bg-glupp-bg flex flex-col">
-      <Header />
-      <main className="flex-1 pb-20 overflow-y-auto">
-        <ErrorBoundary>{children}</ErrorBoundary>
-      </main>
-      <TabBar />
-      <GlobalModals />
-      <PWAInstallPrompt />
-      <OnboardingFlow />
-    </div>
+    <AuthGuard>
+      <div className="min-h-screen bg-glupp-bg flex flex-col">
+        <Header />
+        <main className="flex-1 pb-20 overflow-y-auto">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </main>
+        <TabBar />
+        <GlobalModals />
+        <PWAInstallPrompt />
+        <OnboardingFlow />
+      </div>
+    </AuthGuard>
   );
 }
