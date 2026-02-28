@@ -3,6 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/queries/queryKeys";
+import { useAppStore } from "@/lib/store/useAppStore";
+import { XP_GAINS } from "@/lib/utils/xp";
 import type { BarReview } from "@/types";
 
 interface ReviewInput {
@@ -25,6 +27,7 @@ interface BarReviewStats {
 
 export function useBarReviews(barId: string | null) {
   const queryClient = useQueryClient();
+  const showXPToast = useAppStore((s) => s.showXPToast);
 
   // Fetch reviews for a bar
   const {
@@ -121,7 +124,7 @@ export function useBarReviews(barId: string | null) {
 
   // Submit or update review
   const submitReview = useMutation({
-    mutationFn: async (input: ReviewInput) => {
+    mutationFn: async (input: ReviewInput): Promise<{ review: BarReview; isNew: boolean }> => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non connecte");
 
@@ -149,7 +152,7 @@ export function useBarReviews(barId: string | null) {
           .single();
 
         if (error) throw new Error(error.message);
-        return data as BarReview;
+        return { review: data as BarReview, isNew: false };
       } else {
         // Insert new review
         const { data, error } = await supabase
@@ -167,16 +170,33 @@ export function useBarReviews(barId: string | null) {
           .single();
 
         if (error) throw new Error(error.message);
-        return data as BarReview;
+
+        // Award XP for first review on this bar (best-effort)
+        try {
+          await supabase.rpc("award_xp", {
+            p_user_id: user.id,
+            p_amount: XP_GAINS.bar_review,
+            p_reason: "bar_review",
+          });
+        } catch {
+          // XP award is best-effort, don't fail the review
+        }
+
+        return { review: data as BarReview, isNew: true };
       }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       if (barId) {
         // Force immediate refetch (not just invalidation)
         queryClient.refetchQueries({ queryKey: queryKeys.barReviews.bar(barId) });
         queryClient.refetchQueries({ queryKey: queryKeys.barReviews.user(barId) });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.bars.all });
+
+      // Show XP toast for first review
+      if (result.isNew) {
+        showXPToast(XP_GAINS.bar_review, "Avis de bar");
+      }
     },
   });
 

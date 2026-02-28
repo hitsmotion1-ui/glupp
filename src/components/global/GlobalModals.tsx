@@ -11,9 +11,11 @@ import { CelebrationOverlay } from "@/components/gamification/CelebrationOverlay
 import { TrophyDetailModal } from "@/components/social/TrophyDetailModal";
 import { NotificationModal } from "@/components/social/NotificationModal";
 import { UserProfileModal } from "@/components/social/UserProfileModal";
+import { SubmitBeerModal } from "@/components/beer/SubmitBeerModal";
+import { SubmitBarModal } from "@/components/map/SubmitBarModal";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
-import { Plus, ScanLine, Search } from "lucide-react";
+import { Plus, ScanLine, Search, Beer as BeerIcon, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { beerEmoji } from "@/lib/utils/xp";
 import type { Beer } from "@/types";
@@ -30,6 +32,11 @@ export function GlobalModals() {
 
   // FAB menu
   const [fabOpen, setFabOpen] = useState(false);
+
+  // Submission modals
+  const [showSubmitBeer, setShowSubmitBeer] = useState(false);
+  const [showSubmitBar, setShowSubmitBar] = useState(false);
+  const [submitBeerPrefill, setSubmitBeerPrefill] = useState("");
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -170,6 +177,22 @@ export function GlobalModals() {
               exit={{ opacity: 0 }}
               className="flex flex-col gap-2.5 mb-3 items-end"
             >
+              {/* Proposer un bar */}
+              <motion.button
+                initial={{ opacity: 0, y: 15, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 15, scale: 0.8 }}
+                transition={{ delay: 0.1 }}
+                onClick={() => {
+                  setFabOpen(false);
+                  setShowSubmitBar(true);
+                }}
+                className="flex items-center gap-2.5 px-4 py-2.5 bg-glupp-card/90 backdrop-blur-sm border border-glupp-border/50 rounded-full shadow-lg text-sm text-glupp-cream hover:border-glupp-accent transition-colors whitespace-nowrap"
+              >
+                <MapPin className="w-4 h-4 text-[#4ECDC4]" />
+                Proposer un bar
+              </motion.button>
+
               {/* Scanner option */}
               <motion.button
                 initial={{ opacity: 0, y: 15, scale: 0.8 }}
@@ -265,9 +288,25 @@ export function GlobalModals() {
             )}
 
             {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
-              <p className="text-center py-4 text-glupp-text-muted text-sm">
-                Aucune biere trouvee.
-              </p>
+              <div className="text-center py-6 space-y-3">
+                <BeerIcon className="w-10 h-10 text-glupp-text-muted mx-auto" />
+                <p className="text-glupp-text-muted text-sm">
+                  Aucune biere trouvee.
+                </p>
+                <button
+                  onClick={() => {
+                    setSubmitBeerPrefill(searchQuery);
+                    setShowSearch(false);
+                    setSearchQuery("");
+                    setSearchResults([]);
+                    setShowSubmitBeer(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-glupp-accent/15 border border-glupp-accent/30 rounded-glupp text-sm text-glupp-accent hover:bg-glupp-accent/25 transition-colors"
+                >
+                  <Plus size={14} />
+                  Proposer cette biere
+                </button>
+              </div>
             )}
 
             {searchResults.map((beer) => (
@@ -299,6 +338,21 @@ export function GlobalModals() {
           </div>
         </div>
       </Modal>
+
+      {/* Submission modals */}
+      <SubmitBeerModal
+        isOpen={showSubmitBeer}
+        onClose={() => {
+          setShowSubmitBeer(false);
+          setSubmitBeerPrefill("");
+        }}
+        prefillName={submitBeerPrefill}
+      />
+
+      <SubmitBarModal
+        isOpen={showSubmitBar}
+        onClose={() => setShowSubmitBar(false)}
+      />
 
       {/* Scan result toast */}
       <Toast

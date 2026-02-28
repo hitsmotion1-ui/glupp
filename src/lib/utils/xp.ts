@@ -25,6 +25,9 @@ export const XP_GAINS = {
   challenge: 500,
   gotw: 50,
   passport_complete: 100,
+  bar_review: 10,
+  submit_beer: 15,
+  submit_bar: 10,
 } as const;
 
 export const RARITY_CONFIG = {

@@ -70,4 +70,16 @@ export const queryKeys = {
     bar: (barId: string) => ["barReviews", "bar", barId] as const,
     user: (barId: string) => ["barReviews", "user", barId] as const,
   },
+
+  admin: {
+    stats: ["admin", "stats"] as const,
+    beers: (filters: { search?: string; rarity?: string }) =>
+      ["admin", "beers", filters] as const,
+    bars: (filters: { search?: string }) =>
+      ["admin", "bars", filters] as const,
+    submissions: (status?: string) =>
+      ["admin", "submissions", status] as const,
+    users: (search?: string) =>
+      ["admin", "users", search] as const,
+  },
 } as const;
