@@ -25,7 +25,7 @@ import {
   Megaphone,
   Eye,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -175,8 +175,15 @@ export function NotificationModal() {
   const setShowNotifications = useAppStore((s) => s.setShowNotifications);
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
 
-  const { notifications, isLoading, markAsRead, markAllAsRead } =
+  const { notifications, isLoading, markAsRead, markAllAsRead, celebrateUnreadApprovals } =
     useNotifications();
+
+  // Celebrate unread approved submissions when the modal opens
+  useEffect(() => {
+    if (showNotifications) {
+      celebrateUnreadApprovals();
+    }
+  }, [showNotifications, celebrateUnreadApprovals]);
   const { acceptRequest, rejectRequest } = useFriends();
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
 

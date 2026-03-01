@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { Beer, Send, CheckCircle } from "lucide-react";
+import { Beer, Send, CheckCircle, Camera, X } from "lucide-react";
 
 interface SubmitBeerModalProps {
   isOpen: boolean;
@@ -51,8 +51,34 @@ export function SubmitBeerModal({ isOpen, onClose, prefillName }: SubmitBeerModa
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedCountry = COUNTRIES.find((c) => c.code === form.country_code) || COUNTRIES[0];
+
+  const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5MB
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_PHOTO_SIZE) {
+      setError("La photo ne doit pas depasser 5 Mo");
+      return;
+    }
+
+    setError(null);
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handlePhotoRemove = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhoto(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.brewery.trim()) {
@@ -67,6 +93,18 @@ export function SubmitBeerModal({ isOpen, onClose, prefillName }: SubmitBeerModa
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non connecte");
 
+      // Upload photo if provided
+      let photoUrl: string | null = null;
+      if (photo) {
+        const ext = photo.name.split(".").pop()?.toLowerCase() || "jpg";
+        const path = `beer-photos/${user.id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("submissions")
+          .upload(path, photo);
+        if (uploadError) throw new Error("Erreur upload photo: " + uploadError.message);
+        photoUrl = supabase.storage.from("submissions").getPublicUrl(path).data.publicUrl;
+      }
+
       const { error: insertError } = await supabase.from("submissions").insert({
         user_id: user.id,
         type: "beer",
@@ -78,6 +116,7 @@ export function SubmitBeerModal({ isOpen, onClose, prefillName }: SubmitBeerModa
           country_code: form.country_code,
           abv: form.abv ? parseFloat(form.abv) : null,
           description: form.description.trim() || null,
+          photo_url: photoUrl,
         },
       });
 
@@ -113,6 +152,7 @@ export function SubmitBeerModal({ isOpen, onClose, prefillName }: SubmitBeerModa
     setForm({ name: prefillName || "", brewery: "", style: "Blonde", country_code: "FR", abv: "", description: "" });
     setSubmitted(false);
     setError(null);
+    handlePhotoRemove();
     onClose();
   };
 
@@ -228,6 +268,43 @@ export function SubmitBeerModal({ isOpen, onClose, prefillName }: SubmitBeerModa
             rows={2}
             className="w-full px-3 py-2.5 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors resize-none"
           />
+        </div>
+
+        {/* Photo (optional) */}
+        <div>
+          <label className="text-xs text-glupp-text-muted block mb-1">Photo (optionnel)</label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handlePhotoSelect}
+            className="hidden"
+          />
+          {photoPreview ? (
+            <div className="relative inline-block">
+              <img
+                src={photoPreview}
+                alt="Apercu"
+                className="w-20 h-20 rounded-glupp object-cover border border-glupp-border"
+              />
+              <button
+                type="button"
+                onClick={handlePhotoRemove}
+                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-400 transition-colors"
+              >
+                <X size={12} className="text-white" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-glupp-bg border border-dashed border-glupp-border rounded-glupp text-sm text-glupp-text-muted hover:border-glupp-accent hover:text-glupp-cream transition-colors"
+            >
+              <Camera size={16} />
+              Ajouter une photo
+            </button>
+          )}
         </div>
 
         {error && (

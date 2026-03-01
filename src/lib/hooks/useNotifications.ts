@@ -237,42 +237,11 @@ export function useNotifications() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
-        (payload) => {
-          const newNotif = payload.new as PersistentNotification;
-
-          // Refetch persistent notifications
+        () => {
+          // Refetch persistent notifications (badge count updates automatically)
           queryClient.invalidateQueries({
             queryKey: ["notifications", "persistent"],
           });
-
-          // 🎉 Show celebration for approved submissions
-          if (
-            newNotif.type === "submission_approved" &&
-            !celebratedIds.current.has(newNotif.id)
-          ) {
-            celebratedIds.current.add(newNotif.id);
-            const xp = (newNotif.metadata?.xp_gained as number) || 0;
-            const name = (newNotif.metadata?.name as string) || "";
-
-            // Trigger XP toast
-            if (xp > 0) {
-              showXPToast(xp, `${name} validé !`);
-            }
-            // Trigger celebration confetti
-            triggerCelebration();
-          }
-
-          // Show XP toast for bonus XP
-          if (
-            newNotif.type === "xp_reward" &&
-            !celebratedIds.current.has(newNotif.id)
-          ) {
-            celebratedIds.current.add(newNotif.id);
-            const xp = (newNotif.metadata?.xp_amount as number) || 0;
-            if (xp > 0) {
-              showXPToast(xp, "Bonus admin");
-            }
-          }
         }
       )
       .subscribe();
@@ -280,7 +249,45 @@ export function useNotifications() {
     return () => {
       channel.unsubscribe();
     };
-  }, [queryClient, showXPToast, triggerCelebration]);
+  }, [queryClient]);
+
+  // ── 5. Celebrate unread approvals (called when modal opens) ──
+  const celebrateUnreadApprovals = useCallback(async () => {
+    // Find unread approved-submission notifications that haven't been celebrated yet
+    const unreadApprovals = persistentNotifs.filter(
+      (n) =>
+        n.type === "submission_approved" &&
+        !n.is_read &&
+        !celebratedIds.current.has(n.id)
+    );
+
+    if (unreadApprovals.length === 0) return;
+
+    for (const notif of unreadApprovals) {
+      celebratedIds.current.add(notif.id);
+
+      const xp = (notif.metadata?.xp_gained as number) || 0;
+      const name = (notif.metadata?.name as string) || "";
+
+      // Trigger XP toast
+      if (xp > 0) {
+        showXPToast(xp, `${name} validé !`);
+      }
+      // Trigger celebration confetti
+      triggerCelebration();
+    }
+
+    // Mark them as read
+    const ids = unreadApprovals.map((n) => n.id);
+    await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .in("id", ids);
+
+    queryClient.invalidateQueries({
+      queryKey: ["notifications", "persistent"],
+    });
+  }, [persistentNotifs, showXPToast, triggerCelebration, queryClient]);
 
   return {
     notifications,
@@ -291,5 +298,6 @@ export function useNotifications() {
     count: unreadCount,
     markAsRead,
     markAllAsRead,
+    celebrateUnreadApprovals,
   };
 }

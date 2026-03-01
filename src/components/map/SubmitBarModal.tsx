@@ -182,41 +182,19 @@ export function SubmitBarModal({ isOpen, onClose }: SubmitBarModalProps) {
           />
         </div>
 
-        {/* GPS */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs text-glupp-text-muted">Coordonnees GPS</label>
-            <button
-              onClick={detectLocation}
-              disabled={locating}
-              className="flex items-center gap-1 text-xs text-glupp-accent hover:text-glupp-accent/80 transition-colors"
-            >
-              <Navigation size={10} />
-              {locating ? "Detection..." : "Ma position"}
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              value={form.geo_lat}
-              onChange={(e) => setForm((f) => ({ ...f, geo_lat: e.target.value }))}
-              placeholder="Latitude"
-              className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-xs text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-            />
-            <input
-              type="text"
-              value={form.geo_lng}
-              onChange={(e) => setForm((f) => ({ ...f, geo_lng: e.target.value }))}
-              placeholder="Longitude"
-              className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-xs text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-            />
-          </div>
-          {form.geo_lat && form.geo_lng && (
-            <p className="text-[10px] text-green-400 mt-1">
-              Position detectee
-            </p>
-          )}
-        </div>
+        {/* GPS auto-detect (invisible pour l'user) */}
+        {locating && (
+          <p className="text-xs text-glupp-text-muted flex items-center gap-1.5">
+            <Navigation size={10} className="animate-pulse text-glupp-accent" />
+            Detection de ta position...
+          </p>
+        )}
+        {!locating && form.geo_lat && form.geo_lng && (
+          <p className="text-[10px] text-green-400 flex items-center gap-1">
+            <Navigation size={9} />
+            Position detectee automatiquement
+          </p>
+        )}
 
         {error && (
           <p className="text-xs text-red-400 bg-red-400/10 px-3 py-2 rounded-glupp">{error}</p>

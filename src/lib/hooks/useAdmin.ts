@@ -25,7 +25,7 @@ export interface AdminSubmission {
   type: "beer" | "bar" | "correction";
   status: "pending" | "approved" | "rejected";
   data: Record<string, unknown>;
-  reject_reason: string | null;
+  admin_note: string | null;
   created_at: string;
   // Joined
   user?: Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
@@ -93,6 +93,7 @@ export function useAdmin() {
         let query = supabase
           .from("beers")
           .select("*", { count: "exact" })
+          .eq("is_active", true)
           .order("created_at", { ascending: false })
           .limit(50);
 
@@ -339,6 +340,28 @@ export function useAdmin() {
     },
   });
 
+  const updateSubmissionDataMutation = useMutation({
+    mutationFn: async ({
+      id,
+      data: newData,
+    }: {
+      id: string;
+      data: Record<string, unknown>;
+    }) => {
+      const { data, error } = await supabase
+        .from("submissions")
+        .update({ data: newData })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
+    },
+  });
+
   // ─── Users ───────────────────────────────
 
   function useAdminUsers(search?: string) {
@@ -423,6 +446,9 @@ export function useAdmin() {
     rejectSubmission: (id: string, reason: string) =>
       rejectSubmissionMutation.mutateAsync({ id, reason }),
     rejectingSubmission: rejectSubmissionMutation.isPending,
+    updateSubmissionData: (id: string, data: Record<string, unknown>) =>
+      updateSubmissionDataMutation.mutateAsync({ id, data }),
+    updatingSubmissionData: updateSubmissionDataMutation.isPending,
 
     // Users
     useAdminUsers,
