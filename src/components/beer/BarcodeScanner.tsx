@@ -283,7 +283,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   return (
     <div className="fixed inset-0 z-[70] bg-black flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/80 shrink-0">
+      <div className="flex items-center justify-between p-4 pt-[max(1rem,env(safe-area-inset-top,1rem))] bg-black/80 shrink-0">
         <div className="flex items-center gap-2 text-white">
           <Camera className="w-5 h-5" />
           <span className="font-display font-semibold">

@@ -10,7 +10,7 @@ interface AdminHeaderProps {
 
 export function AdminHeader({ title, subtitle, children }: AdminHeaderProps) {
   return (
-    <header className="border-b border-[#3A3530] bg-[#1E1B16]/50 backdrop-blur-sm sticky top-0 z-10">
+    <header className="border-b border-[#3A3530] bg-[#1E1B16]/50 backdrop-blur-sm sticky top-0 z-10 pt-[env(safe-area-inset-top,0px)]">
       <div className="flex items-center justify-between px-6 py-4 lg:px-8">
         {/* Left: title + subtitle */}
         <div className="min-w-0">

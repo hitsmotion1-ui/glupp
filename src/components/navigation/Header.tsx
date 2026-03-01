@@ -14,7 +14,7 @@ export function Header() {
   useNotifications();
 
   return (
-    <header className="sticky top-0 z-40 bg-glupp-bg/95 backdrop-blur-lg border-b border-glupp-border">
+    <header className="sticky top-0 z-40 bg-glupp-bg/95 backdrop-blur-lg border-b border-glupp-border pt-[env(safe-area-inset-top,0px)]">
       <div className="flex items-center justify-between px-4 h-14">
         <h1 className="font-display text-xl font-bold text-glupp-accent">
           Glupp
