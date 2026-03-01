@@ -38,6 +38,9 @@ export function GlobalModals() {
   const [showSubmitBar, setShowSubmitBar] = useState(false);
   const [submitBeerPrefill, setSubmitBeerPrefill] = useState("");
 
+  // Barcode not found state
+  const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
+
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Beer[]>([]);
@@ -93,10 +96,8 @@ export function GlobalModals() {
         openGluppModal(beer.id);
       }
     } else {
-      setScanToast({
-        message: `Code-barres non reconnu. Essaie la recherche.`,
-        type: "error",
-      });
+      // Show dialog with options instead of just a toast
+      setNotFoundBarcode(barcode);
     }
   };
 
@@ -353,6 +354,54 @@ export function GlobalModals() {
         isOpen={showSubmitBar}
         onClose={() => setShowSubmitBar(false)}
       />
+
+      {/* Barcode not found dialog */}
+      <Modal
+        isOpen={!!notFoundBarcode}
+        onClose={() => setNotFoundBarcode(null)}
+        title="Code-barres non reconnu"
+      >
+        <div className="text-center py-2 space-y-4">
+          <div className="w-14 h-14 rounded-full bg-glupp-accent/15 flex items-center justify-center mx-auto">
+            <ScanLine className="w-7 h-7 text-glupp-accent" />
+          </div>
+          <p className="text-sm text-glupp-text-muted">
+            Le code <span className="font-mono text-glupp-cream">{notFoundBarcode}</span> n&apos;est pas dans notre base.
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                setNotFoundBarcode(null);
+                setShowScanner(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-glupp-accent text-glupp-bg font-medium text-sm rounded-glupp hover:bg-glupp-accent/90 transition-colors"
+            >
+              <ScanLine size={16} />
+              Rescanner
+            </button>
+            <button
+              onClick={() => {
+                setNotFoundBarcode(null);
+                setShowSearch(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-glupp-card border border-glupp-border text-glupp-cream text-sm rounded-glupp hover:border-glupp-accent/50 transition-colors"
+            >
+              <Search size={16} />
+              Rechercher par nom
+            </button>
+            <button
+              onClick={() => {
+                setNotFoundBarcode(null);
+                setShowSubmitBeer(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-glupp-card border border-glupp-border text-glupp-cream text-sm rounded-glupp hover:border-glupp-accent/50 transition-colors"
+            >
+              <Plus size={16} />
+              Proposer cette biere
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Scan result toast */}
       <Toast
