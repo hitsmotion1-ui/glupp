@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { X, Camera, AlertTriangle, Bug, Flashlight, FlashlightOff } from "lucide-react";
+import { X, Camera, AlertTriangle, Bug, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -50,10 +50,36 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const [scanAttempts, setScanAttempts] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
 
+  // Manual entry state
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState("");
+
   const addLog = useCallback((level: LogLevel, message: string) => {
     const id = ++logIdRef.current;
     setLogs((prev) => [...prev.slice(-50), { id, level, message, timestamp: new Date() }]);
   }, []);
+
+  const handleManualSubmit = () => {
+    const code = manualBarcode.trim();
+    if (!code) return;
+    if (hasScanned.current) return;
+    hasScanned.current = true;
+
+    addLog("success", `Code saisi manuellement: ${code}`);
+
+    // Stop scanner if running
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(() => {});
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    onScan(code);
+  };
 
   useEffect(() => {
     mountedRef.current = true;
@@ -111,14 +137,13 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       scannerRef.current = scanner;
       addLog("info", "Instance Html5Qrcode creee (useBarCodeDetector: true)");
 
-      // Use a function for qrbox that returns dimensions based on viewport
-      // Scan a LARGE area — almost the entire viewport
+      // Scan area — wide rectangle optimized for barcodes
       const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
         const width = Math.floor(viewfinderWidth * 0.9);
-        const height = Math.floor(viewfinderHeight * 0.7);
+        const height = Math.floor(viewfinderHeight * 0.5);
         return { width, height };
       };
-      addLog("info", `QR box: 90% x 70% du viewfinder (zone large)`);
+      addLog("info", `QR box: 90% x 50% du viewfinder (rectangle horizontal)`);
 
       addLog("info", "Demande d'acces camera...");
 
@@ -128,9 +153,9 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         .start(
           { facingMode: "environment" },
           {
-            fps: 30,
+            fps: 15,
             qrbox: qrboxFunction,
-            aspectRatio: 1.0,
+            // No forced aspect ratio — let the camera use its native ratio
             disableFlip: false,
           },
           (decodedText, result) => {
@@ -157,8 +182,8 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           () => {
             // Count scan attempts (called each frame where no code is found)
             scanFrameCount++;
-            if (scanFrameCount % 300 === 0) {
-              // Log every ~10 seconds (30fps * 10s)
+            if (scanFrameCount % 150 === 0) {
+              // Log every ~10 seconds (15fps * 10s)
               if (mountedRef.current) {
                 setScanAttempts(scanFrameCount);
                 addLog("info", `${scanFrameCount} frames analysees, aucun code detecte`);
@@ -170,7 +195,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           if (mountedRef.current) {
             setStarting(false);
             setCameraReady(true);
-            addLog("success", "Camera activee et scanner pret (30fps, zone large)");
+            addLog("success", "Camera activee et scanner pret (15fps)");
 
             // Log camera info
             try {
@@ -180,11 +205,6 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
                   "info",
                   `Resolution video: ${videoEl.videoWidth}x${videoEl.videoHeight}`
                 );
-
-                // Check actual scan region vs video resolution
-                const scanW = Math.floor(videoEl.videoWidth * 0.9);
-                const scanH = Math.floor(videoEl.videoHeight * 0.7);
-                addLog("info", `Zone de scan effective: ${scanW}x${scanH}px`);
               }
             } catch {
               // ignore
@@ -271,6 +291,18 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Manual entry toggle */}
+          <button
+            onClick={() => setShowManualEntry(!showManualEntry)}
+            className={`p-2 rounded-full transition-colors ${
+              showManualEntry
+                ? "bg-glupp-accent/30 text-glupp-accent"
+                : "bg-white/10 hover:bg-white/20 text-white/60"
+            }`}
+            aria-label="Saisie manuelle"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
           {/* Debug toggle */}
           <button
             onClick={() => setShowDebug(!showDebug)}
@@ -344,115 +376,160 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           </div>
         )}
 
-        {/* Scan guide overlay - thin horizontal line to show scan area */}
+        {/* Scan guide overlay - horizontal rectangle for barcodes */}
         {!error && !starting && cameraReady && (
           <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
-            <div className="w-[85%] relative">
+            <div className="w-[85%] h-[30%] relative">
               {/* Animated scan line */}
               <motion.div
-                animate={{ y: [-30, 30] }}
+                animate={{ y: ["-50%", "50%"] }}
                 transition={{ duration: 2, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
-                className="h-0.5 bg-glupp-accent/80 shadow-[0_0_8px_rgba(224,136,64,0.5)]"
+                className="absolute left-0 right-0 top-1/2 h-0.5 bg-glupp-accent/80 shadow-[0_0_8px_rgba(224,136,64,0.5)]"
               />
               {/* Corner markers */}
-              <div className="absolute -top-16 -left-2 w-6 h-6 border-t-2 border-l-2 border-glupp-accent/60 rounded-tl-lg" />
-              <div className="absolute -top-16 -right-2 w-6 h-6 border-t-2 border-r-2 border-glupp-accent/60 rounded-tr-lg" />
-              <div className="absolute top-12 -left-2 w-6 h-6 border-b-2 border-l-2 border-glupp-accent/60 rounded-bl-lg" />
-              <div className="absolute top-12 -right-2 w-6 h-6 border-b-2 border-r-2 border-glupp-accent/60 rounded-br-lg" />
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-glupp-accent/60 rounded-tl-lg" />
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-glupp-accent/60 rounded-tr-lg" />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-glupp-accent/60 rounded-bl-lg" />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-glupp-accent/60 rounded-br-lg" />
             </div>
           </div>
         )}
       </div>
 
-      {/* Instructions or Debug panel */}
-      <AnimatePresence mode="wait">
-        {showDebug ? (
-          <motion.div
-            key="debug"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 shrink-0 max-h-[40vh] flex flex-col"
-          >
-            {/* Debug header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700/50">
-              <div className="flex items-center gap-2">
-                <Bug className="w-3.5 h-3.5 text-glupp-accent" />
-                <span className="text-xs font-semibold text-white/90">
-                  Debug Console
-                </span>
-                <span className="text-[10px] text-white/40">
-                  ({logs.length} logs)
-                </span>
-              </div>
-              <button
-                onClick={() => setLogs([])}
-                className="text-[10px] text-white/40 hover:text-white/70 transition-colors px-2 py-0.5 rounded bg-white/5"
+      {/* Bottom panel: instructions / manual entry / debug */}
+      <div className="shrink-0">
+        {/* Manual entry bar */}
+        <AnimatePresence>
+          {showManualEntry && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-[#1E1B16] border-t border-[#3A3530] px-4 py-3"
+            >
+              <p className="text-[11px] text-white/50 mb-2">
+                Saisis le code-barres manuellement :
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleManualSubmit();
+                }}
+                className="flex gap-2"
               >
-                Clear
-              </button>
-            </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={manualBarcode}
+                  onChange={(e) => setManualBarcode(e.target.value)}
+                  placeholder="Ex: 5411551080222"
+                  autoFocus
+                  className="flex-1 px-3 py-2.5 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-glupp-accent transition-colors font-mono"
+                />
+                <button
+                  type="submit"
+                  disabled={!manualBarcode.trim()}
+                  className="px-5 py-2.5 bg-glupp-accent text-[#141210] font-semibold text-sm rounded-lg hover:bg-glupp-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  OK
+                </button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            {/* Log entries */}
-            <div className="flex-1 overflow-y-auto px-3 py-1.5 space-y-0.5 font-mono">
-              {logs.length === 0 ? (
-                <p className="text-[10px] text-white/30 py-2 text-center">
-                  Aucun log
+        {/* Debug panel or instructions */}
+        <AnimatePresence mode="wait">
+          {showDebug ? (
+            <motion.div
+              key="debug"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 max-h-[40vh] flex flex-col"
+            >
+              {/* Debug header */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700/50">
+                <div className="flex items-center gap-2">
+                  <Bug className="w-3.5 h-3.5 text-glupp-accent" />
+                  <span className="text-xs font-semibold text-white/90">
+                    Debug Console
+                  </span>
+                  <span className="text-[10px] text-white/40">
+                    ({logs.length} logs)
+                  </span>
+                </div>
+                <button
+                  onClick={() => setLogs([])}
+                  className="text-[10px] text-white/40 hover:text-white/70 transition-colors px-2 py-0.5 rounded bg-white/5"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Log entries */}
+              <div className="flex-1 overflow-y-auto px-3 py-1.5 space-y-0.5 font-mono">
+                {logs.length === 0 ? (
+                  <p className="text-[10px] text-white/30 py-2 text-center">
+                    Aucun log
+                  </p>
+                ) : (
+                  logs.map((log) => (
+                    <div key={log.id} className="flex items-start gap-1.5 py-0.5">
+                      <span className="text-[10px] text-white/25 shrink-0 tabular-nums w-[52px]">
+                        {log.timestamp.toLocaleTimeString("fr-FR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
+                      </span>
+                      <span className="text-[10px] shrink-0">
+                        {LOG_ICONS[log.level]}
+                      </span>
+                      <span
+                        className={`text-[11px] leading-tight ${LOG_COLORS[log.level]}`}
+                      >
+                        {log.message}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="instructions"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="p-4 bg-black/80 text-center"
+            >
+              {!error && (
+                <p className="text-white/70 text-sm">
+                  Place le code-barres de la biere dans le cadre
                 </p>
-              ) : (
-                logs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-1.5 py-0.5">
-                    <span className="text-[10px] text-white/25 shrink-0 tabular-nums w-[52px]">
-                      {log.timestamp.toLocaleTimeString("fr-FR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </span>
-                    <span className="text-[10px] shrink-0">
-                      {LOG_ICONS[log.level]}
-                    </span>
-                    <span
-                      className={`text-[11px] leading-tight ${LOG_COLORS[log.level]}`}
-                    >
-                      {log.message}
-                    </span>
-                  </div>
-                ))
               )}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="instructions"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="p-4 bg-black/80 text-center shrink-0"
-          >
-            {!error && (
-              <p className="text-white/70 text-sm">
-                Place le code-barres de la biere dans le cadre
-              </p>
-            )}
-            {/* Mini status */}
-            {!error && scanAttempts > 200 && (
-              <p className="mt-1.5 text-[10px] text-yellow-400/70">
-                Essaie de rapprocher ou eloigner la camera du code-barres
-              </p>
-            )}
-            {!error && logs.length > 0 && (
-              <button
-                onClick={() => setShowDebug(true)}
-                className="mt-1.5 text-[10px] text-white/30 hover:text-white/50 transition-colors"
-              >
-                {logs[logs.length - 1]?.message}
-              </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {/* Hint to use manual entry after some time */}
+              {!error && scanAttempts > 100 && !showManualEntry && (
+                <button
+                  onClick={() => setShowManualEntry(true)}
+                  className="mt-2 text-xs text-glupp-accent/80 hover:text-glupp-accent transition-colors"
+                >
+                  Ca ne marche pas ? Saisir le code manuellement
+                </button>
+              )}
+              {!error && scanAttempts <= 100 && scanAttempts > 0 && (
+                <p className="mt-1.5 text-[10px] text-white/40">
+                  Rapproche ou eloigne la camera...
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Override html5-qrcode internal styles */}
       <style jsx global>{`
