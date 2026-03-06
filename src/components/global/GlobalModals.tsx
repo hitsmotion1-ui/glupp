@@ -178,22 +178,6 @@ export function GlobalModals() {
               exit={{ opacity: 0 }}
               className="flex flex-col gap-2.5 mb-3 items-end"
             >
-              {/* Proposer un bar */}
-              <motion.button
-                initial={{ opacity: 0, y: 15, scale: 0.8 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 15, scale: 0.8 }}
-                transition={{ delay: 0.1 }}
-                onClick={() => {
-                  setFabOpen(false);
-                  setShowSubmitBar(true);
-                }}
-                className="flex items-center gap-2.5 px-4 py-2.5 bg-glupp-card/90 backdrop-blur-sm border border-glupp-border/50 rounded-full shadow-lg text-sm text-glupp-cream hover:border-glupp-accent transition-colors whitespace-nowrap"
-              >
-                <MapPin className="w-4 h-4 text-[#4ECDC4]" />
-                Proposer un bar
-              </motion.button>
-
               {/* Scanner option */}
               <motion.button
                 initial={{ opacity: 0, y: 15, scale: 0.8 }}

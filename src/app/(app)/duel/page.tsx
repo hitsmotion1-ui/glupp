@@ -1,10 +1,13 @@
 "use client";
 
 import { useDuel } from "@/lib/hooks/useDuel";
+import { useActivities } from "@/lib/hooks/useActivities";
 import { DuelCards } from "@/components/beer/DuelCards";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Swords, ArrowRight, Beer, Flame } from "lucide-react";
+import { ActivityItem } from "@/components/social/ActivityItem";
+import { GluppOfWeekBanner } from "@/components/gamification/GluppOfWeekBanner";
+import { Swords, ArrowRight, Beer, Flame, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -22,6 +25,9 @@ export default function DuelPage() {
     generatePair,
     submitVote,
   } = useDuel();
+
+  const { activities, isLoading: activitiesLoading } = useActivities();
+  const recentActivities = activities.slice(0, 4);
 
   if (loading) {
     return (
@@ -62,7 +68,7 @@ export default function DuelPage() {
   }
 
   return (
-    <div className="py-6">
+    <div className="py-6 pb-24">
       {/* Header with stats */}
       <div className="text-center mb-6">
         <h2 className="font-display text-xl font-bold text-glupp-cream">
@@ -130,6 +136,43 @@ export default function DuelPage() {
           Gluppe de nouvelles bieres pour plus de duels !
         </Link>
       </div>
+
+      {/* Glupp of the Week */}
+      <div className="px-4 mt-6">
+        <GluppOfWeekBanner />
+      </div>
+
+      {/* Recent Activity */}
+      {recentActivities.length > 0 && (
+        <div className="mt-6 px-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-glupp-cream">
+              Activite recente
+            </h3>
+            <Link
+              href="/social"
+              className="text-xs text-glupp-accent font-medium hover:underline inline-flex items-center gap-0.5"
+            >
+              Voir tout
+              <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {recentActivities.map((activity, i) => (
+              <ActivityItem key={activity.id} activity={activity} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activitiesLoading && (
+        <div className="mt-6 px-4 space-y-2">
+          <Skeleton className="h-4 w-32" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

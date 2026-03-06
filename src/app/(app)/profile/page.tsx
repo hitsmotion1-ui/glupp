@@ -3,20 +3,48 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useProfile } from "@/lib/hooks/useProfile";
+import { useCollection } from "@/lib/hooks/useCollection";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { LevelBadge } from "@/components/gamification/LevelBadge";
 import { ProgressionTree } from "@/components/gamification/ProgressionTree";
+import { TrophyGrid } from "@/components/social/TrophyGrid";
+import { FriendList } from "@/components/social/FriendList";
+import { FriendSearchModal } from "@/components/social/FriendSearchModal";
+import { CrewSection } from "@/components/social/CrewSection";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Swords, Beer, Camera, LogOut, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Swords,
+  Beer,
+  Camera,
+  LogOut,
+  ChevronDown,
+  ChevronUp,
+  Trophy,
+  Users,
+  Shield,
+  Globe,
+} from "lucide-react";
 import { formatNumber } from "@/lib/utils/xp";
+
+type Section = "progression" | "trophies" | "friends" | "crews" | "passport";
 
 export default function ProfilePage() {
   const { signOut } = useAuth();
   const { profile, loading, level, nextLevel, progress } = useProfile();
-  const [showProgression, setShowProgression] = useState(false);
+  const { allBeers, tastedIds } = useCollection();
+  const [openSections, setOpenSections] = useState<Set<Section>>(new Set());
+
+  const toggleSection = (section: Section) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
 
   if (loading) {
     return (
@@ -39,7 +67,7 @@ export default function ProfilePage() {
   if (!profile) {
     return (
       <div className="py-16 px-4 text-center space-y-4">
-        <p className="text-5xl">😕</p>
+        <p className="text-5xl">:(</p>
         <h2 className="font-display text-lg font-bold text-glupp-cream">
           Profil introuvable
         </h2>
@@ -57,6 +85,31 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  // Beer passport data
+  const passportData = (() => {
+    const byCountry = new Map<string, { code: string; country: string; total: number; tasted: number }>();
+    for (const b of allBeers) {
+      const entry = byCountry.get(b.country_code) || {
+        code: b.country_code,
+        country: b.country,
+        total: 0,
+        tasted: 0,
+      };
+      entry.total++;
+      if (tastedIds.has(b.id)) entry.tasted++;
+      byCountry.set(b.country_code, entry);
+    }
+    return Array.from(byCountry.values()).sort((a, b) => b.total - a.total);
+  })();
+
+  const FLAG_MAP: Record<string, string> = {
+    FR: "\u{1F1EB}\u{1F1F7}", BE: "\u{1F1E7}\u{1F1EA}", DE: "\u{1F1E9}\u{1F1EA}",
+    US: "\u{1F1FA}\u{1F1F8}", GB: "\u{1F1EC}\u{1F1E7}", IE: "\u{1F1EE}\u{1F1EA}",
+    NL: "\u{1F1F3}\u{1F1F1}", CZ: "\u{1F1E8}\u{1F1FF}", JP: "\u{1F1EF}\u{1F1F5}",
+    MX: "\u{1F1F2}\u{1F1FD}", ES: "\u{1F1EA}\u{1F1F8}", IT: "\u{1F1EE}\u{1F1F9}",
+    NO: "\u{1F1F3}\u{1F1F4}", DK: "\u{1F1E9}\u{1F1F0}", AU: "\u{1F1E6}\u{1F1FA}",
+  };
 
   return (
     <div className="py-6 px-4 space-y-6 pb-24">
@@ -78,7 +131,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* XP Progress — enhanced */}
+      {/* XP Progress */}
       <div className="bg-glupp-card rounded-glupp-lg p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-glupp-cream">
@@ -124,31 +177,92 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      {/* Progression Tree — collapsible */}
-      <div>
-        <button
-          onClick={() => setShowProgression(!showProgression)}
-          className="w-full flex items-center justify-between py-2 text-sm font-semibold text-glupp-cream"
-        >
-          <span>Progression</span>
-          {showProgression ? (
-            <ChevronUp size={18} className="text-glupp-text-muted" />
-          ) : (
-            <ChevronDown size={18} className="text-glupp-text-muted" />
+      {/* Progression — collapsible */}
+      <CollapsibleSection
+        title="Progression"
+        icon={<ChevronDown size={16} />}
+        isOpen={openSections.has("progression")}
+        onToggle={() => toggleSection("progression")}
+      >
+        <ProgressionTree xp={profile.xp} />
+      </CollapsibleSection>
+
+      {/* Trophies — collapsible */}
+      <CollapsibleSection
+        title="Trophees"
+        icon={<Trophy size={16} className="text-glupp-gold" />}
+        isOpen={openSections.has("trophies")}
+        onToggle={() => toggleSection("trophies")}
+      >
+        <TrophyGrid />
+      </CollapsibleSection>
+
+      {/* Friends — collapsible */}
+      <CollapsibleSection
+        title="Mes Amis"
+        icon={<Users size={16} className="text-glupp-accent" />}
+        isOpen={openSections.has("friends")}
+        onToggle={() => toggleSection("friends")}
+      >
+        <FriendList />
+      </CollapsibleSection>
+
+      {/* Crews — collapsible */}
+      <CollapsibleSection
+        title="Mes Crews"
+        icon={<Shield size={16} className="text-glupp-rare" />}
+        isOpen={openSections.has("crews")}
+        onToggle={() => toggleSection("crews")}
+      >
+        <CrewSection />
+      </CollapsibleSection>
+
+      {/* Beer Passport — collapsible */}
+      <CollapsibleSection
+        title="Beer Passport"
+        icon={<Globe size={16} className="text-glupp-success" />}
+        isOpen={openSections.has("passport")}
+        onToggle={() => toggleSection("passport")}
+      >
+        <div className="space-y-2">
+          {passportData.map((entry) => {
+            const pct = entry.total > 0 ? Math.round((entry.tasted / entry.total) * 100) : 0;
+            return (
+              <div key={entry.code} className="flex items-center gap-3">
+                <span className="text-lg shrink-0">
+                  {FLAG_MAP[entry.code] || "\u{1F30D}"}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between mb-0.5">
+                    <span className="text-xs font-medium text-glupp-cream truncate">
+                      {entry.country}
+                    </span>
+                    <span className="text-[10px] text-glupp-text-muted shrink-0">
+                      {entry.tasted}/{entry.total}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-glupp-border rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-glupp-accent rounded-full transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {passportData.length === 0 && (
+            <p className="text-xs text-glupp-text-muted text-center py-4">
+              Gluppe des bieres pour remplir ton passport !
+            </p>
           )}
-        </button>
-        {showProgression && <ProgressionTree xp={profile.xp} />}
-      </div>
+        </div>
+      </CollapsibleSection>
 
-      {/* Trophies placeholder */}
-      <div className="bg-glupp-card rounded-glupp p-4 text-center">
-        <p className="text-sm text-glupp-text-soft mb-1">🏆 Trophees</p>
-        <p className="text-xs text-glupp-text-muted">
-          Bientot disponible — continue a glupper !
-        </p>
-      </div>
+      {/* Friend Search Modal */}
+      <FriendSearchModal />
 
-      {/* Sign Out — small, at the bottom */}
+      {/* Sign Out */}
       <div className="pt-8">
         <button
           onClick={signOut}
@@ -158,6 +272,41 @@ export default function ProfilePage() {
           Se deconnecter
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ─── Collapsible Section ─── */
+function CollapsibleSection({
+  title,
+  icon,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between py-2 text-sm font-semibold text-glupp-cream"
+      >
+        <span className="flex items-center gap-2">
+          {icon}
+          {title}
+        </span>
+        {isOpen ? (
+          <ChevronUp size={18} className="text-glupp-text-muted" />
+        ) : (
+          <ChevronDown size={18} className="text-glupp-text-muted" />
+        )}
+      </button>
+      {isOpen && <div className="pb-2">{children}</div>}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
   List,
   Map as MapIcon,
 } from "lucide-react";
+import { SubmitBarModal } from "@/components/map/SubmitBarModal";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Bar } from "@/types";
 
@@ -48,6 +49,7 @@ export default function MapPage() {
   const [selectedBarId, setSelectedBarId] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  const [showSubmitBar, setShowSubmitBar] = useState(false);
 
   // Mount portal container for the bottom sheet (renders outside <main> overflow)
   useEffect(() => {
@@ -124,6 +126,16 @@ export default function MapPage() {
               </p>
             </div>
 
+            <div className="flex items-center gap-2">
+            {/* Proposer un bar */}
+            <button
+              onClick={() => setShowSubmitBar(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-glupp-card border border-glupp-border rounded-glupp text-xs text-glupp-text-soft hover:border-glupp-accent transition-colors"
+            >
+              <MapPin size={12} />
+              + Bar
+            </button>
+
             {/* View toggle */}
             <div className="flex bg-glupp-card border border-glupp-border rounded-glupp overflow-hidden">
               <button
@@ -148,6 +160,7 @@ export default function MapPage() {
                 <List size={12} />
                 Liste
               </button>
+            </div>
             </div>
           </div>
 
@@ -392,6 +405,12 @@ export default function MapPage() {
         </AnimatePresence>,
         portalContainer
       )}
+
+      {/* Submit bar modal */}
+      <SubmitBarModal
+        isOpen={showSubmitBar}
+        onClose={() => setShowSubmitBar(false)}
+      />
     </>
   );
 }

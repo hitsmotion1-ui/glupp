@@ -2,15 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Swords, Trophy, Map, Users, User, Beer } from "lucide-react";
+import { Swords, Trophy, Map, User } from "lucide-react";
 import { motion } from "framer-motion";
 
 const tabs = [
   { href: "/duel", label: "Duel", icon: Swords },
-  { href: "/ranking", label: "Classement", icon: Trophy },
-  { href: "/collection", label: "Collection", icon: Beer },
-  { href: "/map", label: "Carte", icon: Map },
-  { href: "/social", label: "Social", icon: Users },
+  { href: "/collection", label: "Classement", icon: Trophy },
+  { href: "/map", label: "Explorer", icon: Map },
   { href: "/profile", label: "Profil", icon: User },
 ];
 
