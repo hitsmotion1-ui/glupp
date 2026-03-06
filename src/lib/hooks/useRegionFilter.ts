@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { normalizeRegions } from "@/lib/utils/regionMapping";
 
 export const COUNTRIES = [
   { code: "FR", flag: "\u{1F1EB}\u{1F1F7}", name: "France" },
@@ -26,7 +27,7 @@ export function useRegionFilter() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
 
-  // Fetch regions for selected country
+  // Fetch raw regions then normalize them
   const { data: regions = [] } = useQuery({
     queryKey: ["regions", selectedCountry],
     queryFn: async () => {
@@ -39,8 +40,9 @@ export function useRegionFilter() {
         .not("region", "is", null);
 
       if (!data) return [];
-      const unique = [...new Set(data.map((d) => d.region as string))].filter(Boolean).sort();
-      return unique;
+      const rawRegions = data.map((d) => d.region as string).filter(Boolean);
+      // Normalise les adresses/codes postaux en noms de régions
+      return normalizeRegions(rawRegions, selectedCountry);
     },
     enabled: !!selectedCountry,
     staleTime: 10 * 60 * 1000,
