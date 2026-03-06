@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useAdmin } from "@/lib/hooks/useAdmin";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { RARITY_CONFIG } from "@/lib/utils/xp";
@@ -14,7 +16,41 @@ import {
   Trash2,
   Loader2,
   Beer as BeerIcon,
+  ChevronDown,
 } from "lucide-react";
+
+// ═══════════════════════════════════════════
+// Country Emoji Picker Data
+// ═══════════════════════════════════════════
+
+const COUNTRY_LIST = [
+  { code: "FR", flag: "\u{1F1EB}\u{1F1F7}", name: "France" },
+  { code: "BE", flag: "\u{1F1E7}\u{1F1EA}", name: "Belgique" },
+  { code: "DE", flag: "\u{1F1E9}\u{1F1EA}", name: "Allemagne" },
+  { code: "US", flag: "\u{1F1FA}\u{1F1F8}", name: "USA" },
+  { code: "GB", flag: "\u{1F1EC}\u{1F1E7}", name: "UK" },
+  { code: "IE", flag: "\u{1F1EE}\u{1F1EA}", name: "Irlande" },
+  { code: "NL", flag: "\u{1F1F3}\u{1F1F1}", name: "Pays-Bas" },
+  { code: "CZ", flag: "\u{1F1E8}\u{1F1FF}", name: "Tchequie" },
+  { code: "JP", flag: "\u{1F1EF}\u{1F1F5}", name: "Japon" },
+  { code: "MX", flag: "\u{1F1F2}\u{1F1FD}", name: "Mexique" },
+  { code: "ES", flag: "\u{1F1EA}\u{1F1F8}", name: "Espagne" },
+  { code: "IT", flag: "\u{1F1EE}\u{1F1F9}", name: "Italie" },
+  { code: "NO", flag: "\u{1F1F3}\u{1F1F4}", name: "Norvege" },
+  { code: "DK", flag: "\u{1F1E9}\u{1F1F0}", name: "Danemark" },
+  { code: "AU", flag: "\u{1F1E6}\u{1F1FA}", name: "Australie" },
+  { code: "CA", flag: "\u{1F1E8}\u{1F1E6}", name: "Canada" },
+  { code: "PL", flag: "\u{1F1F5}\u{1F1F1}", name: "Pologne" },
+  { code: "AT", flag: "\u{1F1E6}\u{1F1F9}", name: "Autriche" },
+  { code: "SE", flag: "\u{1F1F8}\u{1F1EA}", name: "Suede" },
+  { code: "PT", flag: "\u{1F1F5}\u{1F1F9}", name: "Portugal" },
+  { code: "BR", flag: "\u{1F1E7}\u{1F1F7}", name: "Bresil" },
+  { code: "CH", flag: "\u{1F1E8}\u{1F1ED}", name: "Suisse" },
+  { code: "NZ", flag: "\u{1F1F3}\u{1F1FF}", name: "Nouvelle-Zelande" },
+  { code: "CN", flag: "\u{1F1E8}\u{1F1F3}", name: "Chine" },
+  { code: "VN", flag: "\u{1F1FB}\u{1F1F3}", name: "Vietnam" },
+  { code: "TH", flag: "\u{1F1F9}\u{1F1ED}", name: "Thailande" },
+];
 
 // ═══════════════════════════════════════════
 // Types
@@ -27,8 +63,14 @@ interface BeerFormData {
   country_code: string;
   style: string;
   abv: string;
+  ibu: string;
   rarity: Rarity;
   description: string;
+  region: string;
+  taste_bitter: number;
+  taste_sweet: number;
+  taste_fruity: number;
+  taste_body: number;
 }
 
 const EMPTY_FORM: BeerFormData = {
@@ -38,8 +80,14 @@ const EMPTY_FORM: BeerFormData = {
   country_code: "",
   style: "",
   abv: "",
+  ibu: "",
   rarity: "common",
   description: "",
+  region: "",
+  taste_bitter: 3,
+  taste_sweet: 3,
+  taste_fruity: 3,
+  taste_body: 3,
 };
 
 const RARITY_OPTIONS: { value: string; label: string }[] = [
@@ -73,6 +121,21 @@ export default function AdminBeersPage() {
   );
   const beers = data?.beers ?? [];
 
+  // ── Fetch existing styles for dropdown ──
+  const { data: existingStyles = [] } = useQuery({
+    queryKey: ["admin", "beer-styles"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("beers")
+        .select("style")
+        .eq("is_active", true);
+      if (!data) return [];
+      const styles = new Set(data.map((b) => b.style).filter(Boolean));
+      return Array.from(styles).sort();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // ── Handlers ──
   const updateField = useCallback(
     <K extends keyof BeerFormData>(key: K, value: BeerFormData[K]) => {
@@ -95,8 +158,14 @@ export default function AdminBeersPage() {
       country_code: beer.country_code,
       style: beer.style,
       abv: beer.abv != null ? String(beer.abv) : "",
+      ibu: beer.ibu != null ? String(beer.ibu) : "",
       rarity: beer.rarity,
       description: beer.description ?? "",
+      region: beer.region ?? "",
+      taste_bitter: beer.taste_bitter ?? 3,
+      taste_sweet: beer.taste_sweet ?? 3,
+      taste_fruity: beer.taste_fruity ?? 3,
+      taste_body: beer.taste_body ?? 3,
     });
   }, []);
 
@@ -116,8 +185,14 @@ export default function AdminBeersPage() {
         country_code: form.country_code.trim(),
         style: form.style.trim(),
         abv: form.abv ? parseFloat(form.abv) : null,
+        ibu: form.ibu ? parseInt(form.ibu) : null,
         rarity: form.rarity,
         description: form.description.trim() || null,
+        region: form.region.trim() || null,
+        taste_bitter: form.taste_bitter,
+        taste_sweet: form.taste_sweet,
+        taste_fruity: form.taste_fruity,
+        taste_body: form.taste_body,
       });
       closeModals();
     } catch (err) {
@@ -135,8 +210,14 @@ export default function AdminBeersPage() {
         country_code: form.country_code.trim(),
         style: form.style.trim(),
         abv: form.abv ? parseFloat(form.abv) : null,
+        ibu: form.ibu ? parseInt(form.ibu) : null,
         rarity: form.rarity,
         description: form.description.trim() || null,
+        region: form.region.trim() || null,
+        taste_bitter: form.taste_bitter,
+        taste_sweet: form.taste_sweet,
+        taste_fruity: form.taste_fruity,
+        taste_body: form.taste_body,
       });
       closeModals();
     } catch (err) {
@@ -184,6 +265,13 @@ export default function AdminBeersPage() {
         <span>
           {beer.country} <span className="text-[#A89888] text-xs">{beer.country_code}</span>
         </span>
+      ),
+    },
+    {
+      key: "region",
+      label: "Region",
+      render: (beer) => (
+        <span className="text-[#A89888] text-xs">{beer.region || "\u2014"}</span>
       ),
     },
     {
@@ -331,6 +419,7 @@ export default function AdminBeersPage() {
             onCancel={closeModals}
             submitting={admin.creatingBeer}
             submitLabel="Creer"
+            existingStyles={existingStyles}
           />
         </ModalOverlay>
       )}
@@ -348,6 +437,7 @@ export default function AdminBeersPage() {
             onCancel={closeModals}
             submitting={admin.updatingBeer}
             submitLabel="Enregistrer"
+            existingStyles={existingStyles}
           />
         </ModalOverlay>
       )}
@@ -374,7 +464,7 @@ function ModalOverlay({
         onClick={onClose}
       />
       {/* Content */}
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-[#1E1B16] border border-[#3A3530] shadow-2xl">
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-[#1E1B16] border border-[#3A3530] shadow-2xl">
         {children}
       </div>
     </div>
@@ -382,7 +472,299 @@ function ModalOverlay({
 }
 
 // ═══════════════════════════════════════════
-// Beer Form
+// Country Picker
+// ═══════════════════════════════════════════
+
+function CountryPicker({
+  selectedFlag,
+  selectedCode,
+  onSelect,
+}: {
+  selectedFlag: string;
+  selectedCode: string;
+  onSelect: (flag: string, code: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return COUNTRY_LIST;
+    const q = search.toLowerCase();
+    return COUNTRY_LIST.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q)
+    );
+  }, [search]);
+
+  const selectedName = COUNTRY_LIST.find((c) => c.code === selectedCode)?.name;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] hover:border-[#E08840]/50 transition-colors"
+      >
+        <span>
+          {selectedFlag ? (
+            <>
+              <span className="text-lg mr-2">{selectedFlag}</span>
+              {selectedName || selectedCode}
+            </>
+          ) : (
+            <span className="text-[#6B6050]">Choisir un pays...</span>
+          )}
+        </span>
+        <ChevronDown size={14} className="text-[#6B6050]" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-[#1E1B16] border border-[#3A3530] rounded-lg shadow-xl max-h-64 overflow-hidden">
+          <div className="p-2 border-b border-[#3A3530]">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher..."
+              className="w-full px-2 py-1.5 bg-[#141210] border border-[#3A3530] rounded text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50"
+              autoFocus
+            />
+          </div>
+          <div className="overflow-y-auto max-h-48">
+            {filtered.map((c) => (
+              <button
+                key={c.code}
+                type="button"
+                onClick={() => {
+                  onSelect(c.flag, c.code);
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-[#3A3530] transition-colors ${
+                  selectedCode === c.code ? "bg-[#E08840]/10 text-[#E08840]" : "text-[#F5E6D3]"
+                }`}
+              >
+                <span className="text-lg">{c.flag}</span>
+                <span>{c.name}</span>
+                <span className="text-xs text-[#6B6050] ml-auto">{c.code}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="text-center text-sm text-[#6B6050] py-4">
+                Aucun pays trouve
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// Style Dropdown with custom add
+// ═══════════════════════════════════════════
+
+function StylePicker({
+  value,
+  onChange,
+  existingStyles,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  existingStyles: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const [newStyle, setNewStyle] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setAddingNew(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return existingStyles;
+    const q = search.toLowerCase();
+    return existingStyles.filter((s) => s.toLowerCase().includes(q));
+  }, [search, existingStyles]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] hover:border-[#E08840]/50 transition-colors"
+      >
+        <span className={value ? "text-[#F5E6D3]" : "text-[#6B6050]"}>
+          {value || "Choisir un style..."}
+        </span>
+        <ChevronDown size={14} className="text-[#6B6050]" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-[#1E1B16] border border-[#3A3530] rounded-lg shadow-xl max-h-72 overflow-hidden">
+          <div className="p-2 border-b border-[#3A3530]">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un style..."
+              className="w-full px-2 py-1.5 bg-[#141210] border border-[#3A3530] rounded text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50"
+              autoFocus
+            />
+          </div>
+
+          <div className="overflow-y-auto max-h-48">
+            {filtered.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  onChange(s);
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-[#3A3530] transition-colors ${
+                  value === s ? "bg-[#E08840]/10 text-[#E08840]" : "text-[#F5E6D3]"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+
+            {/* Add new style */}
+            {!addingNew ? (
+              <button
+                type="button"
+                onClick={() => setAddingNew(true)}
+                className="w-full text-left px-3 py-2 text-sm text-[#E08840] hover:bg-[#E08840]/10 transition-colors border-t border-[#3A3530]"
+              >
+                + Ajouter un nouveau style
+              </button>
+            ) : (
+              <div className="p-2 border-t border-[#3A3530] flex gap-2">
+                <input
+                  type="text"
+                  value={newStyle}
+                  onChange={(e) => setNewStyle(e.target.value)}
+                  placeholder="Nouveau style..."
+                  className="flex-1 px-2 py-1.5 bg-[#141210] border border-[#3A3530] rounded text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newStyle.trim()) {
+                      onChange(newStyle.trim());
+                      setOpen(false);
+                      setAddingNew(false);
+                      setNewStyle("");
+                      setSearch("");
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newStyle.trim()) {
+                      onChange(newStyle.trim());
+                      setOpen(false);
+                      setAddingNew(false);
+                      setNewStyle("");
+                      setSearch("");
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-[#E08840] text-[#141210] rounded text-xs font-semibold hover:bg-[#E08840]/90"
+                >
+                  OK
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// Taste Slider (admin)
+// ═══════════════════════════════════════════
+
+const TASTE_DIMENSIONS = [
+  { key: "taste_bitter" as const, label: "Amertume", color: "#E08840", emoji: "\u{1F37A}" },
+  { key: "taste_sweet" as const, label: "Sucre", color: "#DCB04C", emoji: "\u{1F36F}" },
+  { key: "taste_fruity" as const, label: "Fruite", color: "#4CAF50", emoji: "\u{1F353}" },
+  { key: "taste_body" as const, label: "Corps", color: "#8D7C6C", emoji: "\u{1F4AA}" },
+];
+
+function TasteSliders({
+  values,
+  onChange,
+}: {
+  values: { taste_bitter: number; taste_sweet: number; taste_fruity: number; taste_body: number };
+  onChange: (key: keyof typeof values, value: number) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {TASTE_DIMENSIONS.map((dim) => (
+        <div key={dim.key}>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs text-[#A89888] flex items-center gap-1.5">
+              <span>{dim.emoji}</span>
+              {dim.label}
+            </label>
+            <span
+              className="text-xs font-bold tabular-nums w-4 text-center"
+              style={{ color: dim.color }}
+            >
+              {values[dim.key]}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-[#6B6050] w-3 text-center">1</span>
+            <input
+              type="range"
+              min={1}
+              max={5}
+              step={1}
+              value={values[dim.key]}
+              onChange={(e) => onChange(dim.key, parseInt(e.target.value))}
+              className="flex-1 h-2 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, ${dim.color} 0%, ${dim.color} ${((values[dim.key] - 1) / 4) * 100}%, #3A3530 ${((values[dim.key] - 1) / 4) * 100}%, #3A3530 100%)`,
+              }}
+            />
+            <span className="text-[10px] text-[#6B6050] w-3 text-center">5</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// Beer Form (enhanced)
 // ═══════════════════════════════════════════
 
 function BeerForm({
@@ -393,6 +775,7 @@ function BeerForm({
   onCancel,
   submitting,
   submitLabel,
+  existingStyles,
 }: {
   title: string;
   form: BeerFormData;
@@ -401,10 +784,13 @@ function BeerForm({
   onCancel: () => void;
   submitting: boolean;
   submitLabel: string;
+  existingStyles: string[];
 }) {
   const inputClass =
     "w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors";
   const labelClass = "block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider";
+  const sectionClass = "rounded-lg border border-[#3A3530] p-4 space-y-4";
+  const sectionTitleClass = "text-sm font-bold text-[#F5E6D3] mb-3";
 
   return (
     <div className="p-6">
@@ -426,101 +812,129 @@ function BeerForm({
         </button>
       </div>
 
-      {/* Form fields */}
-      <div className="space-y-4">
-        {/* Name + Brewery row */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className={labelClass}>Nom *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => onChange("name", e.target.value)}
-              placeholder="Ex: Chouffe Blonde"
-              className={inputClass}
-            />
+      <div className="space-y-5">
+        {/* ── Section 1: Infos de base ── */}
+        <div className={sectionClass}>
+          <h3 className={sectionTitleClass}>Informations</h3>
+
+          {/* Name + Brewery row */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Nom *</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => onChange("name", e.target.value)}
+                placeholder="Ex: Chouffe Blonde"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Brasserie *</label>
+              <input
+                type="text"
+                value={form.brewery}
+                onChange={(e) => onChange("brewery", e.target.value)}
+                placeholder="Ex: Brasserie d'Achouffe"
+                className={inputClass}
+              />
+            </div>
           </div>
+
+          {/* Country (emoji picker) */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Pays</label>
+              <CountryPicker
+                selectedFlag={form.country}
+                selectedCode={form.country_code}
+                onSelect={(flag, code) => {
+                  onChange("country", flag);
+                  onChange("country_code", code);
+                }}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Region</label>
+              <input
+                type="text"
+                value={form.region}
+                onChange={(e) => onChange("region", e.target.value)}
+                placeholder="Ex: Bretagne, Bavaria, California..."
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {/* Style (dropdown) + ABV + IBU */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className={labelClass}>Style</label>
+              <StylePicker
+                value={form.style}
+                onChange={(v) => onChange("style", v)}
+                existingStyles={existingStyles}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>ABV (%)</label>
+              <input
+                type="number"
+                value={form.abv}
+                onChange={(e) => onChange("abv", e.target.value)}
+                placeholder="Ex: 8.0"
+                step="0.1"
+                min="0"
+                max="100"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>IBU</label>
+              <input
+                type="number"
+                value={form.ibu}
+                onChange={(e) => onChange("ibu", e.target.value)}
+                placeholder="Ex: 35"
+                min="0"
+                max="200"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {/* Rarity */}
           <div>
-            <label className={labelClass}>Brasserie *</label>
-            <input
-              type="text"
-              value={form.brewery}
-              onChange={(e) => onChange("brewery", e.target.value)}
-              placeholder="Ex: Brasserie d'Achouffe"
+            <label className={labelClass}>Rarete</label>
+            <select
+              value={form.rarity}
+              onChange={(e) => onChange("rarity", e.target.value as Rarity)}
               className={inputClass}
-            />
+            >
+              {Object.entries(RARITY_CONFIG).map(([key, cfg]) => (
+                <option key={key} value={key}>
+                  {cfg.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Country + Country Code row */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className={labelClass}>Pays (emoji)</label>
-            <input
-              type="text"
-              value={form.country}
-              onChange={(e) => onChange("country", e.target.value)}
-              placeholder="Ex: \uD83C\uDDE7\uD83C\uDDEA"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Code pays (ISO)</label>
-            <input
-              type="text"
-              value={form.country_code}
-              onChange={(e) => onChange("country_code", e.target.value)}
-              placeholder="Ex: BE"
-              className={inputClass}
-              maxLength={2}
-            />
-          </div>
+        {/* ── Section 2: Profil gustatif ── */}
+        <div className={sectionClass}>
+          <h3 className={sectionTitleClass}>Profil gustatif</h3>
+          <TasteSliders
+            values={{
+              taste_bitter: form.taste_bitter,
+              taste_sweet: form.taste_sweet,
+              taste_fruity: form.taste_fruity,
+              taste_body: form.taste_body,
+            }}
+            onChange={(key, value) => onChange(key, value)}
+          />
         </div>
 
-        {/* Style + ABV row */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className={labelClass}>Style</label>
-            <input
-              type="text"
-              value={form.style}
-              onChange={(e) => onChange("style", e.target.value)}
-              placeholder="Ex: Belgian Blonde"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>ABV (%)</label>
-            <input
-              type="number"
-              value={form.abv}
-              onChange={(e) => onChange("abv", e.target.value)}
-              placeholder="Ex: 8.0"
-              step="0.1"
-              min="0"
-              max="100"
-              className={inputClass}
-            />
-          </div>
-        </div>
-
-        {/* Rarity */}
-        <div>
-          <label className={labelClass}>Rarete</label>
-          <select
-            value={form.rarity}
-            onChange={(e) => onChange("rarity", e.target.value as Rarity)}
-            className={inputClass}
-          >
-            {Object.entries(RARITY_CONFIG).map(([key, cfg]) => (
-              <option key={key} value={key}>
-                {cfg.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Description */}
+        {/* ── Section 3: Description ── */}
         <div>
           <label className={labelClass}>Description</label>
           <textarea

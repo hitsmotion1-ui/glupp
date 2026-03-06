@@ -5,7 +5,7 @@ import { useCollection } from "@/lib/hooks/useCollection";
 import { useMyTop } from "@/lib/hooks/useMyTop";
 import { useRanking } from "@/lib/hooks/useRanking";
 import { useRegionFilter } from "@/lib/hooks/useRegionFilter";
-import { matchesNormalizedRegion } from "@/lib/utils/regionMapping";
+import { matchesNormalizedRegion, matchesNormalizedDepartment } from "@/lib/utils/regionMapping";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -268,12 +268,18 @@ function PokedexView() {
       beers = beers.filter((b) => b.country_code === regionFilter.selectedCountry);
     }
     if (regionFilter.selectedRegion) {
-      beers = beers.filter((b) =>
-        matchesNormalizedRegion(b.region, regionFilter.selectedRegion!, b.country_code)
-      );
+      if (regionFilter.regionMode === "departments") {
+        beers = beers.filter((b) =>
+          matchesNormalizedDepartment(b.region, regionFilter.selectedRegion!, b.country_code)
+        );
+      } else {
+        beers = beers.filter((b) =>
+          matchesNormalizedRegion(b.region, regionFilter.selectedRegion!, b.country_code)
+        );
+      }
     }
     return beers;
-  }, [allFilteredBeers, regionFilter.selectedCountry, regionFilter.selectedRegion]);
+  }, [allFilteredBeers, regionFilter.selectedCountry, regionFilter.selectedRegion, regionFilter.regionMode]);
 
   // Country stats for RegionFilter
   const countryStats = useMemo(() => {
@@ -474,12 +480,18 @@ function MondialView() {
       beers = beers.filter((b) => b.country_code === regionFilter.selectedCountry);
     }
     if (regionFilter.selectedRegion) {
-      beers = beers.filter((b) =>
-        matchesNormalizedRegion(b.region, regionFilter.selectedRegion!, b.country_code)
-      );
+      if (regionFilter.regionMode === "departments") {
+        beers = beers.filter((b) =>
+          matchesNormalizedDepartment(b.region, regionFilter.selectedRegion!, b.country_code)
+        );
+      } else {
+        beers = beers.filter((b) =>
+          matchesNormalizedRegion(b.region, regionFilter.selectedRegion!, b.country_code)
+        );
+      }
     }
     return beers;
-  }, [rankings, regionFilter.selectedCountry, regionFilter.selectedRegion]);
+  }, [rankings, regionFilter.selectedCountry, regionFilter.selectedRegion, regionFilter.regionMode]);
 
   if (loading) {
     return (

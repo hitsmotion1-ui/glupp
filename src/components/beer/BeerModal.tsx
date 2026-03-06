@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { supabase } from "@/lib/supabase/client";
@@ -19,8 +19,26 @@ import {
   Camera,
   RotateCcw,
   Beer as BeerIcon,
+  Pencil,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// ── Taste dimensions for user rating ──
+const TASTE_DIMS = [
+  { key: "bitter" as const, label: "Amertume", color: "#E08840", emoji: "\u{1F37A}" },
+  { key: "sweet" as const, label: "Sucre", color: "#DCB04C", emoji: "\u{1F36F}" },
+  { key: "fruity" as const, label: "Fruite", color: "#4CAF50", emoji: "\u{1F353}" },
+  { key: "body" as const, label: "Corps", color: "#8D7C6C", emoji: "\u{1F4AA}" },
+];
+
+interface UserTasteRating {
+  bitter: number;
+  sweet: number;
+  fruity: number;
+  body: number;
+}
 
 export function BeerModal() {
   const queryClient = useQueryClient();
@@ -38,11 +56,24 @@ export function BeerModal() {
   const [regluppLoading, setRegluppLoading] = useState(false);
   const [regluppDone, setRegluppDone] = useState(false);
 
+  // ── User taste rating state ──
+  const [userTaste, setUserTaste] = useState<UserTasteRating | null>(null);
+  const [editingTaste, setEditingTaste] = useState(false);
+  const [tasteDraft, setTasteDraft] = useState<UserTasteRating>({
+    bitter: 3,
+    sweet: 3,
+    fruity: 3,
+    body: 3,
+  });
+  const [savingTaste, setSavingTaste] = useState(false);
+
   useEffect(() => {
     if (!selectedBeerId) {
       setBeer(null);
       setUserBeerData(null);
       setRegluppDone(false);
+      setUserTaste(null);
+      setEditingTaste(false);
       return;
     }
 
@@ -65,7 +96,7 @@ export function BeerModal() {
       if (user) {
         const { data: userBeer } = await supabase
           .from("user_beers")
-          .select("id, tasted_at, photo_url, bar_name, glupp_count")
+          .select("id, tasted_at, photo_url, bar_name, glupp_count, user_taste_bitter, user_taste_sweet, user_taste_fruity, user_taste_body")
           .eq("user_id", user.id)
           .eq("beer_id", selectedBeerId)
           .maybeSingle();
@@ -78,6 +109,29 @@ export function BeerModal() {
             bar_name: userBeer.bar_name,
             glupp_count: userBeer.glupp_count ?? 1,
           });
+
+          // Load user taste if exists
+          if (userBeer.user_taste_bitter != null) {
+            const ut = {
+              bitter: userBeer.user_taste_bitter,
+              sweet: userBeer.user_taste_sweet ?? 3,
+              fruity: userBeer.user_taste_fruity ?? 3,
+              body: userBeer.user_taste_body ?? 3,
+            };
+            setUserTaste(ut);
+            setTasteDraft(ut);
+          } else {
+            // Default draft from beer's official values
+            if (beerData) {
+              const bd = beerData as Beer;
+              setTasteDraft({
+                bitter: bd.taste_bitter,
+                sweet: bd.taste_sweet,
+                fruity: bd.taste_fruity,
+                body: bd.taste_body,
+              });
+            }
+          }
         }
       }
 
@@ -86,6 +140,38 @@ export function BeerModal() {
 
     fetchBeer();
   }, [selectedBeerId]);
+
+  // ── Save user taste rating ──
+  const handleSaveTaste = useCallback(async () => {
+    if (!beer) return;
+    setSavingTaste(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setSavingTaste(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("user_beers")
+      .update({
+        user_taste_bitter: tasteDraft.bitter,
+        user_taste_sweet: tasteDraft.sweet,
+        user_taste_fruity: tasteDraft.fruity,
+        user_taste_body: tasteDraft.body,
+      })
+      .eq("user_id", user.id)
+      .eq("beer_id", beer.id);
+
+    if (!error) {
+      setUserTaste({ ...tasteDraft });
+      setEditingTaste(false);
+    }
+
+    setSavingTaste(false);
+  }, [beer, tasteDraft]);
 
   // Re-Glupp handler
   const handleReglupp = async () => {
@@ -313,7 +399,7 @@ export function BeerModal() {
             ))}
           </div>
 
-          {/* Taste Profile */}
+          {/* Official Taste Profile */}
           <div>
             <h3 className="text-sm font-semibold text-glupp-cream mb-3">
               Profil gustatif
@@ -324,6 +410,104 @@ export function BeerModal() {
               fruity={beer.taste_fruity}
               body={beer.taste_body}
             />
+          </div>
+
+          {/* ── User Taste Rating ("Mon ressenti") ── */}
+          <div className="bg-glupp-card-alt rounded-glupp p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-glupp-cream flex items-center gap-1.5">
+                <span>🎯</span>
+                Mon ressenti
+              </h3>
+              {!editingTaste ? (
+                <button
+                  onClick={() => setEditingTaste(true)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-glupp-accent hover:bg-glupp-accent/10 transition-colors"
+                >
+                  <Pencil size={10} />
+                  {userTaste ? "Modifier" : "Noter"}
+                </button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingTaste(false);
+                      if (userTaste) setTasteDraft(userTaste);
+                    }}
+                    className="px-2 py-1 rounded-md text-[10px] text-glupp-text-muted hover:bg-glupp-border/50 transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleSaveTaste}
+                    disabled={savingTaste}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] bg-glupp-accent text-glupp-bg font-medium hover:bg-glupp-accent/90 transition-colors disabled:opacity-50"
+                  >
+                    {savingTaste ? (
+                      <Loader2 size={10} className="animate-spin" />
+                    ) : (
+                      <Check size={10} />
+                    )}
+                    Sauver
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {editingTaste ? (
+              // ── Interactive sliders ──
+              <div className="space-y-2.5">
+                {TASTE_DIMS.map((dim) => (
+                  <div key={dim.key}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[11px] text-glupp-text-soft flex items-center gap-1">
+                        <span>{dim.emoji}</span>
+                        {dim.label}
+                      </span>
+                      <span
+                        className="text-[11px] font-bold tabular-nums"
+                        style={{ color: dim.color }}
+                      >
+                        {tasteDraft[dim.key]}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      step={1}
+                      value={tasteDraft[dim.key]}
+                      onChange={(e) =>
+                        setTasteDraft((prev) => ({
+                          ...prev,
+                          [dim.key]: parseInt(e.target.value),
+                        }))
+                      }
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, ${dim.color} 0%, ${dim.color} ${((tasteDraft[dim.key] - 1) / 4) * 100}%, rgba(58,53,48,0.6) ${((tasteDraft[dim.key] - 1) / 4) * 100}%, rgba(58,53,48,0.6) 100%)`,
+                      }}
+                    />
+                  </div>
+                ))}
+                <p className="text-[10px] text-glupp-text-muted text-center mt-1">
+                  Note cette biere selon ton ressenti !
+                </p>
+              </div>
+            ) : userTaste ? (
+              // ── Saved user taste (read-only) ──
+              <TasteProfile
+                bitter={userTaste.bitter}
+                sweet={userTaste.sweet}
+                fruity={userTaste.fruity}
+                body={userTaste.body}
+              />
+            ) : (
+              // ── No taste yet ──
+              <p className="text-xs text-glupp-text-muted text-center py-2">
+                Partage ton ressenti sur cette biere !
+              </p>
+            )}
           </div>
 
           {/* Fun Fact */}

@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
-import { normalizeRegions } from "@/lib/utils/regionMapping";
+import {
+  normalizeRegions,
+  normalizeToDepartments,
+  COUNTRIES_WITH_DEPARTMENTS,
+} from "@/lib/utils/regionMapping";
 
 export const COUNTRIES = [
   { code: "FR", flag: "\u{1F1EB}\u{1F1F7}", name: "France" },
@@ -23,9 +27,16 @@ export const COUNTRIES = [
   { code: "AU", flag: "\u{1F1E6}\u{1F1FA}", name: "Australie" },
 ] as const;
 
+export type RegionMode = "regions" | "departments";
+
 export function useRegionFilter() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [regionMode, setRegionMode] = useState<RegionMode>("regions");
+
+  // Whether current country supports department mode
+  const hasDepartments =
+    selectedCountry != null && COUNTRIES_WITH_DEPARTMENTS.has(selectedCountry);
 
   // Fetch raw regions then normalize them
   const { data: regions = [] } = useQuery({
@@ -48,17 +59,51 @@ export function useRegionFilter() {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Fetch departments (only for countries that support it)
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments", selectedCountry],
+    queryFn: async () => {
+      if (!selectedCountry) return [];
+      const { data } = await supabase
+        .from("beers")
+        .select("region")
+        .eq("country_code", selectedCountry)
+        .eq("is_active", true)
+        .not("region", "is", null);
+
+      if (!data) return [];
+      const rawRegions = data.map((d) => d.region as string).filter(Boolean);
+      return normalizeToDepartments(rawRegions, selectedCountry);
+    },
+    enabled: !!selectedCountry && hasDepartments,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const handleSetCountry = (code: string | null) => {
     setSelectedCountry(code);
     setSelectedRegion(null);
+    setRegionMode("regions");
   };
+
+  const handleSetRegionMode = (mode: RegionMode) => {
+    setRegionMode(mode);
+    setSelectedRegion(null);
+  };
+
+  // Active list depends on mode
+  const activeList = regionMode === "departments" ? departments : regions;
 
   return {
     countries: COUNTRIES,
-    regions,
+    regions: activeList,
+    allRegions: regions,
+    departments,
     selectedCountry,
     setSelectedCountry: handleSetCountry,
     selectedRegion,
     setSelectedRegion,
+    regionMode,
+    setRegionMode: handleSetRegionMode,
+    hasDepartments,
   };
 }
