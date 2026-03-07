@@ -226,56 +226,17 @@ export function useAdmin() {
 
   const approveBeerMutation = useMutation({
     mutationFn: async (beerId: string) => {
-      // 1. Approve the beer
-      const { data: beer, error } = await supabase
-        .from("beers")
-        .update({ status: "approved" })
-        .eq("id", beerId)
-        .select("*, added_by")
-        .single();
+      // Use RPC with SECURITY DEFINER to bypass RLS for cross-user operations
+      const { data, error } = await supabase.rpc("approve_beer", {
+        p_beer_id: beerId,
+      });
 
       if (error) throw new Error(error.message);
-
-      // 2. Award +25 XP to the proposer + auto-glupp
-      if (beer.added_by) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("xp, beers_tasted")
-          .eq("id", beer.added_by)
-          .single();
-
-        if (profile) {
-          await supabase
-            .from("profiles")
-            .update({
-              xp: (profile.xp || 0) + 25,
-              beers_tasted: (profile.beers_tasted || 0) + 1,
-            })
-            .eq("id", beer.added_by);
-        }
-
-        // Auto-glupp: add the approved beer to the proposer's collection
-        await supabase
-          .from("user_beers")
-          .upsert(
-            { user_id: beer.added_by, beer_id: beerId },
-            { onConflict: "user_id,beer_id" }
-          );
-
-        // Send notification (use submission_approved which is a valid type in the CHECK constraint)
-        await supabase.from("notifications").insert({
-          user_id: beer.added_by,
-          type: "submission_approved",
-          title: "Biere validee !",
-          message: `Ta biere "${beer.name}" a ete validee par l'equipe Glupp ! +25 XP Decouvreur`,
-          metadata: { beer_id: beerId, xp_gained: 25 },
-        });
-      }
-
-      return beer as Beer;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
@@ -285,33 +246,18 @@ export function useAdmin() {
 
   const rejectBeerMutation = useMutation({
     mutationFn: async ({ beerId, reason }: { beerId: string; reason?: string }) => {
-      const { data: beer, error } = await supabase
-        .from("beers")
-        .update({ status: "rejected" })
-        .eq("id", beerId)
-        .select("*, added_by")
-        .single();
+      // Use RPC with SECURITY DEFINER to bypass RLS for cross-user operations
+      const { data, error } = await supabase.rpc("reject_beer", {
+        p_beer_id: beerId,
+        p_reason: reason?.trim() || null,
+      });
 
       if (error) throw new Error(error.message);
-
-      // Notify proposer (use submission_rejected which is a valid type in the CHECK constraint)
-      if (beer.added_by) {
-        const reasonText = reason?.trim()
-          ? ` Raison : ${reason.trim()}`
-          : "";
-        await supabase.from("notifications").insert({
-          user_id: beer.added_by,
-          type: "submission_rejected",
-          title: "Biere non retenue",
-          message: `Ta proposition "${beer.name}" n'a pas ete retenue.${reasonText}`,
-          metadata: { beer_id: beerId, reason: reason?.trim() || null },
-        });
-      }
-
-      return beer as Beer;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
     },
   });

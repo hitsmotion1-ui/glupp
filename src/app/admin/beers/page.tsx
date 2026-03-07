@@ -122,6 +122,10 @@ export default function AdminBeersPage() {
   const [rejectingBeerName, setRejectingBeerName] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
+  // ── Error feedback ──
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
   // ── Query: beers list ──
   const { data, isLoading } = admin.useAdminBeers(
     search || undefined,
@@ -366,6 +370,32 @@ export default function AdminBeersPage() {
       </AdminHeader>
 
       <div className="px-6 py-6 lg:px-8 space-y-6">
+        {/* ── Error / Success feedback ── */}
+        {actionError && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            <XCircle size={16} className="shrink-0" />
+            <span>{actionError}</span>
+            <button
+              onClick={() => setActionError(null)}
+              className="ml-auto text-red-400/70 hover:text-red-400"
+            >
+              &times;
+            </button>
+          </div>
+        )}
+        {actionSuccess && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm">
+            <CheckCircle size={16} className="shrink-0" />
+            <span>{actionSuccess}</span>
+            <button
+              onClick={() => setActionSuccess(null)}
+              className="ml-auto text-green-400/70 hover:text-green-400"
+            >
+              &times;
+            </button>
+          </div>
+        )}
+
         {/* ── Pending Beers (Moderation) ── */}
         {pendingBeers.length > 0 && (
           <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-4">
@@ -425,10 +455,15 @@ export default function AdminBeersPage() {
                       </button>
                       <button
                         onClick={async () => {
+                          setActionError(null);
+                          setActionSuccess(null);
                           try {
                             await admin.approveBeer(beer.id);
+                            setActionSuccess(`"${beer.name}" validee avec succes !`);
                           } catch (err) {
-                            console.error("Failed to approve:", err);
+                            setActionError(
+                              err instanceof Error ? err.message : "Erreur lors de la validation"
+                            );
                           }
                         }}
                         disabled={admin.approvingBeer}
@@ -604,12 +639,17 @@ export default function AdminBeersPage() {
               </button>
               <button
                 onClick={async () => {
+                  setActionError(null);
+                  setActionSuccess(null);
                   try {
                     await admin.rejectBeer(rejectingBeerId, rejectReason || undefined);
+                    setActionSuccess(`"${rejectingBeerName}" rejetee.`);
                     setRejectingBeerId(null);
                     setRejectReason("");
                   } catch (err) {
-                    console.error("Failed to reject:", err);
+                    setActionError(
+                      err instanceof Error ? err.message : "Erreur lors du rejet"
+                    );
                   }
                 }}
                 disabled={admin.rejectingBeer}
