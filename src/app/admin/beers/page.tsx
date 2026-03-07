@@ -117,6 +117,11 @@ export default function AdminBeersPage() {
   const [editingBeer, setEditingBeer] = useState<Beer | null>(null);
   const [form, setForm] = useState<BeerFormData>(EMPTY_FORM);
 
+  // ── Reject modal ──
+  const [rejectingBeerId, setRejectingBeerId] = useState<string | null>(null);
+  const [rejectingBeerName, setRejectingBeerName] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+
   // ── Query: beers list ──
   const { data, isLoading } = admin.useAdminBeers(
     search || undefined,
@@ -420,19 +425,17 @@ export default function AdminBeersPage() {
                         Valider
                       </button>
                       <button
-                        onClick={async () => {
-                          if (!window.confirm(`Rejeter "${beer.name}" ?`)) return;
-                          try {
-                            await admin.rejectBeer(beer.id);
-                          } catch (err) {
-                            console.error("Failed to reject:", err);
-                          }
+                        onClick={() => {
+                          setRejectingBeerId(beer.id);
+                          setRejectingBeerName(beer.name);
+                          setRejectReason("");
                         }}
                         disabled={admin.rejectingBeer}
-                        className="flex items-center justify-center w-8 h-8 rounded-lg text-[#A89888] hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-50"
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 text-xs font-semibold hover:bg-red-500/25 transition-colors disabled:opacity-50"
                         title="Rejeter"
                       >
                         <XCircle size={14} />
+                        Rejeter
                       </button>
                     </div>
                   </div>
@@ -527,6 +530,82 @@ export default function AdminBeersPage() {
             submitLabel="Enregistrer"
             existingStyles={existingStyles}
           />
+        </ModalOverlay>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Reject Modal                               */}
+      {/* ═══════════════════════════════════════════ */}
+      {rejectingBeerId && (
+        <ModalOverlay
+          onClose={() => {
+            setRejectingBeerId(null);
+            setRejectReason("");
+          }}
+        >
+          <div className="p-6 max-w-md mx-auto">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/15">
+                <XCircle size={18} className="text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-[#F5E6D3] font-display">
+                  Rejeter la biere
+                </h2>
+                <p className="text-xs text-[#A89888]">
+                  &quot;{rejectingBeerName}&quot;
+                </p>
+              </div>
+            </div>
+
+            {/* Reason field */}
+            <div className="mb-4">
+              <label className="block mb-1.5 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
+                Raison du rejet (optionnel)
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Ex: Doublon avec une biere existante, informations incorrectes..."
+                rows={3}
+                className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/25 transition-colors resize-none"
+                autoFocus
+              />
+              <p className="text-[10px] text-[#6B6050] mt-1">
+                Le commentaire sera inclus dans la notification envoyee a l&apos;utilisateur.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#3A3530]">
+              <button
+                onClick={() => {
+                  setRejectingBeerId(null);
+                  setRejectReason("");
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[#A89888] hover:text-[#F5E6D3] hover:bg-[#3A3530] transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await admin.rejectBeer(rejectingBeerId, rejectReason || undefined);
+                    setRejectingBeerId(null);
+                    setRejectReason("");
+                  } catch (err) {
+                    console.error("Failed to reject:", err);
+                  }
+                }}
+                disabled={admin.rejectingBeer}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {admin.rejectingBeer && <Loader2 size={14} className="animate-spin" />}
+                Confirmer le rejet
+              </button>
+            </div>
+          </div>
         </ModalOverlay>
       )}
     </div>

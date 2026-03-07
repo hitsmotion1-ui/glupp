@@ -250,10 +250,10 @@ export function useAdmin() {
             .eq("id", beer.added_by);
         }
 
-        // Send notification
+        // Send notification (use submission_approved which is a valid type in the CHECK constraint)
         await supabase.from("notifications").insert({
           user_id: beer.added_by,
-          type: "beer_approved",
+          type: "submission_approved",
           title: "Biere validee !",
           message: `Ta biere "${beer.name}" a ete validee par l'equipe Glupp ! +25 XP Decouvreur`,
           metadata: { beer_id: beerId, xp_gained: 25 },
@@ -272,7 +272,7 @@ export function useAdmin() {
   });
 
   const rejectBeerMutation = useMutation({
-    mutationFn: async (beerId: string) => {
+    mutationFn: async ({ beerId, reason }: { beerId: string; reason?: string }) => {
       const { data: beer, error } = await supabase
         .from("beers")
         .update({ status: "rejected" })
@@ -282,14 +282,17 @@ export function useAdmin() {
 
       if (error) throw new Error(error.message);
 
-      // Notify proposer
+      // Notify proposer (use submission_rejected which is a valid type in the CHECK constraint)
       if (beer.added_by) {
+        const reasonText = reason?.trim()
+          ? ` Raison : ${reason.trim()}`
+          : "";
         await supabase.from("notifications").insert({
           user_id: beer.added_by,
-          type: "beer_rejected",
+          type: "submission_rejected",
           title: "Biere non retenue",
-          message: `Ta proposition "${beer.name}" n'a pas ete retenue.`,
-          metadata: { beer_id: beerId },
+          message: `Ta proposition "${beer.name}" n'a pas ete retenue.${reasonText}`,
+          metadata: { beer_id: beerId, reason: reason?.trim() || null },
         });
       }
 
@@ -552,7 +555,8 @@ export function useAdmin() {
     useAdminPendingBeers,
     approveBeer: approveBeerMutation.mutateAsync,
     approvingBeer: approveBeerMutation.isPending,
-    rejectBeer: rejectBeerMutation.mutateAsync,
+    rejectBeer: (beerId: string, reason?: string) =>
+      rejectBeerMutation.mutateAsync({ beerId, reason }),
     rejectingBeer: rejectBeerMutation.isPending,
 
     // Bars
