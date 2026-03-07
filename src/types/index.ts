@@ -29,6 +29,8 @@ export interface Beer {
   fun_fact_icon: string;
   region: string | null;
   is_active: boolean;
+  added_by: string | null;
+  status: "pending" | "approved" | "rejected";
   created_at: string;
 }
 

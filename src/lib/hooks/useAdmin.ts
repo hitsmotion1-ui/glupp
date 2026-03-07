@@ -182,6 +182,125 @@ export function useAdmin() {
     },
   });
 
+  // ─── Pending Beers (moderation) ──────────
+
+  function useAdminPendingBeers() {
+    return useQuery({
+      queryKey: ["admin", "beers", "pending"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("beers")
+          .select("*")
+          .eq("status", "pending")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) return [];
+
+        // Fetch profiles for proposers
+        const addedByIds = [...new Set(data.map((b) => b.added_by).filter(Boolean))];
+        let profileMap = new Map<string, Pick<Profile, "id" | "username" | "display_name">>();
+
+        if (addedByIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, username, display_name")
+            .in("id", addedByIds);
+
+          if (profiles) {
+            profileMap = new Map(profiles.map((p) => [p.id, p]));
+          }
+        }
+
+        return (data as Beer[]).map((beer) => ({
+          ...beer,
+          proposer: beer.added_by ? profileMap.get(beer.added_by) || null : null,
+        }));
+      },
+      staleTime: 15 * 1000,
+    });
+  }
+
+  const approveBeerMutation = useMutation({
+    mutationFn: async (beerId: string) => {
+      // 1. Approve the beer
+      const { data: beer, error } = await supabase
+        .from("beers")
+        .update({ status: "approved" })
+        .eq("id", beerId)
+        .select("*, added_by")
+        .single();
+
+      if (error) throw new Error(error.message);
+
+      // 2. Award +25 XP to the proposer
+      if (beer.added_by) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("xp")
+          .eq("id", beer.added_by)
+          .single();
+
+        if (profile) {
+          await supabase
+            .from("profiles")
+            .update({ xp: (profile.xp || 0) + 25 })
+            .eq("id", beer.added_by);
+        }
+
+        // Send notification
+        await supabase.from("notifications").insert({
+          user_id: beer.added_by,
+          type: "beer_approved",
+          title: "Biere validee !",
+          message: `Ta biere "${beer.name}" a ete validee par l'equipe Glupp ! +25 XP Decouvreur`,
+          metadata: { beer_id: beerId, xp_gained: 25 },
+        });
+      }
+
+      return beer as Beer;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
+    },
+  });
+
+  const rejectBeerMutation = useMutation({
+    mutationFn: async (beerId: string) => {
+      const { data: beer, error } = await supabase
+        .from("beers")
+        .update({ status: "rejected" })
+        .eq("id", beerId)
+        .select("*, added_by")
+        .single();
+
+      if (error) throw new Error(error.message);
+
+      // Notify proposer
+      if (beer.added_by) {
+        await supabase.from("notifications").insert({
+          user_id: beer.added_by,
+          type: "beer_rejected",
+          title: "Biere non retenue",
+          message: `Ta proposition "${beer.name}" n'a pas ete retenue.`,
+          metadata: { beer_id: beerId },
+        });
+      }
+
+      return beer as Beer;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
+    },
+  });
+
   // ─── Bars CRUD ───────────────────────────
 
   function useAdminBars(search?: string) {
@@ -428,6 +547,13 @@ export function useAdmin() {
     updatingBeer: updateBeerMutation.isPending,
     deleteBeer: deleteBeerMutation.mutateAsync,
     deletingBeer: deleteBeerMutation.isPending,
+
+    // Beer moderation
+    useAdminPendingBeers,
+    approveBeer: approveBeerMutation.mutateAsync,
+    approvingBeer: approveBeerMutation.isPending,
+    rejectBeer: rejectBeerMutation.mutateAsync,
+    rejectingBeer: rejectBeerMutation.isPending,
 
     // Bars
     useAdminBars,

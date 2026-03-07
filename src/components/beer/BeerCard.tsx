@@ -53,8 +53,17 @@ export function BeerCard({ beer, tasted, onClick }: BeerCardProps) {
         <RarityBadge rarity={beer.rarity} />
       </div>
 
+      {/* Pending badge for user-proposed beers awaiting validation */}
+      {beer.status === "pending" && (
+        <div className="absolute top-1.5 left-1.5">
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-[9px] font-semibold text-yellow-400 leading-none">
+            ⏳
+          </span>
+        </div>
+      )}
+
       {/* Lock overlay for untasted — smaller, bottom-right */}
-      {!tasted && (
+      {!tasted && beer.status !== "pending" && (
         <div className="absolute top-2 right-2">
           <div className="w-5 h-5 rounded-full bg-glupp-bg/80 flex items-center justify-center">
             <Lock size={10} className="text-glupp-text-muted" />

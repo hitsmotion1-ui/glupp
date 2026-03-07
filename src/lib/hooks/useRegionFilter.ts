@@ -48,6 +48,7 @@ export function useRegionFilter() {
         .select("region")
         .eq("country_code", selectedCountry)
         .eq("is_active", true)
+        .eq("status", "approved")
         .not("region", "is", null);
 
       if (!data) return [];
@@ -69,6 +70,7 @@ export function useRegionFilter() {
         .select("region")
         .eq("country_code", selectedCountry)
         .eq("is_active", true)
+        .eq("status", "approved")
         .not("region", "is", null);
 
       if (!data) return [];

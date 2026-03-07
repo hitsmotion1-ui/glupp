@@ -17,6 +17,7 @@ export function useBeers() {
         .from("beers")
         .select("*")
         .eq("is_active", true)
+        .eq("status", "approved")
         .order("elo", { ascending: false });
 
       if (error) throw new Error(error.message);

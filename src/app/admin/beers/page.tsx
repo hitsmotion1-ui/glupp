@@ -17,6 +17,9 @@ import {
   Loader2,
   Beer as BeerIcon,
   ChevronDown,
+  CheckCircle,
+  XCircle,
+  Clock,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -121,6 +124,9 @@ export default function AdminBeersPage() {
   );
   const beers = data?.beers ?? [];
 
+  // ── Query: pending beers for moderation ──
+  const { data: pendingBeers = [], isLoading: loadingPending } = admin.useAdminPendingBeers();
+
   // ── Fetch existing styles for dropdown ──
   const { data: existingStyles = [] } = useQuery({
     queryKey: ["admin", "beer-styles"],
@@ -128,7 +134,8 @@ export default function AdminBeersPage() {
       const { data } = await supabase
         .from("beers")
         .select("style")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("status", "approved");
       if (!data) return [];
       const styles = new Set(data.map((b) => b.style).filter(Boolean));
       return Array.from(styles).sort();
@@ -354,6 +361,87 @@ export default function AdminBeersPage() {
       </AdminHeader>
 
       <div className="px-6 py-6 lg:px-8 space-y-6">
+        {/* ── Pending Beers (Moderation) ── */}
+        {pendingBeers.length > 0 && (
+          <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Clock size={18} className="text-yellow-400" />
+              <h3 className="text-sm font-bold text-yellow-400">
+                Bieres en attente de validation ({pendingBeers.length})
+              </h3>
+            </div>
+
+            <div className="space-y-2">
+              {pendingBeers.map((beer) => {
+                const proposer = (beer as Beer & { proposer?: { username: string; display_name?: string } | null }).proposer;
+                return (
+                  <div
+                    key={beer.id}
+                    className="flex items-center gap-3 p-3 bg-[#1E1B16] rounded-lg border border-[#3A3530]"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-[#F5E6D3] text-sm truncate">
+                        {beer.country} {beer.name}
+                      </p>
+                      <p className="text-xs text-[#A89888] truncate">
+                        {beer.brewery} · {beer.style}
+                        {beer.abv ? ` · ${beer.abv}%` : ""}
+                        {beer.region ? ` · ${beer.region}` : ""}
+                      </p>
+                      {proposer && (
+                        <p className="text-xs text-[#6B6050] mt-0.5">
+                          Proposee par @{proposer.display_name || proposer.username}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => {
+                          openEdit(beer);
+                        }}
+                        className="flex items-center justify-center w-8 h-8 rounded-lg text-[#A89888] hover:text-[#E08840] hover:bg-[#E08840]/10 transition-colors"
+                        title="Modifier avant validation"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await admin.approveBeer(beer.id);
+                          } catch (err) {
+                            console.error("Failed to approve:", err);
+                          }
+                        }}
+                        disabled={admin.approvingBeer}
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/15 text-green-400 text-xs font-semibold hover:bg-green-500/25 transition-colors disabled:opacity-50"
+                        title="Valider"
+                      >
+                        <CheckCircle size={14} />
+                        Valider
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm(`Rejeter "${beer.name}" ?`)) return;
+                          try {
+                            await admin.rejectBeer(beer.id);
+                          } catch (err) {
+                            console.error("Failed to reject:", err);
+                          }
+                        }}
+                        disabled={admin.rejectingBeer}
+                        className="flex items-center justify-center w-8 h-8 rounded-lg text-[#A89888] hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-50"
+                        title="Rejeter"
+                      >
+                        <XCircle size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── Filters Bar ── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search */}

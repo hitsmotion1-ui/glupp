@@ -28,6 +28,8 @@ export const XP_GAINS = {
   bar_review: 10,
   submit_beer: 15,
   submit_bar: 10,
+  propose_beer: 10,       // XP immediat a la proposition
+  discover_beer: 25,      // XP bonus quand admin valide
 } as const;
 
 export const RARITY_CONFIG = {

@@ -46,6 +46,7 @@ export function useCollection() {
           .from("beers")
           .select("*")
           .eq("is_active", true)
+          .eq("status", "approved")
           .order("name")
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 

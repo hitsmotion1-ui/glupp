@@ -11,11 +11,11 @@ import { CelebrationOverlay } from "@/components/gamification/CelebrationOverlay
 import { TrophyDetailModal } from "@/components/social/TrophyDetailModal";
 import { NotificationModal } from "@/components/social/NotificationModal";
 import { UserProfileModal } from "@/components/social/UserProfileModal";
-import { SubmitBeerModal } from "@/components/beer/SubmitBeerModal";
+import { AddBeerModal } from "@/components/beer/AddBeerModal";
 import { SubmitBarModal } from "@/components/map/SubmitBarModal";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
-import { Plus, ScanLine, Search, Beer as BeerIcon, MapPin } from "lucide-react";
+import { Plus, ScanLine, Search, Beer as BeerIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { beerEmoji } from "@/lib/utils/xp";
 import type { Beer } from "@/types";
@@ -33,10 +33,10 @@ export function GlobalModals() {
   // FAB menu
   const [fabOpen, setFabOpen] = useState(false);
 
-  // Submission modals
-  const [showSubmitBeer, setShowSubmitBeer] = useState(false);
+  // Add beer modal (replaces SubmitBeerModal)
+  const [showAddBeer, setShowAddBeer] = useState(false);
   const [showSubmitBar, setShowSubmitBar] = useState(false);
-  const [submitBeerPrefill, setSubmitBeerPrefill] = useState("");
+  const [addBeerPrefill, setAddBeerPrefill] = useState("");
 
   // Barcode not found state
   const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
@@ -76,6 +76,7 @@ export function GlobalModals() {
       .select("*")
       .eq("barcode", barcode)
       .eq("is_active", true)
+      .eq("status", "approved")
       .maybeSingle();
 
     if (error) {
@@ -101,7 +102,7 @@ export function GlobalModals() {
     }
   };
 
-  // Search handler
+  // Search handler — only show approved beers
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.length < 2) {
@@ -114,6 +115,7 @@ export function GlobalModals() {
       .from("beers")
       .select("*")
       .eq("is_active", true)
+      .eq("status", "approved")
       .or(
         `name.ilike.%${query}%,brewery.ilike.%${query}%,style.ilike.%${query}%`
       )
@@ -280,16 +282,17 @@ export function GlobalModals() {
                 </p>
                 <button
                   onClick={() => {
-                    setSubmitBeerPrefill(searchQuery);
+                    setAddBeerPrefill(searchQuery);
                     setShowSearch(false);
                     setSearchQuery("");
                     setSearchResults([]);
-                    setShowSubmitBeer(true);
+                    setShowAddBeer(true);
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-glupp-accent/15 border border-glupp-accent/30 rounded-glupp text-sm text-glupp-accent hover:bg-glupp-accent/25 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-glupp-accent/15 border border-glupp-accent/30 rounded-glupp text-sm text-glupp-accent hover:bg-glupp-accent/25 transition-colors"
                 >
                   <Plus size={14} />
-                  Proposer cette biere
+                  Proposer &quot;{searchQuery}&quot; a Glupp
+                  <span className="text-xs opacity-75">+10 XP</span>
                 </button>
               </div>
             )}
@@ -324,14 +327,14 @@ export function GlobalModals() {
         </div>
       </Modal>
 
-      {/* Submission modals */}
-      <SubmitBeerModal
-        isOpen={showSubmitBeer}
+      {/* Add Beer modal (replaces SubmitBeerModal) */}
+      <AddBeerModal
+        isOpen={showAddBeer}
         onClose={() => {
-          setShowSubmitBeer(false);
-          setSubmitBeerPrefill("");
+          setShowAddBeer(false);
+          setAddBeerPrefill("");
         }}
-        prefillName={submitBeerPrefill}
+        prefillName={addBeerPrefill}
       />
 
       <SubmitBarModal
@@ -376,12 +379,13 @@ export function GlobalModals() {
             <button
               onClick={() => {
                 setNotFoundBarcode(null);
-                setShowSubmitBeer(true);
+                setShowAddBeer(true);
               }}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-glupp-card border border-glupp-border text-glupp-cream text-sm rounded-glupp hover:border-glupp-accent/50 transition-colors"
             >
               <Plus size={16} />
               Proposer cette biere
+              <span className="text-xs text-glupp-accent">+10 XP</span>
             </button>
           </div>
         </div>
