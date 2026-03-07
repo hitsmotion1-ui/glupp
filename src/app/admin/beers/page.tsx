@@ -384,6 +384,20 @@ export default function AdminBeersPage() {
                     key={beer.id}
                     className="flex items-center gap-3 p-3 bg-[#1E1B16] rounded-lg border border-[#3A3530]"
                   >
+                    {/* Photo preview */}
+                    {beer.image_url ? (
+                      <div className="shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-[#3A3530] bg-[#141210]">
+                        <img
+                          src={beer.image_url}
+                          alt={beer.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="shrink-0 w-14 h-14 rounded-lg border border-[#3A3530] bg-[#141210] flex items-center justify-center">
+                        <BeerIcon size={20} className="text-[#3A3530]" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-[#F5E6D3] text-sm truncate">
                         {beer.country} {beer.name}

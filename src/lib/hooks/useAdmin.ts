@@ -94,6 +94,7 @@ export function useAdmin() {
           .from("beers")
           .select("*", { count: "exact" })
           .eq("is_active", true)
+          .eq("status", "approved")
           .order("created_at", { ascending: false })
           .limit(50);
 
@@ -235,20 +236,31 @@ export function useAdmin() {
 
       if (error) throw new Error(error.message);
 
-      // 2. Award +25 XP to the proposer
+      // 2. Award +25 XP to the proposer + auto-glupp
       if (beer.added_by) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("xp")
+          .select("xp, beers_tasted")
           .eq("id", beer.added_by)
           .single();
 
         if (profile) {
           await supabase
             .from("profiles")
-            .update({ xp: (profile.xp || 0) + 25 })
+            .update({
+              xp: (profile.xp || 0) + 25,
+              beers_tasted: (profile.beers_tasted || 0) + 1,
+            })
             .eq("id", beer.added_by);
         }
+
+        // Auto-glupp: add the approved beer to the proposer's collection
+        await supabase
+          .from("user_beers")
+          .upsert(
+            { user_id: beer.added_by, beer_id: beerId },
+            { onConflict: "user_id,beer_id" }
+          );
 
         // Send notification (use submission_approved which is a valid type in the CHECK constraint)
         await supabase.from("notifications").insert({
@@ -397,37 +409,110 @@ export function useAdmin() {
     return useQuery({
       queryKey: queryKeys.admin.submissions(status),
       queryFn: async () => {
-        let query = supabase
+        // 1. Fetch from legacy submissions table
+        let legacyQuery = supabase
           .from("submissions")
           .select("*")
           .order("created_at", { ascending: false })
           .limit(50);
 
         if (status) {
-          query = query.eq("status", status);
+          legacyQuery = legacyQuery.eq("status", status);
         }
 
-        const { data, error } = await query;
-        if (error) throw new Error(error.message);
-        if (!data || data.length === 0) return [];
+        const { data: legacyData } = await legacyQuery;
+        const legacySubmissions = legacyData || [];
 
-        // Fetch profiles for submitters
-        const userIds = [...new Set(data.map((s) => s.user_id))];
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, username, display_name, avatar_url")
-          .in("id", userIds);
+        // 2. Fetch pending/rejected beers from beers table (new flow)
+        let beersQuery = supabase
+          .from("beers")
+          .select("*")
+          .eq("is_active", true)
+          .in("status", status ? [status] : ["pending", "approved", "rejected"])
+          .order("created_at", { ascending: false })
+          .limit(50);
 
-        const profileMap = new Map(
-          (profiles || []).map((p) => [p.id, p])
-        );
+        // For "all" filter, show only pending + recently rejected from beers table
+        // For specific status, filter accordingly
+        if (!status) {
+          beersQuery = supabase
+            .from("beers")
+            .select("*")
+            .eq("is_active", true)
+            .neq("status", "approved")
+            .order("created_at", { ascending: false })
+            .limit(50);
+        } else if (status === "approved") {
+          // Don't show approved beers in submissions (they're in the beers tab)
+          beersQuery = supabase
+            .from("beers")
+            .select("*")
+            .eq("is_active", true)
+            .eq("status", "approved")
+            .not("added_by", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(20);
+        }
 
-        return data.map((s) => ({
+        const { data: beerSubmissions } = await beersQuery;
+        const pendingBeers = (beerSubmissions || []).filter((b) => b.added_by);
+
+        // 3. Collect all user IDs
+        const userIds = [
+          ...new Set([
+            ...legacySubmissions.map((s) => s.user_id),
+            ...pendingBeers.map((b) => b.added_by).filter(Boolean),
+          ]),
+        ];
+
+        let profileMap = new Map<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">>();
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, username, display_name, avatar_url")
+            .in("id", userIds);
+
+          profileMap = new Map(
+            (profiles || []).map((p) => [p.id, p])
+          );
+        }
+
+        // 4. Convert pending beers to AdminSubmission format
+        const beerAsSubmissions: AdminSubmission[] = pendingBeers.map((beer) => ({
+          id: `beer-${beer.id}`,
+          user_id: beer.added_by!,
+          type: "beer" as const,
+          status: beer.status as "pending" | "approved" | "rejected",
+          data: {
+            name: beer.name,
+            brewery: beer.brewery,
+            style: beer.style,
+            abv: beer.abv,
+            country: beer.country,
+            country_code: beer.country_code,
+            region: beer.region,
+            image_url: beer.image_url,
+            beer_id: beer.id,
+          },
+          admin_note: null,
+          created_at: beer.created_at,
+          user: beer.added_by ? profileMap.get(beer.added_by) || undefined : undefined,
+        }));
+
+        // 5. Format legacy submissions
+        const legacyFormatted = legacySubmissions.map((s) => ({
           ...s,
           user: profileMap.get(s.user_id) || null,
         })) as AdminSubmission[];
+
+        // 6. Merge and sort by date (newest first)
+        const allSubmissions = [...beerAsSubmissions, ...legacyFormatted].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        return allSubmissions;
       },
-      staleTime: 30 * 1000,
+      staleTime: 15 * 1000,
     });
   }
 

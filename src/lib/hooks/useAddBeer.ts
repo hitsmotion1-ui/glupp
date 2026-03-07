@@ -148,17 +148,8 @@ export function useAddBeer() {
 
       if (beerError) throw new Error(beerError.message);
 
-      // 2. Auto-glupp: add to user_beers
-      const { error: gluppError } = await supabase
-        .from("user_beers")
-        .insert({
-          user_id: user.id,
-          beer_id: beer.id,
-        });
-
-      if (gluppError) {
-        console.error("Auto-glupp failed:", gluppError.message);
-      }
+      // 2. Auto-glupp is deferred until admin approves the beer
+      // (handled in useAdmin.ts → approveBeerMutation)
 
       // 3. Give +10 XP for the proposal
       try {
@@ -188,20 +179,8 @@ export function useAddBeer() {
         console.error("Failed to award XP for beer proposal");
       }
 
-      // 4. Update beers_tasted count
-      await supabase
-        .from("profiles")
-        .select("beers_tasted")
-        .eq("id", user.id)
-        .single()
-        .then(({ data: profile }) => {
-          if (profile) {
-            supabase
-              .from("profiles")
-              .update({ beers_tasted: (profile.beers_tasted || 0) + 1 })
-              .eq("id", user.id);
-          }
-        });
+      // 4. beers_tasted count is updated when admin approves the beer
+      // (handled in useAdmin.ts → approveBeerMutation)
 
       // 5. Notify admins
       const { data: admins } = await supabase

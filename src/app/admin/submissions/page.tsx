@@ -85,10 +85,23 @@ export default function SubmissionsPage() {
 
   // ─── Handlers ────────────────────────────
 
+  // Check if this is a beer-table submission (new flow) vs legacy submission
+  function isBeerSubmission(id: string): boolean {
+    return id.startsWith("beer-");
+  }
+
+  function getRealBeerId(id: string): string {
+    return id.replace("beer-", "");
+  }
+
   async function handleApprove(id: string) {
     setActionError(null);
     try {
-      await admin.approveSubmission(id);
+      if (isBeerSubmission(id)) {
+        await admin.approveBeer(getRealBeerId(id));
+      } else {
+        await admin.approveSubmission(id);
+      }
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Erreur lors de l'approbation"
@@ -100,7 +113,11 @@ export default function SubmissionsPage() {
     if (!rejectReason.trim()) return;
     setActionError(null);
     try {
-      await admin.rejectSubmission(id, rejectReason.trim());
+      if (isBeerSubmission(id)) {
+        await admin.rejectBeer(getRealBeerId(id), rejectReason.trim());
+      } else {
+        await admin.rejectSubmission(id, rejectReason.trim());
+      }
       setRejectingId(null);
       setRejectReason("");
     } catch (err) {
@@ -123,7 +140,19 @@ export default function SubmissionsPage() {
   async function handleSaveEdit(id: string) {
     setActionError(null);
     try {
-      await admin.updateSubmissionData(id, editData);
+      if (isBeerSubmission(id)) {
+        // For beer-table submissions, update the beer directly
+        const realId = getRealBeerId(id);
+        const updateData: Record<string, unknown> = {};
+        if (editData.name) updateData.name = editData.name;
+        if (editData.brewery) updateData.brewery = editData.brewery;
+        if (editData.style) updateData.style = editData.style;
+        if (editData.abv !== undefined) updateData.abv = editData.abv;
+        if (editData.country) updateData.country = editData.country;
+        await admin.updateBeer(realId, updateData as Partial<{ name: string; brewery: string; style: string; abv: number; country: string }>);
+      } else {
+        await admin.updateSubmissionData(id, editData);
+      }
       setEditingId(null);
       setEditData({});
     } catch (err) {
@@ -357,6 +386,21 @@ function SubmissionCard({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-4">
         {submission.type === "beer" && (
           <>
+            {/* Photo preview for beer submissions */}
+            {data.image_url && (
+              <div className="col-span-full mb-2">
+                <dt className="text-[10px] uppercase tracking-wider text-[#6B6050] font-semibold mb-1">
+                  Photo
+                </dt>
+                <div className="w-20 h-20 rounded-lg overflow-hidden border border-[#3A3530] bg-[#141210]">
+                  <img
+                    src={data.image_url as string}
+                    alt={data.name as string}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
             {isEditing ? (
               <>
                 {BEER_EDITABLE_FIELDS.map((field) => (
@@ -383,6 +427,9 @@ function SubmissionCard({
                 />
                 {data.country && (
                   <DataField label="Pays" value={data.country as string} />
+                )}
+                {data.region && (
+                  <DataField label="Region" value={data.region as string} />
                 )}
                 {data.barcode && (
                   <DataField label="Code-barres" value={data.barcode as string} />
