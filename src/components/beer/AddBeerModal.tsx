@@ -16,6 +16,8 @@ import {
   Search,
   Loader2,
   AlertTriangle,
+  Camera,
+  X,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -76,6 +78,8 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
   const [countryCode, setCountryCode] = useState("FR");
   const [region, setRegion] = useState("");
   const [abv, setAbv] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // ── Duplicate state ──
@@ -101,6 +105,8 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
       setCountryCode("FR");
       setRegion("");
       setAbv("");
+      setPhotoFile(null);
+      setPhotoPreview(null);
       setError(null);
       setDuplicates([]);
       setShowDuplicateCheck(false);
@@ -126,6 +132,23 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
       (c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
     );
   }, [countrySearch]);
+
+  // ── Photo handler ──
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Max 5 MB
+    if (file.size > 5 * 1024 * 1024) {
+      setError("La photo ne doit pas depasser 5 Mo");
+      return;
+    }
+
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
 
   // ── Handlers ──
   const handleSubmit = async () => {
@@ -157,6 +180,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
         country_code: countryCode,
         region: region.trim() || undefined,
         abv: abv ? parseFloat(abv) : null,
+        imageFile: photoFile,
       };
 
       await addBeer(input);
@@ -185,6 +209,8 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
     setCountryCode("FR");
     setRegion("");
     setAbv("");
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setError(null);
     setDuplicates([]);
     setShowDuplicateCheck(false);
@@ -499,6 +525,46 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
               % vol
             </span>
           </div>
+        </div>
+
+        {/* ── Photo ── */}
+        <div>
+          <label className="text-xs text-glupp-text-muted block mb-1">
+            Photo (optionnel)
+          </label>
+          {photoPreview ? (
+            <div className="relative inline-block">
+              <img
+                src={photoPreview}
+                alt="Preview"
+                className="w-24 h-24 rounded-glupp object-cover border border-glupp-border"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoFile(null);
+                  setPhotoPreview(null);
+                }}
+                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500/80 flex items-center justify-center"
+              >
+                <X size={12} className="text-white" />
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 px-3 py-2.5 bg-glupp-bg border border-glupp-border border-dashed rounded-glupp cursor-pointer hover:border-glupp-accent transition-colors">
+              <Camera size={16} className="text-glupp-text-muted" />
+              <span className="text-sm text-glupp-text-muted">
+                Prendre une photo
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+            </label>
+          )}
         </div>
 
         {/* ── Error ── */}

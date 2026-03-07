@@ -21,6 +21,7 @@ export interface AddBeerInput {
   country_code: string;  // ISO code
   region?: string;
   abv?: number | null;
+  imageFile?: File | null;
 }
 
 export interface DuplicateCandidate {
@@ -91,6 +92,30 @@ export function useAddBeer() {
       const taste = getDefaultTaste(input.style);
       const color = getDefaultColor(input.style);
 
+      // 0. Upload photo if provided
+      let imageUrl: string | null = null;
+      if (input.imageFile) {
+        const timestamp = Date.now();
+        const fileExt = input.imageFile.name.split(".").pop() || "jpg";
+        const filePath = `proposals/${user.id}/${timestamp}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("beer-photos")
+          .upload(filePath, input.imageFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from("beer-photos")
+            .getPublicUrl(filePath);
+          imageUrl = publicUrl;
+        } else {
+          console.warn("Photo upload failed:", uploadError.message);
+        }
+      }
+
       // 1. Insert beer with status: 'pending'
       const { data: beer, error: beerError } = await supabase
         .from("beers")
@@ -113,6 +138,7 @@ export function useAddBeer() {
           taste_body: taste.body,
           fun_fact: null,
           fun_fact_icon: "💡",
+          image_url: imageUrl,
           is_active: true,
           added_by: user.id,
           status: "pending",

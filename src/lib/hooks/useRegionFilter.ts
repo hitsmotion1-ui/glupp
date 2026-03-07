@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import {
   normalizeRegions,
   normalizeToDepartments,
   COUNTRIES_WITH_DEPARTMENTS,
+  ALL_FR_REGIONS,
+  ALL_FR_DEPARTMENTS,
 } from "@/lib/utils/regionMapping";
 
 export const COUNTRIES = [
@@ -38,8 +40,8 @@ export function useRegionFilter() {
   const hasDepartments =
     selectedCountry != null && COUNTRIES_WITH_DEPARTMENTS.has(selectedCountry);
 
-  // Fetch raw regions then normalize them
-  const { data: regions = [] } = useQuery({
+  // Fetch raw regions from DB then normalize them
+  const { data: fetchedRegions = [] } = useQuery({
     queryKey: ["regions", selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return [];
@@ -60,8 +62,8 @@ export function useRegionFilter() {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Fetch departments (only for countries that support it)
-  const { data: departments = [] } = useQuery({
+  // Fetch departments from DB (only for countries that support it)
+  const { data: fetchedDepartments = [] } = useQuery({
     queryKey: ["departments", selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return [];
@@ -80,6 +82,22 @@ export function useRegionFilter() {
     enabled: !!selectedCountry && hasDepartments,
     staleTime: 10 * 60 * 1000,
   });
+
+  // Pour la France, toujours afficher TOUTES les régions et départements
+  // même s'il n'y a pas encore de bières recensées
+  const regions = useMemo(() => {
+    if (selectedCountry === "FR") {
+      return [...new Set([...ALL_FR_REGIONS, ...fetchedRegions])].sort();
+    }
+    return fetchedRegions;
+  }, [selectedCountry, fetchedRegions]);
+
+  const departments = useMemo(() => {
+    if (selectedCountry === "FR") {
+      return [...new Set([...ALL_FR_DEPARTMENTS, ...fetchedDepartments])].sort();
+    }
+    return fetchedDepartments;
+  }, [selectedCountry, fetchedDepartments]);
 
   const handleSetCountry = (code: string | null) => {
     setSelectedCountry(code);

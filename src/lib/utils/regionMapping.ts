@@ -270,6 +270,41 @@ const KNOWN_REGIONS = new Set([
 const FR_DEPT_NAMES_SET = new Set(Object.values(FR_DEPT_TO_NAME));
 
 /**
+ * Mapping inversé : nom de département → nom de région
+ * Ex: "Vendee" → "Pays de la Loire", "Paris" → "Ile-de-France"
+ */
+const FR_DEPT_NAME_TO_REGION: Record<string, string> = {};
+for (const [code, deptName] of Object.entries(FR_DEPT_TO_NAME)) {
+  const region = FR_DEPT_TO_REGION[code];
+  if (region) FR_DEPT_NAME_TO_REGION[deptName] = region;
+}
+
+/**
+ * Liste complète des 13 régions métropolitaines + Outre-Mer
+ */
+export const ALL_FR_REGIONS: string[] = [
+  "Auvergne-Rhone-Alpes",
+  "Bourgogne-Franche-Comte",
+  "Bretagne",
+  "Centre-Val de Loire",
+  "Corse",
+  "Grand Est",
+  "Hauts-de-France",
+  "Ile-de-France",
+  "Normandie",
+  "Nouvelle-Aquitaine",
+  "Occitanie",
+  "Outre-Mer",
+  "Pays de la Loire",
+  "Provence-Alpes-Cote d'Azur",
+];
+
+/**
+ * Liste complète des 95 départements métropolitains
+ */
+export const ALL_FR_DEPARTMENTS: string[] = [...new Set(Object.values(FR_DEPT_TO_NAME))].sort();
+
+/**
  * Extrait un code postal à 5 chiffres (FR) ou 4 chiffres (BE) d'une chaîne
  */
 function extractPostalCode(str: string): string | null {
@@ -299,6 +334,12 @@ export function normalizeRegion(
 
   const trimmed = region.trim();
   if (!trimmed) return null;
+
+  // Pour la France, si c'est un nom de département, mapper vers la région parente
+  // Ex: "Vendee" → "Pays de la Loire", "Paris" → "Ile-de-France"
+  if (countryCode === "FR" && FR_DEPT_NAME_TO_REGION[trimmed]) {
+    return FR_DEPT_NAME_TO_REGION[trimmed];
+  }
 
   // Si c'est déjà un nom de région connu, le retourner directement
   if (KNOWN_REGIONS.has(trimmed)) return trimmed;
