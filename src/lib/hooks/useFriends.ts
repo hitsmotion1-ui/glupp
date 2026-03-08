@@ -22,6 +22,7 @@ interface FriendEntry {
   friend_id: string;
   friendship_status: string;
   friend_since: string;
+  initiated_by: string | null;
   friend_data: FriendData;
 }
 
@@ -39,6 +40,7 @@ export function useFriends() {
   const queryClient = useQueryClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Fetch all friendships (accepted + pending)
   const { data: allFriendships = [], isLoading } = useQuery({
@@ -48,6 +50,7 @@ export function useFriends() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return [];
+      setCurrentUserId(user.id);
 
       const { data, error } = await supabase.rpc("get_friends", {
         p_user_id: user.id,
@@ -59,7 +62,7 @@ export function useFriends() {
       }
       return (data as FriendEntry[]) || [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   // Split into friends and requests
@@ -68,9 +71,26 @@ export function useFriends() {
     [allFriendships]
   );
 
+  // Only show RECEIVED requests (where current user is NOT the initiator)
   const requests = useMemo(
-    () => allFriendships.filter((f) => f.friendship_status === "pending"),
-    [allFriendships]
+    () =>
+      allFriendships.filter(
+        (f) =>
+          f.friendship_status === "pending" &&
+          f.initiated_by !== currentUserId
+      ),
+    [allFriendships, currentUserId]
+  );
+
+  // Sent requests (where current user IS the initiator)
+  const sentRequests = useMemo(
+    () =>
+      allFriendships.filter(
+        (f) =>
+          f.friendship_status === "pending" &&
+          f.initiated_by === currentUserId
+      ),
+    [allFriendships, currentUserId]
   );
 
   // Search users
@@ -143,8 +163,9 @@ export function useFriends() {
       if (error) throw new Error(error.message);
       return { ...data, action };
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+    onSuccess: async (_, variables) => {
+      // Force immediate refetch (not just invalidation) for instant UI update
+      await queryClient.refetchQueries({ queryKey: queryKeys.friends.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
       if (variables.action === "accept") {
         showXPToast(0, "Nouvel ami !");
@@ -191,6 +212,7 @@ export function useFriends() {
   return {
     friends,
     requests,
+    sentRequests,
     isLoading,
     searchQuery,
     setSearchQuery,

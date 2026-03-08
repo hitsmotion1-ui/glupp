@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { useFriends } from "@/lib/hooks/useFriends";
 import { getLevel } from "@/lib/utils/xp";
-import { UserPlus, Check, X, Users, Loader2 } from "lucide-react";
+import { UserPlus, Check, X, Users, Loader2, Clock } from "lucide-react";
 
 type FriendTab = "friends" | "requests";
 
@@ -17,7 +17,7 @@ export function FriendList() {
   const setShowFriendSearch = useAppStore((s) => s.setShowFriendSearch);
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
 
-  const { friends, requests, isLoading, acceptRequest, rejectRequest } =
+  const { friends, requests, sentRequests, isLoading, acceptRequest, rejectRequest } =
     useFriends();
 
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
@@ -78,7 +78,7 @@ export function FriendList() {
           onClick={() => setTab("friends")}
         />
         <Pill
-          label={`Demandes${requests.length > 0 ? ` (${requests.length})` : ""}`}
+          label={`Demandes${requests.length + sentRequests.length > 0 ? ` (${requests.length + sentRequests.length})` : ""}`}
           active={tab === "requests"}
           onClick={() => setTab("requests")}
           color={requests.length > 0 ? "#E05252" : undefined}
@@ -141,59 +141,109 @@ export function FriendList() {
             exit={{ opacity: 0, x: -10 }}
             className="px-4 space-y-2"
           >
-            {requests.length === 0 ? (
+            {requests.length === 0 && sentRequests.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-sm text-glupp-text-muted">
                   Aucune demande en attente
                 </p>
               </div>
             ) : (
-              requests.map((r) => {
-                const data = r.friend_data;
-                const loading = loadingIds.has(r.friendship_id);
-                const level = getLevel(data.xp);
+              <>
+                {/* Received requests - with accept/reject buttons */}
+                {requests.length > 0 && (
+                  <>
+                    <p className="text-xs font-medium text-glupp-text-muted uppercase tracking-wide">
+                      Demandes reçues
+                    </p>
+                    {requests.map((r) => {
+                      const data = r.friend_data;
+                      const loading = loadingIds.has(r.friendship_id);
+                      const level = getLevel(data.xp);
 
-                return (
-                  <div
-                    key={r.friendship_id}
-                    className="flex items-center gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp"
-                  >
-                    <Avatar
-                      url={data.avatar_url}
-                      name={data.display_name || data.username}
-                      size="md"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-glupp-cream truncate">
-                        {data.display_name || data.username}
-                      </p>
-                      <p className="text-xs text-glupp-text-muted">
-                        {level.icon} Nv.{level.level} · {data.beers_tasted}{" "}
-                        bières
-                      </p>
-                    </div>
+                      return (
+                        <div
+                          key={r.friendship_id}
+                          className="flex items-center gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp"
+                        >
+                          <Avatar
+                            url={data.avatar_url}
+                            name={data.display_name || data.username}
+                            size="md"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-glupp-cream truncate">
+                              {data.display_name || data.username}
+                            </p>
+                            <p className="text-xs text-glupp-text-muted">
+                              {level.icon} Nv.{level.level} · {data.beers_tasted}{" "}
+                              bières
+                            </p>
+                          </div>
 
-                    {loading ? (
-                      <Loader2 size={20} className="animate-spin text-glupp-accent" />
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleAccept(r.friendship_id)}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-glupp-success/20 text-glupp-success hover:bg-glupp-success/30 transition-colors"
+                          {loading ? (
+                            <Loader2 size={20} className="animate-spin text-glupp-accent" />
+                          ) : (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleAccept(r.friendship_id)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-glupp-success/20 text-glupp-success hover:bg-glupp-success/30 transition-colors"
+                              >
+                                <Check size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleReject(r.friendship_id)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-glupp-error/20 text-glupp-error hover:bg-glupp-error/30 transition-colors"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Sent requests - read only, waiting for response */}
+                {sentRequests.length > 0 && (
+                  <>
+                    <p className="text-xs font-medium text-glupp-text-muted uppercase tracking-wide mt-3">
+                      Demandes envoyées
+                    </p>
+                    {sentRequests.map((r) => {
+                      const data = r.friend_data;
+                      const level = getLevel(data.xp);
+
+                      return (
+                        <div
+                          key={r.friendship_id}
+                          className="flex items-center gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp opacity-70"
                         >
-                          <Check size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleReject(r.friendship_id)}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-glupp-error/20 text-glupp-error hover:bg-glupp-error/30 transition-colors"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                          <Avatar
+                            url={data.avatar_url}
+                            name={data.display_name || data.username}
+                            size="md"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-glupp-cream truncate">
+                              {data.display_name || data.username}
+                            </p>
+                            <p className="text-xs text-glupp-text-muted">
+                              {level.icon} Nv.{level.level} · {data.beers_tasted}{" "}
+                              bières
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-glupp-text-muted text-xs">
+                            <Clock size={14} />
+                            <span>En attente</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </>
             )}
           </motion.div>
         )}
