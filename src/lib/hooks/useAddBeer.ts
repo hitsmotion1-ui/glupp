@@ -137,7 +137,7 @@ export function useAddBeer() {
 
       if (existingRejected) {
         // Re-submit: update the rejected beer with new info and reset to pending
-        const { data: updated, error: updateError } = await supabase
+        const { data: updatedList, error: updateError } = await supabase
           .from("beers")
           .update({
             name: input.name.trim(),
@@ -156,11 +156,13 @@ export function useAddBeer() {
             status: "pending",
           })
           .eq("id", existingRejected.id)
-          .select()
-          .single();
+          .select();
 
         if (updateError) throw new Error(updateError.message);
-        beer = updated as Beer;
+        if (!updatedList || updatedList.length === 0) {
+          throw new Error("Impossible de re-soumettre cette biere. Veuillez reessayer.");
+        }
+        beer = updatedList[0] as Beer;
       } else {
         // New submission: insert a fresh beer
         const { data: inserted, error: beerError } = await supabase
