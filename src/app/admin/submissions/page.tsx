@@ -69,6 +69,7 @@ export default function SubmissionsPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // ─── Edit state ─────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -297,11 +298,36 @@ export default function SubmissionsPage() {
                 onCancelEdit={handleCancelEdit}
                 onSaveEdit={() => handleSaveEdit(sub.id)}
                 onEditFieldChange={handleEditFieldChange}
+                onPhotoClick={(url) => setLightboxUrl(url)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* ── Photo Lightbox ── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxUrl(null);
+            }}
+            className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-10"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Photo biere"
+            className="max-w-[90vw] max-h-[85vh] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -328,6 +354,7 @@ interface SubmissionCardProps {
   onCancelEdit: () => void;
   onSaveEdit: () => void;
   onEditFieldChange: (key: string, value: unknown) => void;
+  onPhotoClick?: (url: string) => void;
 }
 
 function SubmissionCard({
@@ -348,6 +375,7 @@ function SubmissionCard({
   onCancelEdit,
   onSaveEdit,
   onEditFieldChange,
+  onPhotoClick,
 }: SubmissionCardProps) {
   const data = submission.data as Record<string, unknown>;
   const isPending = submission.status === "pending";
@@ -392,13 +420,18 @@ function SubmissionCard({
                 <dt className="text-[10px] uppercase tracking-wider text-[#6B6050] font-semibold mb-1">
                   Photo
                 </dt>
-                <div className="w-20 h-20 rounded-lg overflow-hidden border border-[#3A3530] bg-[#141210]">
+                <button
+                  type="button"
+                  onClick={() => onPhotoClick?.(data.image_url as string)}
+                  className="w-20 h-20 rounded-lg overflow-hidden border border-[#3A3530] bg-[#141210] cursor-zoom-in hover:border-[#E08840]/50 transition-colors"
+                  title="Agrandir la photo"
+                >
                   <img
                     src={data.image_url as string}
                     alt={data.name as string}
                     className="w-full h-full object-cover"
                   />
-                </div>
+                </button>
               </div>
             )}
             {isEditing ? (

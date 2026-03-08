@@ -122,9 +122,12 @@ export default function AdminBeersPage() {
   const [rejectingBeerName, setRejectingBeerName] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
-  // ── Error feedback ──
+  // ── Error / feedback ──
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // ── Photo lightbox ──
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // ── Query: beers list ──
   const { data, isLoading } = admin.useAdminBeers(
@@ -414,15 +417,20 @@ export default function AdminBeersPage() {
                     key={beer.id}
                     className="flex items-center gap-3 p-3 bg-[#1E1B16] rounded-lg border border-[#3A3530]"
                   >
-                    {/* Photo preview */}
+                    {/* Photo preview (clickable for lightbox) */}
                     {beer.image_url ? (
-                      <div className="shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-[#3A3530] bg-[#141210]">
+                      <button
+                        type="button"
+                        onClick={() => setLightboxUrl(beer.image_url!)}
+                        className="shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-[#3A3530] bg-[#141210] cursor-zoom-in hover:border-[#E08840]/50 transition-colors"
+                        title="Agrandir la photo"
+                      >
                         <img
                           src={beer.image_url}
                           alt={beer.name}
                           className="w-full h-full object-cover"
                         />
-                      </div>
+                      </button>
                     ) : (
                       <div className="shrink-0 w-14 h-14 rounded-lg border border-[#3A3530] bg-[#141210] flex items-center justify-center">
                         <BeerIcon size={20} className="text-[#3A3530]" />
@@ -459,7 +467,7 @@ export default function AdminBeersPage() {
                           setActionSuccess(null);
                           try {
                             await admin.approveBeer(beer.id);
-                            setActionSuccess(`"${beer.name}" validee avec succes !`);
+                            setActionSuccess(`Approuvee : "${beer.name}" ajoutee a la liste !`);
                           } catch (err) {
                             setActionError(
                               err instanceof Error ? err.message : "Erreur lors de la validation"
@@ -643,7 +651,7 @@ export default function AdminBeersPage() {
                   setActionSuccess(null);
                   try {
                     await admin.rejectBeer(rejectingBeerId, rejectReason || undefined);
-                    setActionSuccess(`"${rejectingBeerName}" rejetee.`);
+                    setActionSuccess(`Rejetee : "${rejectingBeerName}" a ete refusee.`);
                     setRejectingBeerId(null);
                     setRejectReason("");
                   } catch (err) {
@@ -661,6 +669,30 @@ export default function AdminBeersPage() {
             </div>
           </div>
         </ModalOverlay>
+      )}
+
+      {/* ── Photo Lightbox ── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxUrl(null);
+            }}
+            className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-10"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Photo biere"
+            className="max-w-[90vw] max-h-[85vh] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );
