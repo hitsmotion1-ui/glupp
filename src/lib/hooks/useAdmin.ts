@@ -352,36 +352,29 @@ export function useAdmin() {
   // ─── Submissions ─────────────────────────
 
   function useAdminSubmissions(status?: string) {
+    // Always fetch ALL submissions (single cache), then filter client-side
     return useQuery({
-      queryKey: queryKeys.admin.submissions(status),
+      queryKey: ["admin", "submissions", "all"],
       queryFn: async () => {
         // 1. Fetch from legacy submissions table
-        let legacyQuery = supabase
+        const legacyQuery = supabase
           .from("submissions")
           .select("*")
           .order("created_at", { ascending: false })
           .limit(50);
-
-        if (status) {
-          legacyQuery = legacyQuery.eq("status", status);
-        }
 
         const { data: legacyData } = await legacyQuery;
         const legacySubmissions = legacyData || [];
 
         // 2. Fetch user-submitted beers from beers table (new flow)
         // Only show beers that were proposed by users (added_by IS NOT NULL)
-        let beersQuery = supabase
+        const beersQuery = supabase
           .from("beers")
           .select("*")
           .eq("is_active", true)
           .not("added_by", "is", null)
           .order("created_at", { ascending: false })
           .limit(50);
-
-        if (status) {
-          beersQuery = beersQuery.eq("status", status);
-        }
 
         const { data: beerSubmissions } = await beersQuery;
         const pendingBeers = (beerSubmissions || []).filter((b) => b.added_by);
@@ -442,6 +435,10 @@ export function useAdmin() {
         return allSubmissions;
       },
       staleTime: 15 * 1000,
+      select: (data) => {
+        if (!status) return data;
+        return data.filter((s) => s.status === status);
+      },
     });
   }
 
