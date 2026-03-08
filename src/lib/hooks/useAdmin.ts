@@ -369,35 +369,18 @@ export function useAdmin() {
         const { data: legacyData } = await legacyQuery;
         const legacySubmissions = legacyData || [];
 
-        // 2. Fetch pending/rejected beers from beers table (new flow)
+        // 2. Fetch user-submitted beers from beers table (new flow)
+        // Only show beers that were proposed by users (added_by IS NOT NULL)
         let beersQuery = supabase
           .from("beers")
           .select("*")
           .eq("is_active", true)
-          .in("status", status ? [status] : ["pending", "approved", "rejected"])
+          .not("added_by", "is", null)
           .order("created_at", { ascending: false })
           .limit(50);
 
-        // For "all" filter, show only pending + recently rejected from beers table
-        // For specific status, filter accordingly
-        if (!status) {
-          beersQuery = supabase
-            .from("beers")
-            .select("*")
-            .eq("is_active", true)
-            .neq("status", "approved")
-            .order("created_at", { ascending: false })
-            .limit(50);
-        } else if (status === "approved") {
-          // Don't show approved beers in submissions (they're in the beers tab)
-          beersQuery = supabase
-            .from("beers")
-            .select("*")
-            .eq("is_active", true)
-            .eq("status", "approved")
-            .not("added_by", "is", null)
-            .order("created_at", { ascending: false })
-            .limit(20);
+        if (status) {
+          beersQuery = beersQuery.eq("status", status);
         }
 
         const { data: beerSubmissions } = await beersQuery;

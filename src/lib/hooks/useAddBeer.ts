@@ -116,37 +116,80 @@ export function useAddBeer() {
         }
       }
 
-      // 1. Insert beer with status: 'pending'
-      const { data: beer, error: beerError } = await supabase
+      // 1. Check if a previously rejected beer exists for this user (same name)
+      //    If so, re-edit it instead of creating a duplicate
+      const { data: existingRejected } = await supabase
         .from("beers")
-        .insert({
-          name: input.name.trim(),
-          brewery: input.brewery.trim(),
-          style: input.style,
-          country: input.country,
-          country_code: input.country_code,
-          region: input.region?.trim() || null,
-          abv: input.abv ?? null,
-          ibu: null,
-          elo: 1500,
-          total_votes: 0,
-          rarity: "common",
-          color,
-          taste_bitter: taste.bitter,
-          taste_sweet: taste.sweet,
-          taste_fruity: taste.fruity,
-          taste_body: taste.body,
-          fun_fact: null,
-          fun_fact_icon: "💡",
-          image_url: imageUrl,
-          is_active: true,
-          added_by: user.id,
-          status: "pending",
-        })
-        .select()
-        .single();
+        .select("id")
+        .eq("added_by", user.id)
+        .eq("status", "rejected")
+        .eq("is_active", true)
+        .ilike("name", input.name.trim())
+        .limit(1)
+        .maybeSingle();
 
-      if (beerError) throw new Error(beerError.message);
+      let beer: Beer;
+
+      if (existingRejected) {
+        // Re-submit: update the rejected beer with new info and reset to pending
+        const { data: updated, error: updateError } = await supabase
+          .from("beers")
+          .update({
+            name: input.name.trim(),
+            brewery: input.brewery.trim(),
+            style: input.style,
+            country: input.country,
+            country_code: input.country_code,
+            region: input.region?.trim() || null,
+            abv: input.abv ?? null,
+            color,
+            taste_bitter: taste.bitter,
+            taste_sweet: taste.sweet,
+            taste_fruity: taste.fruity,
+            taste_body: taste.body,
+            ...(imageUrl ? { image_url: imageUrl } : {}), // Keep old photo if no new one
+            status: "pending",
+          })
+          .eq("id", existingRejected.id)
+          .select()
+          .single();
+
+        if (updateError) throw new Error(updateError.message);
+        beer = updated as Beer;
+      } else {
+        // New submission: insert a fresh beer
+        const { data: inserted, error: beerError } = await supabase
+          .from("beers")
+          .insert({
+            name: input.name.trim(),
+            brewery: input.brewery.trim(),
+            style: input.style,
+            country: input.country,
+            country_code: input.country_code,
+            region: input.region?.trim() || null,
+            abv: input.abv ?? null,
+            ibu: null,
+            elo: 1500,
+            total_votes: 0,
+            rarity: "common",
+            color,
+            taste_bitter: taste.bitter,
+            taste_sweet: taste.sweet,
+            taste_fruity: taste.fruity,
+            taste_body: taste.body,
+            fun_fact: null,
+            fun_fact_icon: "💡",
+            image_url: imageUrl,
+            is_active: true,
+            added_by: user.id,
+            status: "pending",
+          })
+          .select()
+          .single();
+
+        if (beerError) throw new Error(beerError.message);
+        beer = inserted as Beer;
+      }
 
       // 2. Auto-glupp is deferred until admin approves the beer
       // (handled in useAdmin.ts → approveBeerMutation)
