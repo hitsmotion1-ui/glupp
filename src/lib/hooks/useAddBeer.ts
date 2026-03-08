@@ -43,6 +43,7 @@ export function useAddBeer() {
   const [showDuplicates, setShowDuplicates] = useState(false);
 
   // ── Anti-duplicate check ──
+  // Only match approved or pending beers (rejected beers can be re-submitted)
   const checkDuplicates = async (name: string, brewery: string): Promise<DuplicateCandidate[]> => {
     if (!name.trim()) return [];
 
@@ -50,6 +51,7 @@ export function useAddBeer() {
       .from("beers")
       .select("id, name, brewery, country, style")
       .eq("is_active", true)
+      .neq("status", "rejected")
       .ilike("name", `%${name.trim()}%`)
       .limit(5);
 
@@ -62,6 +64,7 @@ export function useAddBeer() {
         .from("beers")
         .select("id, name, brewery, country, style")
         .eq("is_active", true)
+        .neq("status", "rejected")
         .ilike("brewery", `%${brewery.trim()}%`)
         .ilike("name", `%${name.trim().split(" ")[0]}%`)
         .limit(5);
@@ -118,15 +121,17 @@ export function useAddBeer() {
 
       // 1. Check if a previously rejected beer exists for this user (same name)
       //    If so, re-edit it instead of creating a duplicate
-      const { data: existingRejected } = await supabase
+      const { data: rejectedList } = await supabase
         .from("beers")
         .select("id")
         .eq("added_by", user.id)
         .eq("status", "rejected")
         .eq("is_active", true)
         .ilike("name", input.name.trim())
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const existingRejected = rejectedList?.[0] ?? null;
 
       let beer: Beer;
 
