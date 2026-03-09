@@ -133,10 +133,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION cancel_friend_request(p_friendship_id UUID, p_user_id UUID)
 RETURNS JSONB AS $$
 BEGIN
+  -- Allow cancellation if:
+  --   a) The user IS the initiator (normal case, new requests)
+  --   b) initiated_by IS NULL (legacy rows — either party can cancel)
   DELETE FROM friendships
   WHERE id = p_friendship_id
-    AND initiated_by = p_user_id
-    AND status = 'pending';
+    AND (user_a = p_user_id OR user_b = p_user_id)
+    AND status = 'pending'
+    AND (initiated_by IS NULL OR initiated_by = p_user_id);
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Demande introuvable ou non annulable';

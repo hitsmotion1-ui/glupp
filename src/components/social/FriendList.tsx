@@ -242,7 +242,7 @@ export function FriendList() {
                   </div>
                 )}
 
-                {/* Received requests - with accept/reject buttons */}
+                {/* Received requests - with accept/reject/cancel buttons */}
                 {requests.length > 0 && (
                   <>
                     <p className="text-xs font-medium text-glupp-text-muted uppercase tracking-wide">
@@ -252,6 +252,9 @@ export function FriendList() {
                       const data = r.friend_data;
                       const loading = loadingIds.has(r.friendship_id);
                       const level = getLevel(data.xp);
+                      // initiated_by === null means legacy row — both can cancel
+                      const canCancel = r.initiated_by === null;
+                      const isConfirmingCancel = confirmCancelId === r.friendship_id;
 
                       return (
                         <div
@@ -280,6 +283,24 @@ export function FriendList() {
 
                           {loading ? (
                             <Loader2 size={20} className="animate-spin text-glupp-accent shrink-0" />
+                          ) : isConfirmingCancel ? (
+                            /* Cancel confirmation (for legacy NULL rows) */
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-xs text-glupp-text-muted">Annuler ?</span>
+                              <button
+                                onClick={() => handleCancel(r.friendship_id)}
+                                className="w-7 h-7 flex items-center justify-center rounded-full bg-glupp-error/20 text-glupp-error hover:bg-glupp-error/30 transition-colors"
+                                title="Confirmer l'annulation"
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button
+                                onClick={() => setConfirmCancelId(null)}
+                                className="w-7 h-7 flex items-center justify-center rounded-full bg-glupp-card-alt text-glupp-text-muted hover:bg-glupp-border transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
                           ) : (
                             <div className="flex gap-2 shrink-0">
                               <button
@@ -296,6 +317,16 @@ export function FriendList() {
                               >
                                 <X size={16} />
                               </button>
+                              {/* Cancel button — shown when we don't know who initiated */}
+                              {canCancel && (
+                                <button
+                                  onClick={() => setConfirmCancelId(r.friendship_id)}
+                                  className="w-8 h-8 flex items-center justify-center rounded-full text-glupp-text-muted hover:text-glupp-error hover:bg-glupp-error/10 transition-colors"
+                                  title="Annuler cette demande"
+                                >
+                                  <Clock size={15} />
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
