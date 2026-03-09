@@ -17,7 +17,7 @@ const STEPS: OnboardingStep[] = [
     emoji: "🍺",
     title: "Bienvenue sur Glupp !",
     description:
-      "Collectionne toutes les bières que tu goûtes, comme un Pokédex de la bière. Chaque gorgée compte !",
+      "Collectionne toutes les bières que tu goûtes dans ton Beerdex. Chaque gorgée compte !",
     color: "#E08840",
   },
   {

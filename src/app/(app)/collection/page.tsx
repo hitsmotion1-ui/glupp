@@ -33,7 +33,7 @@ const RARITY_FILTERS: { key: Rarity | "all"; label: string }[] = [
 const RARITY_ORDER: Rarity[] = ["common", "rare", "epic", "legendary"];
 const PAGE_SIZE = 60;
 
-type ViewMode = "top" | "pokedex" | "mondial";
+type ViewMode = "top" | "beerdex" | "mondial";
 type SortMode = "tasted_first" | "rarity" | "name";
 
 export default function CollectionPage() {
@@ -48,7 +48,7 @@ export default function CollectionPage() {
       <div className="flex gap-2 px-4 mb-4">
         {([
           { key: "top" as const, label: "Mon Top", icon: Trophy },
-          { key: "pokedex" as const, label: "Pokedex", icon: BookOpen },
+          { key: "beerdex" as const, label: "Beerdex", icon: BookOpen },
           { key: "mondial" as const, label: "Mondial", icon: Globe },
         ]).map(({ key, label, icon: Icon }) => (
           <button
@@ -79,15 +79,15 @@ export default function CollectionPage() {
             <MyTopView />
           </motion.div>
         )}
-        {viewMode === "pokedex" && (
+        {viewMode === "beerdex" && (
           <motion.div
-            key="pokedex"
+            key="beerdex"
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 16 }}
             transition={{ duration: 0.2 }}
           >
-            <PokedexView />
+            <BeerdexView />
           </motion.div>
         )}
         {viewMode === "mondial" && (
@@ -244,8 +244,8 @@ function MyTopView() {
   );
 }
 
-/* ─── Pokedex View (original Collection) ─── */
-function PokedexView() {
+/* ─── Beerdex View (original Collection) ─── */
+function BeerdexView() {
   const {
     filteredBeers: allFilteredBeers,
     tastedIds,
