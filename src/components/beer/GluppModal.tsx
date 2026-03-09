@@ -430,12 +430,15 @@ export function GluppModal() {
           )}
         </div>
 
-        {/* ── Photo section — optional ── */}
+        {/* ── Photo section — mandatory ── */}
         <div>
           <label className="flex items-center justify-between text-sm text-glupp-text-soft mb-2">
             <span>
               <Camera size={14} className="inline mr-1.5" />
               Photo
+              <span className="ml-1.5 text-[10px] text-glupp-error font-medium uppercase tracking-wide">
+                obligatoire
+              </span>
             </span>
             <span className="text-[10px] text-glupp-accent font-medium">
               +15 XP
@@ -469,7 +472,7 @@ export function GluppModal() {
               <div className="text-left">
                 <p className="text-sm">Prendre une photo</p>
                 <p className="text-[10px] opacity-60">
-                  Optionnel mais recommande
+                  Toi avec ta bière, ou juste ta bière — c&apos;est toi le boss 📸
                 </p>
               </div>
             </button>
@@ -586,14 +589,21 @@ export function GluppModal() {
           <p className="text-glupp-error text-sm text-center">{error}</p>
         )}
 
-        {/* Confirm button — shows only base XP */}
+        {/* Photo required hint */}
+        {!photoFile && (
+          <p className="text-[11px] text-center text-glupp-error opacity-80">
+            📷 Ajoute une photo pour pouvoir gluppsser !
+          </p>
+        )}
+
+        {/* Confirm button */}
         <Button
           variant="primary"
           size="lg"
           className="w-full"
           loading={loading}
           onClick={handleGlupp}
-          disabled={loading}
+          disabled={loading || !photoFile}
         >
           Confirmer le Glupp ! (+{xp.total} XP)
         </Button>

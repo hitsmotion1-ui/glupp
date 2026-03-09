@@ -332,45 +332,64 @@ export default function AdminDashboardPage() {
                 })();
 
                 return (
-                  <div key={act.id} className="flex items-center gap-3 px-4 py-3">
-                    {/* Type badge */}
-                    <div
-                      className="flex items-center justify-center w-8 h-8 rounded-lg text-sm shrink-0"
-                      style={{ background: `${cfg.color}20` }}
-                    >
-                      {cfg.icon}
-                    </div>
+                  <div key={act.id} className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      {/* Type badge */}
+                      <div
+                        className="flex items-center justify-center w-8 h-8 rounded-lg text-sm shrink-0"
+                        style={{ background: `${cfg.color}20` }}
+                      >
+                        {cfg.icon}
+                      </div>
 
-                    {/* Avatar */}
-                    <div className="w-7 h-7 rounded-full bg-[#3A3530] flex items-center justify-center shrink-0 overflow-hidden">
-                      {act.user?.avatar_url ? (
-                        <img src={act.user.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[10px] font-bold text-[#A89888]">
-                          {(act.user?.username || "?")[0].toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#F5E6D3] truncate">
-                        <span className="font-medium">{act.user?.username ?? "?"}</span>
-                        {" "}
-                        <span className="text-[#A89888]">
-                          {cfg.label === "Glupp" ? "a gluppé" :
-                           cfg.label === "Duel" ? "a joué un duel" :
-                           cfg.label === "Photo" ? "a pris une photo" :
-                           `a effectué ${cfg.label.toLowerCase()}`}
-                        </span>
-                        {act.beer && (
-                          <span className="text-[#E08840]"> · {act.beer.name}</span>
+                      {/* Avatar */}
+                      <div className="w-7 h-7 rounded-full bg-[#3A3530] flex items-center justify-center shrink-0 overflow-hidden">
+                        {act.user?.avatar_url ? (
+                          <img src={act.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-[#A89888]">
+                            {(act.user?.username || "?")[0].toUpperCase()}
+                          </span>
                         )}
-                      </p>
-                    </div>
+                      </div>
 
-                    {/* Time */}
-                    <span className="text-xs text-[#6B6050] shrink-0">{timeAgo}</span>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[#F5E6D3] truncate">
+                          <span className="font-medium">{act.user?.username ?? "?"}</span>
+                          {" "}
+                          <span className="text-[#A89888]">
+                            {cfg.label === "Glupp" ? "a gluppé" :
+                             cfg.label === "Duel" ? "a joué un duel" :
+                             cfg.label === "Photo" ? "a pris une photo" :
+                             `a effectué ${cfg.label.toLowerCase()}`}
+                          </span>
+                          {act.beer && (
+                            <span className="text-[#E08840]"> · {act.beer.name}</span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Photo thumbnail (click to open full) */}
+                      {act.photo_url && (
+                        <a
+                          href={act.photo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Voir la photo"
+                          className="shrink-0"
+                        >
+                          <img
+                            src={act.photo_url}
+                            alt=""
+                            className="w-10 h-10 rounded-lg object-cover border border-[#3A3530] hover:opacity-80 transition-opacity"
+                          />
+                        </a>
+                      )}
+
+                      {/* Time */}
+                      <span className="text-xs text-[#6B6050] shrink-0">{timeAgo}</span>
+                    </div>
                   </div>
                 );
               })}

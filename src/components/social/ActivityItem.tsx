@@ -6,7 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { RarityBadge } from "@/components/beer/RarityBadge";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { beerEmoji } from "@/lib/utils/xp";
-import { Swords, Trophy, TrendingUp, Camera } from "lucide-react";
+import { Swords, Trophy, TrendingUp } from "lucide-react";
 import type { ActivityEntry } from "@/lib/hooks/useActivities";
 import type { Rarity } from "@/types";
 
@@ -73,10 +73,22 @@ function GluppContent({ activity }: { activity: ActivityEntry }) {
             +{xp} XP
           </span>
         )}
-        {activity.photo_url && (
-          <Camera size={12} className="text-glupp-rarity-rare" />
-        )}
       </div>
+
+      {activity.photo_url && (
+        <a
+          href={activity.photo_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block mt-2 rounded-glupp overflow-hidden"
+        >
+          <img
+            src={activity.photo_url}
+            alt="Photo glupp"
+            className="w-full max-h-52 object-cover hover:opacity-90 transition-opacity"
+          />
+        </a>
+      )}
     </div>
   );
 }
