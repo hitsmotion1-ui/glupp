@@ -103,14 +103,13 @@ BEGIN
 
     -- Send notification to the person who sent the request
     IF v_initiator_id IS NOT NULL AND v_initiator_id != p_user_id THEN
-      INSERT INTO notifications (user_id, type, title, message, data, is_read)
+      INSERT INTO notifications (user_id, type, title, message, metadata)
       VALUES (
         v_initiator_id,
         'friend_accepted',
         '🤝 Demande acceptée !',
         v_accepter_name || ' a accepté ta demande d''ami',
-        jsonb_build_object('accepter_id', p_user_id, 'accepter_name', v_accepter_name),
-        false
+        jsonb_build_object('accepter_id', p_user_id, 'accepter_name', v_accepter_name)
       );
     END IF;
 
