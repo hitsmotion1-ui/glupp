@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "@/components/ui/Modal";
@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAppStore } from "@/lib/store/useAppStore";
+import { useFriends } from "@/lib/hooks/useFriends";
 import { queryKeys } from "@/lib/queries/queryKeys";
 import { supabase } from "@/lib/supabase/client";
 import { getLevel, getNextLevel, getLevelProgress, formatNumber } from "@/lib/utils/xp";
@@ -20,6 +21,12 @@ import {
   ArrowLeftRight,
   Sparkles,
   User,
+  UserPlus,
+  UserMinus,
+  Clock,
+  Check,
+  X,
+  Loader2,
 } from "lucide-react";
 import type { Rarity } from "@/types";
 
@@ -58,6 +65,63 @@ export function UserProfileModal() {
   const selectedUserId = useAppStore((s) => s.selectedUserId);
   const closeUserProfileModal = useAppStore((s) => s.closeUserProfileModal);
   const openBeerModal = useAppStore((s) => s.openBeerModal);
+
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const {
+    friends,
+    requests,
+    sentRequests,
+    sendRequest,
+    acceptRequest,
+    rejectRequest,
+    removeFriend,
+  } = useFriends();
+
+  // Current logged-in user
+  const { data: currentUserId } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.id ?? null;
+    },
+    staleTime: Infinity,
+  });
+
+  // Friendship status with the viewed user
+  const friendEntry = useMemo(() => {
+    if (!selectedUserId) return null;
+    return (
+      friends.find((f) => f.friend_id === selectedUserId) ||
+      requests.find((f) => f.friend_id === selectedUserId) ||
+      sentRequests.find((f) => f.friend_id === selectedUserId) ||
+      null
+    );
+  }, [friends, requests, sentRequests, selectedUserId]);
+
+  const friendshipStatus = friendEntry?.friendship_status ?? null;
+  const isSentByMe = friendEntry
+    ? sentRequests.some((f) => f.friend_id === selectedUserId)
+    : false;
+  const isReceivedByMe = friendEntry
+    ? requests.some((f) => f.friend_id === selectedUserId)
+    : false;
+  const isOwnProfile = currentUserId === selectedUserId;
+
+  const handleFriendAction = async (action: "add" | "accept" | "reject" | "remove") => {
+    if (!selectedUserId || !friendEntry && action !== "add") return;
+    setActionLoading(true);
+    setConfirmRemove(false);
+    try {
+      if (action === "add") await sendRequest(selectedUserId);
+      else if (action === "accept") await acceptRequest(friendEntry!.friendship_id);
+      else if (action === "reject") await rejectRequest(friendEntry!.friendship_id);
+      else if (action === "remove") await removeFriend(friendEntry!.friendship_id);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Fetch user profile
   const { data: profile, isLoading: loadingProfile } = useQuery({
@@ -164,7 +228,7 @@ export function UserProfileModal() {
     : "";
 
   return (
-    <Modal isOpen={!!selectedUserId} onClose={closeUserProfileModal}>
+    <Modal isOpen={!!selectedUserId} onClose={() => { setConfirmRemove(false); closeUserProfileModal(); }}>
       {loadingProfile ? (
         <div className="space-y-4 pb-4">
           <div className="flex flex-col items-center gap-3">
@@ -222,6 +286,76 @@ export function UserProfileModal() {
                   color="#E08840"
                   subLabel={`${formatNumber(profile.xp)} / ${formatNumber(nextLevel.min)} XP`}
                 />
+              </div>
+            )}
+
+            {/* Friend action button */}
+            {!isOwnProfile && (
+              <div className="mt-3">
+                {actionLoading ? (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-glupp-card border border-glupp-border text-sm text-glupp-text-muted">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Chargement…</span>
+                  </div>
+                ) : friendshipStatus === "accepted" ? (
+                  // Already friends — show remove (with confirmation)
+                  confirmRemove ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-glupp-text-muted">Retirer cet ami ?</span>
+                      <button
+                        onClick={() => handleFriendAction("remove")}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-glupp-error/20 text-glupp-error text-xs font-medium hover:bg-glupp-error/30 transition-colors"
+                      >
+                        <Check size={13} /> Confirmer
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemove(false)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-glupp-card border border-glupp-border text-glupp-text-muted text-xs font-medium hover:bg-glupp-card-alt transition-colors"
+                      >
+                        <X size={13} /> Annuler
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRemove(true)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-glupp-card border border-glupp-border text-sm text-glupp-text-muted hover:text-glupp-error hover:border-glupp-error/40 transition-colors"
+                    >
+                      <UserMinus size={15} />
+                      <span>Retirer de mes amis</span>
+                    </button>
+                  )
+                ) : isSentByMe ? (
+                  // I sent the request — waiting
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-glupp-card border border-glupp-border text-sm text-glupp-text-muted">
+                    <Clock size={14} />
+                    <span>Demande envoyée</span>
+                  </div>
+                ) : isReceivedByMe ? (
+                  // They sent me a request — accept or reject
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleFriendAction("accept")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-glupp-success/20 text-glupp-success text-sm font-medium hover:bg-glupp-success/30 transition-colors"
+                    >
+                      <Check size={14} /> Accepter
+                    </button>
+                    <button
+                      onClick={() => handleFriendAction("reject")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-glupp-card border border-glupp-border text-glupp-text-muted text-sm hover:bg-glupp-error/10 hover:text-glupp-error transition-colors"
+                    >
+                      <X size={14} /> Refuser
+                    </button>
+                  </div>
+                ) : (
+                  // Not friends — add
+                  <button
+                    onClick={() => handleFriendAction("add")}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-glupp-accent text-glupp-bg text-sm font-medium hover:bg-glupp-accent/90 transition-colors"
+                  >
+                    <UserPlus size={15} />
+                    <span>Ajouter en ami</span>
+                  </button>
+                )}
               </div>
             )}
           </motion.div>
