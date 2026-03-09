@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { useFriends } from "@/lib/hooks/useFriends";
 import { getLevel } from "@/lib/utils/xp";
-import { UserPlus, Check, X, Users, Loader2, Clock } from "lucide-react";
+import { UserPlus, Check, X, Users, Loader2, Clock, UserMinus } from "lucide-react";
 
 type FriendTab = "friends" | "requests";
 
@@ -17,10 +17,11 @@ export function FriendList() {
   const setShowFriendSearch = useAppStore((s) => s.setShowFriendSearch);
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
 
-  const { friends, requests, sentRequests, isLoading, acceptRequest, rejectRequest } =
+  const { friends, requests, sentRequests, isLoading, acceptRequest, rejectRequest, removeFriend } =
     useFriends();
 
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const handleAccept = async (friendshipId: string) => {
     setLoadingIds((prev) => new Set(prev).add(friendshipId));
@@ -39,6 +40,20 @@ export function FriendList() {
     setLoadingIds((prev) => new Set(prev).add(friendshipId));
     try {
       await rejectRequest(friendshipId);
+    } finally {
+      setLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(friendshipId);
+        return next;
+      });
+    }
+  };
+
+  const handleRemove = async (friendshipId: string) => {
+    setLoadingIds((prev) => new Set(prev).add(friendshipId));
+    setConfirmRemoveId(null);
+    try {
+      await removeFriend(friendshipId);
     } finally {
       setLoadingIds((prev) => {
         const next = new Set(prev);
@@ -105,28 +120,67 @@ export function FriendList() {
               friends.map((f) => {
                 const data = f.friend_data;
                 const level = getLevel(data.xp);
+                const isRemoving = loadingIds.has(f.friendship_id);
+                const isConfirming = confirmRemoveId === f.friendship_id;
 
                 return (
-                  <button
+                  <div
                     key={f.friendship_id}
-                    onClick={() => openUserProfileModal(f.friend_id)}
-                    className="w-full flex items-center gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp hover:border-glupp-accent/30 transition-colors text-left"
+                    className="flex items-center gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp transition-colors"
                   >
-                    <Avatar
-                      url={data.avatar_url}
-                      name={data.display_name || data.username}
-                      size="md"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-glupp-cream truncate">
-                        {data.display_name || data.username}
-                      </p>
-                      <p className="text-xs text-glupp-text-muted">
-                        {level.icon} Nv.{level.level} · {data.beers_tasted}{" "}
-                        bières · {data.duels_played} duels
-                      </p>
-                    </div>
-                  </button>
+                    {/* Clickable profile area */}
+                    <button
+                      onClick={() => {
+                        setConfirmRemoveId(null);
+                        openUserProfileModal(f.friend_id);
+                      }}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                    >
+                      <Avatar
+                        url={data.avatar_url}
+                        name={data.display_name || data.username}
+                        size="md"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-glupp-cream truncate">
+                          {data.display_name || data.username}
+                        </p>
+                        <p className="text-xs text-glupp-text-muted">
+                          {level.icon} Nv.{level.level} · {data.beers_tasted}{" "}
+                          bières · {data.duels_played} duels
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Remove button / confirmation */}
+                    {isRemoving ? (
+                      <Loader2 size={18} className="animate-spin text-glupp-text-muted shrink-0" />
+                    ) : isConfirming ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-xs text-glupp-text-muted">Retirer ?</span>
+                        <button
+                          onClick={() => handleRemove(f.friendship_id)}
+                          className="w-7 h-7 flex items-center justify-center rounded-full bg-glupp-error/20 text-glupp-error hover:bg-glupp-error/30 transition-colors"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemoveId(null)}
+                          className="w-7 h-7 flex items-center justify-center rounded-full bg-glupp-card-alt text-glupp-text-muted hover:bg-glupp-border transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmRemoveId(f.friendship_id)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full text-glupp-text-muted hover:text-glupp-error hover:bg-glupp-error/10 transition-colors shrink-0"
+                        title="Retirer cet ami"
+                      >
+                        <UserMinus size={16} />
+                      </button>
+                    )}
+                  </div>
                 );
               })
             )}
