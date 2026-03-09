@@ -36,7 +36,10 @@ export interface PersistentNotification {
     | "submission_rejected"
     | "xp_reward"
     | "admin_new_submission"
-    | "system";
+    | "system"
+    | "trophy"
+    | "ban_status"
+    | "friend_accepted";
   title: string;
   message: string | null;
   metadata: Record<string, unknown>;

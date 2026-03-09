@@ -173,6 +173,28 @@ export function useFriends() {
     },
   });
 
+  // Cancel a sent friend request (only initiator can cancel)
+  const cancelRequestMutation = useMutation({
+    mutationFn: async (friendshipId: string) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non connecté");
+
+      const { data, error } = await supabase.rpc("cancel_friend_request", {
+        p_friendship_id: friendshipId,
+        p_user_id: user.id,
+      });
+
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.search(searchQuery) });
+    },
+  });
+
   // Remove friend
   const removeFriendMutation = useMutation({
     mutationFn: async (friendshipId: string) => {
@@ -204,6 +226,11 @@ export function useFriends() {
     [updateRequestMutation]
   );
 
+  const cancelRequest = useCallback(
+    (friendshipId: string) => cancelRequestMutation.mutateAsync(friendshipId),
+    [cancelRequestMutation]
+  );
+
   const removeFriend = useCallback(
     (friendshipId: string) => removeFriendMutation.mutateAsync(friendshipId),
     [removeFriendMutation]
@@ -221,7 +248,9 @@ export function useFriends() {
     sendRequest,
     acceptRequest,
     rejectRequest,
+    cancelRequest,
     removeFriend,
     sendingRequest: sendRequestMutation.isPending,
+    cancellingRequest: cancelRequestMutation.isPending,
   };
 }

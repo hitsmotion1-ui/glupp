@@ -91,6 +91,12 @@ function PersistentNotifCard({
       iconColor: "text-glupp-accent",
       accentBorder: "border-l-glupp-accent",
     },
+    friend_accepted: {
+      icon: UserPlus,
+      iconBg: "bg-green-500/15",
+      iconColor: "text-green-500",
+      accentBorder: "border-l-green-500",
+    },
   };
 
   const config = configMap[p.type] || configMap.system;
