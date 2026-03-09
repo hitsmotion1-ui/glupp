@@ -288,6 +288,33 @@ export function useAdmin() {
     });
   }
 
+  const createBarMutation = useMutation({
+    mutationFn: async (input: BarInput) => {
+      const { data, error } = await supabase
+        .from("bars")
+        .insert({
+          name: input.name,
+          address: input.address ?? null,
+          city: input.city ?? null,
+          geo_lat: input.geo_lat ?? null,
+          geo_lng: input.geo_lng ?? null,
+          is_verified: false,
+          rating: 0,
+          total_votes: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+      return data as Bar;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "bars"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bars.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
+    },
+  });
+
   const updateBarMutation = useMutation({
     mutationFn: async ({ id, data: input }: { id: string; data: Partial<BarInput> }) => {
       const { data, error } = await supabase
@@ -572,6 +599,8 @@ export function useAdmin() {
 
     // Bars
     useAdminBars,
+    createBar: createBarMutation.mutateAsync,
+    creatingBar: createBarMutation.isPending,
     updateBar: (id: string, data: Partial<BarInput>) =>
       updateBarMutation.mutateAsync({ id, data }),
     updatingBar: updateBarMutation.isPending,

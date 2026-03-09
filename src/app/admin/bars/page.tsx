@@ -8,6 +8,7 @@ import type { Bar } from "@/types";
 import {
   Search,
   X,
+  Plus,
   Pencil,
   Trash2,
   Loader2,
@@ -37,6 +38,94 @@ const EMPTY_FORM: BarFormData = {
 };
 
 // ═══════════════════════════════════════════
+// Shared Form Fields Component
+// ═══════════════════════════════════════════
+
+function BarFormFields({
+  form,
+  updateField,
+}: {
+  form: BarFormData;
+  updateField: <K extends keyof BarFormData>(key: K, value: BarFormData[K]) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Name */}
+      <div>
+        <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
+          Nom *
+        </label>
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => updateField("name", e.target.value)}
+          placeholder="Nom du bar"
+          className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+        />
+      </div>
+
+      {/* City + Address */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
+            Ville
+          </label>
+          <input
+            type="text"
+            value={form.city}
+            onChange={(e) => updateField("city", e.target.value)}
+            placeholder="Ex: Paris"
+            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+          />
+        </div>
+        <div>
+          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
+            Adresse
+          </label>
+          <input
+            type="text"
+            value={form.address}
+            onChange={(e) => updateField("address", e.target.value)}
+            placeholder="Ex: 12 rue de la Biere"
+            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+          />
+        </div>
+      </div>
+
+      {/* Geo coordinates */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
+            Latitude
+          </label>
+          <input
+            type="number"
+            value={form.geo_lat}
+            onChange={(e) => updateField("geo_lat", e.target.value)}
+            placeholder="Ex: 48.8566"
+            step="0.0001"
+            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+          />
+        </div>
+        <div>
+          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
+            Longitude
+          </label>
+          <input
+            type="number"
+            value={form.geo_lng}
+            onChange={(e) => updateField("geo_lng", e.target.value)}
+            placeholder="Ex: 2.3522"
+            step="0.0001"
+            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
 // Bar Management Page
 // ═══════════════════════════════════════════
 
@@ -47,6 +136,7 @@ export default function AdminBarsPage() {
   const [search, setSearch] = useState("");
 
   // ── Modals ──
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingBar, setEditingBar] = useState<Bar | null>(null);
   const [form, setForm] = useState<BarFormData>(EMPTY_FORM);
 
@@ -73,10 +163,32 @@ export default function AdminBarsPage() {
     });
   }, []);
 
+  const openCreate = useCallback(() => {
+    setForm(EMPTY_FORM);
+    setShowCreateModal(true);
+  }, []);
+
   const closeModal = useCallback(() => {
+    setShowCreateModal(false);
     setEditingBar(null);
     setForm(EMPTY_FORM);
   }, []);
+
+  const handleCreate = useCallback(async () => {
+    if (!form.name.trim()) return;
+    try {
+      await admin.createBar({
+        name: form.name.trim(),
+        address: form.address.trim() || null,
+        city: form.city.trim() || null,
+        geo_lat: form.geo_lat ? parseFloat(form.geo_lat) : null,
+        geo_lng: form.geo_lng ? parseFloat(form.geo_lng) : null,
+      });
+      closeModal();
+    } catch (err) {
+      console.error("Failed to create bar:", err);
+    }
+  }, [form, admin, closeModal]);
 
   const handleUpdate = useCallback(async () => {
     if (!editingBar || !form.name.trim()) return;
@@ -236,8 +348,16 @@ export default function AdminBarsPage() {
       <AdminHeader title="Gestion des Bars" />
 
       <div className="px-6 py-6 lg:px-8 space-y-6">
-        {/* ── Search Bar ── */}
+        {/* ── Toolbar ── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-[#E08840] text-[#141210] rounded-lg text-sm font-semibold hover:bg-[#E08840]/90 transition-colors shrink-0"
+          >
+            <Plus size={16} />
+            Ajouter un bar
+          </button>
+
           <div className="relative flex-1 max-w-sm">
             <Search
               size={16}
@@ -275,6 +395,57 @@ export default function AdminBarsPage() {
       </div>
 
       {/* ═══════════════════════════════════════════ */}
+      {/* Create Modal                               */}
+      {/* ═══════════════════════════════════════════ */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={closeModal}
+          />
+          <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-[#1E1B16] border border-[#3A3530] shadow-2xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#4ECDC4]/15">
+                    <MapPin size={18} className="text-[#4ECDC4]" />
+                  </div>
+                  <h2 className="text-lg font-bold text-[#F5E6D3] font-display">
+                    Ajouter un bar
+                  </h2>
+                </div>
+                <button
+                  onClick={closeModal}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg text-[#A89888] hover:text-[#F5E6D3] hover:bg-[#3A3530] transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <BarFormFields form={form} updateField={updateField} />
+
+              <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#3A3530]">
+                <button
+                  onClick={closeModal}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-[#A89888] hover:text-[#F5E6D3] hover:bg-[#3A3530] transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={admin.creatingBar || !form.name.trim()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E08840] text-[#141210] text-sm font-semibold hover:bg-[#E08840]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {admin.creatingBar && <Loader2 size={14} className="animate-spin" />}
+                  Créer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
       {/* Edit Modal                                 */}
       {/* ═══════════════════════════════════════════ */}
       {editingBar && (
@@ -307,79 +478,7 @@ export default function AdminBarsPage() {
               </div>
 
               {/* Form fields */}
-              <div className="space-y-4">
-                {/* Name */}
-                <div>
-                  <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-                    Nom *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => updateField("name", e.target.value)}
-                    placeholder="Nom du bar"
-                    className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
-                  />
-                </div>
-
-                {/* City + Address */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-                      Ville
-                    </label>
-                    <input
-                      type="text"
-                      value={form.city}
-                      onChange={(e) => updateField("city", e.target.value)}
-                      placeholder="Ex: Paris"
-                      className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-                      Adresse
-                    </label>
-                    <input
-                      type="text"
-                      value={form.address}
-                      onChange={(e) => updateField("address", e.target.value)}
-                      placeholder="Ex: 12 rue de la Biere"
-                      className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Geo coordinates */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-                      Latitude
-                    </label>
-                    <input
-                      type="number"
-                      value={form.geo_lat}
-                      onChange={(e) => updateField("geo_lat", e.target.value)}
-                      placeholder="Ex: 48.8566"
-                      step="0.0001"
-                      className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-                      Longitude
-                    </label>
-                    <input
-                      type="number"
-                      value={form.geo_lng}
-                      onChange={(e) => updateField("geo_lng", e.target.value)}
-                      placeholder="Ex: 2.3522"
-                      step="0.0001"
-                      className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
+              <BarFormFields form={form} updateField={updateField} />
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#3A3530]">

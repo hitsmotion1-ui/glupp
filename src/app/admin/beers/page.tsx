@@ -74,6 +74,9 @@ interface BeerFormData {
   taste_sweet: number;
   taste_fruity: number;
   taste_body: number;
+  barcode: string;
+  fun_fact: string;
+  fun_fact_icon: string;
 }
 
 const EMPTY_FORM: BeerFormData = {
@@ -91,6 +94,9 @@ const EMPTY_FORM: BeerFormData = {
   taste_sweet: 3,
   taste_fruity: 3,
   taste_body: 3,
+  barcode: "",
+  fun_fact: "",
+  fun_fact_icon: "💡",
 };
 
 const RARITY_OPTIONS: { value: string; label: string }[] = [
@@ -185,6 +191,9 @@ export default function AdminBeersPage() {
       taste_sweet: beer.taste_sweet ?? 3,
       taste_fruity: beer.taste_fruity ?? 3,
       taste_body: beer.taste_body ?? 3,
+      barcode: (beer as Beer & { barcode?: string }).barcode ?? "",
+      fun_fact: (beer as Beer & { fun_fact?: string }).fun_fact ?? "",
+      fun_fact_icon: (beer as Beer & { fun_fact_icon?: string }).fun_fact_icon ?? "💡",
     });
   }, []);
 
@@ -212,6 +221,9 @@ export default function AdminBeersPage() {
         taste_sweet: form.taste_sweet,
         taste_fruity: form.taste_fruity,
         taste_body: form.taste_body,
+        barcode: form.barcode.trim() || null,
+        fun_fact: form.fun_fact.trim() || null,
+        fun_fact_icon: form.fun_fact_icon || "💡",
       });
       closeModals();
     } catch (err) {
@@ -237,6 +249,9 @@ export default function AdminBeersPage() {
         taste_sweet: form.taste_sweet,
         taste_fruity: form.taste_fruity,
         taste_body: form.taste_body,
+        barcode: form.barcode.trim() || null,
+        fun_fact: form.fun_fact.trim() || null,
+        fun_fact_icon: form.fun_fact_icon || "💡",
       });
       closeModals();
     } catch (err) {
@@ -1197,6 +1212,56 @@ function BeerForm({
             rows={3}
             className={`${inputClass} resize-none`}
           />
+        </div>
+
+        {/* ── Section 4: Barcode ── */}
+        <div className={sectionClass}>
+          <h3 className={sectionTitleClass}>Code-barres</h3>
+          <div>
+            <label className={labelClass}>EAN / UPC</label>
+            <input
+              type="text"
+              value={form.barcode}
+              onChange={(e) => onChange("barcode", e.target.value)}
+              placeholder="Ex: 5410228103706"
+              maxLength={30}
+              className={inputClass}
+            />
+            <p className="text-[10px] text-[#6B6050] mt-1">
+              Permet a l&apos;utilisateur de scanner la biere directement depuis sa camera.
+            </p>
+          </div>
+        </div>
+
+        {/* ── Section 5: Fun Fact ── */}
+        <div className={sectionClass}>
+          <h3 className={sectionTitleClass}>Fun Fact</h3>
+          <div className="flex gap-3">
+            {/* Icon emoji picker */}
+            <div className="shrink-0">
+              <label className={labelClass}>Icone</label>
+              <input
+                type="text"
+                value={form.fun_fact_icon}
+                onChange={(e) => onChange("fun_fact_icon", e.target.value)}
+                maxLength={4}
+                className="w-16 text-center px-2 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-lg text-[#F5E6D3] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+              />
+            </div>
+            <div className="flex-1">
+              <label className={labelClass}>Anecdote / Histoire</label>
+              <textarea
+                value={form.fun_fact}
+                onChange={(e) => onChange("fun_fact", e.target.value)}
+                placeholder="Ex: Cette biere est brassee dans une ancienne abbaye cistercienne fondee en 1133..."
+                rows={3}
+                className={`${inputClass} resize-none`}
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-[#6B6050]">
+            Affiche dans la fiche biere pour enrichir l&apos;experience utilisateur.
+          </p>
         </div>
       </div>
 
