@@ -81,7 +81,8 @@ export function useAdmin() {
       if (error) throw new Error(error.message);
       return data as AdminStats;
     },
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // ─── Beers CRUD ──────────────────────────
@@ -676,7 +677,42 @@ export function useAdmin() {
         if (error) throw new Error(error.message);
         return (data as Activity[]) || [];
       },
-      staleTime: 30 * 1000,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    });
+  }
+
+  // ─── All glupps (modération photos) ─────
+
+  const GLUPPS_PAGE_SIZE = 25;
+
+  function useAdminGlupps({
+    page = 0,
+    onlyWithPhoto = false,
+  }: { page?: number; onlyWithPhoto?: boolean } = {}) {
+    return useQuery({
+      queryKey: ["admin", "glupps", page, onlyWithPhoto],
+      queryFn: async () => {
+        let query = supabase
+          .from("activities")
+          .select(
+            "id, user_id, beer_id, photo_url, created_at, metadata, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery, rarity)",
+            { count: "exact" }
+          )
+          .eq("type", "glupp")
+          .order("created_at", { ascending: false })
+          .range(page * GLUPPS_PAGE_SIZE, (page + 1) * GLUPPS_PAGE_SIZE - 1);
+
+        if (onlyWithPhoto) {
+          query = query.not("photo_url", "is", null);
+        }
+
+        const { data, error, count } = await query;
+        if (error) throw new Error(error.message);
+        return { glupps: data || [], total: count ?? 0 };
+      },
+      staleTime: 0,
+      refetchOnWindowFocus: true,
     });
   }
 
@@ -779,5 +815,9 @@ export function useAdmin() {
 
     // Activities
     useAdminActivities,
+
+    // Glupps (modération photos)
+    useAdminGlupps,
+    GLUPPS_PAGE_SIZE,
   };
 }

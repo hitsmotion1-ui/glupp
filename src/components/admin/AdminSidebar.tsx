@@ -15,12 +15,14 @@ import {
   X,
   Trophy,
   Star,
+  Sparkles,
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/beers", label: "Bi\u00e8res", icon: Beer, exact: false },
   { href: "/admin/bars", label: "Bars", icon: MapPin, exact: false },
+  { href: "/admin/glupps", label: "Glupps", icon: Sparkles, exact: false },
   {
     href: "/admin/submissions",
     label: "Soumissions",
