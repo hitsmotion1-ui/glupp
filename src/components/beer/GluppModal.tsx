@@ -193,6 +193,11 @@ export function GluppModal() {
     }
   };
 
+  // Un bar sélectionné = position connue → plus besoin de GPS
+  const barIsSelected =
+    locationType === "bar" &&
+    (selectedBarId !== null || (showNewBar && newBarName.trim().length > 0));
+
   // XP calculation — clear breakdown
   const computeXP = () => {
     // Base XP (always earned)
@@ -204,8 +209,9 @@ export function GluppModal() {
 
     // Photo bonus
     const photoBonus = photoFile ? 15 : 0;
-    // Geo bonus (only if photo taken too)
-    const geoBonus = photoFile && geoLat ? 20 : 0;
+    // Geo bonus: GPS activé OU bar sélectionné (les deux comptent comme localisation)
+    const hasLocation = geoLat !== null || barIsSelected;
+    const geoBonus = photoFile && hasLocation ? 20 : 0;
 
     return { base, photoBonus, geoBonus, total: base + photoBonus + geoBonus };
   };
@@ -488,53 +494,64 @@ export function GluppModal() {
           />
         </div>
 
-        {/* ── Geolocation — optional, requires photo for XP ── */}
-        <div>
-          <label className="flex items-center justify-between text-sm text-glupp-text-soft mb-2">
-            <span>
-              <Navigation size={14} className="inline mr-1.5" />
-              Position
+        {/* ── Geolocation — masqué si un bar est sélectionné (la position est déjà connue) ── */}
+        {barIsSelected ? (
+          /* Bar sélectionné → position validée automatiquement */
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-glupp-success/10 border border-glupp-success/30 rounded-glupp">
+            <CheckCircle size={14} className="text-glupp-success shrink-0" />
+            <span className="text-sm text-glupp-success flex-1">
+              Position validée via le bar
             </span>
-            <span className="text-[10px] text-glupp-accent font-medium">
-              {photoFile ? "+20 XP" : "+20 XP avec photo"}
-            </span>
-          </label>
-
-          {geoLat && geoLng ? (
-            <div className="flex items-center justify-between px-4 py-2.5 bg-glupp-success/10 border border-glupp-success/30 rounded-glupp">
-              <div className="flex items-center gap-2 text-sm text-glupp-success">
-                <CheckCircle size={14} />
-                <span>
-                  Position enregistree
-                  {geoCity && (
-                    <span className="text-glupp-text-muted ml-1">
-                      ({geoCity})
-                    </span>
-                  )}
-                </span>
-              </div>
-              <button
-                onClick={removeGeo}
-                className="text-glupp-text-muted hover:text-glupp-cream transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={requestGeolocation}
-              disabled={geoLoading}
-              className="w-full flex items-center gap-3 py-2.5 px-4 border border-dashed border-glupp-border rounded-glupp text-glupp-text-muted hover:border-glupp-accent hover:text-glupp-accent transition-colors disabled:opacity-50"
-            >
-              <MapPin size={18} />
-              <span className="text-sm">
-                {geoLoading
-                  ? "Localisation..."
-                  : geoError || "Ajouter ma position"}
+            <span className="text-[10px] text-glupp-accent font-medium shrink-0">+20 XP</span>
+          </div>
+        ) : (
+          <div>
+            <label className="flex items-center justify-between text-sm text-glupp-text-soft mb-2">
+              <span>
+                <Navigation size={14} className="inline mr-1.5" />
+                Position
               </span>
-            </button>
-          )}
-        </div>
+              <span className="text-[10px] text-glupp-accent font-medium">
+                {photoFile ? "+20 XP" : "+20 XP avec photo"}
+              </span>
+            </label>
+
+            {geoLat && geoLng ? (
+              <div className="flex items-center justify-between px-4 py-2.5 bg-glupp-success/10 border border-glupp-success/30 rounded-glupp">
+                <div className="flex items-center gap-2 text-sm text-glupp-success">
+                  <CheckCircle size={14} />
+                  <span>
+                    Position enregistree
+                    {geoCity && (
+                      <span className="text-glupp-text-muted ml-1">
+                        ({geoCity})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <button
+                  onClick={removeGeo}
+                  className="text-glupp-text-muted hover:text-glupp-cream transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={requestGeolocation}
+                disabled={geoLoading}
+                className="w-full flex items-center gap-3 py-2.5 px-4 border border-dashed border-glupp-border rounded-glupp text-glupp-text-muted hover:border-glupp-accent hover:text-glupp-accent transition-colors disabled:opacity-50"
+              >
+                <MapPin size={18} />
+                <span className="text-sm">
+                  {geoLoading
+                    ? "Localisation..."
+                    : geoError || "Ajouter ma position"}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── XP Summary bar ── */}
         <motion.div
@@ -573,12 +590,14 @@ export function GluppModal() {
               <span className="text-glupp-success">Photo : +15</span>
             )}
             {xp.geoBonus > 0 && (
-              <span className="text-glupp-success">Position : +20</span>
+              <span className="text-glupp-success">
+                {barIsSelected ? "Bar : +20" : "Position : +20"}
+              </span>
             )}
             {!photoFile && (
               <span className="opacity-50">Photo : +15</span>
             )}
-            {!(photoFile && geoLat) && (
+            {!(photoFile && (geoLat || barIsSelected)) && (
               <span className="opacity-50">Pos. : +20</span>
             )}
           </div>

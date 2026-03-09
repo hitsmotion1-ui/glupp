@@ -168,7 +168,10 @@ export function useFriends() {
       await queryClient.refetchQueries({ queryKey: queryKeys.friends.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
       if (variables.action === "accept") {
-        showXPToast(0, "Nouvel ami !");
+        showXPToast(5, "Nouvel ami !");
+        // Refresh profile so the +5 XP appears immediately
+        queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
+        queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
       }
     },
   });
