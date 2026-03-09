@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/queries/queryKeys";
-import type { Beer, Bar, Profile, Rarity } from "@/types";
+import type { Beer, Bar, Profile, Rarity, Trophy, GluppOfWeek, Activity, UserAdminDetail } from "@/types";
 
 // ═══════════════════════════════════════════
 // Types
@@ -548,6 +548,140 @@ export function useAdmin() {
     });
   }
 
+  // ─── Toggle Ban ──────────────────────────
+
+  const toggleBanMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.rpc("admin_toggle_ban", {
+        p_user_id: userId,
+      });
+      if (error) throw new Error(error.message);
+      return data as { success: boolean; is_banned: boolean; username: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+
+  // ─── Award Trophy ─────────────────────────
+
+  const awardTrophyMutation = useMutation({
+    mutationFn: async ({ userId, trophyId }: { userId: string; trophyId: string }) => {
+      const { data, error } = await supabase.rpc("admin_award_trophy", {
+        p_user_id: userId,
+        p_trophy_id: trophyId,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
+    },
+  });
+
+  // ─── Set GOTW ────────────────────────────
+
+  const setGOTWMutation = useMutation({
+    mutationFn: async ({
+      beerId,
+      weekStart,
+      weekEnd,
+      bonusXp,
+    }: {
+      beerId: string;
+      weekStart: string;
+      weekEnd: string;
+      bonusXp: number;
+    }) => {
+      const { data, error } = await supabase.rpc("admin_set_gotw", {
+        p_beer_id: beerId,
+        p_week_start: weekStart,
+        p_week_end: weekEnd,
+        p_bonus_xp: bonusXp,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "gotw"] });
+    },
+  });
+
+  // ─── Trophies list ───────────────────────
+
+  function useAdminTrophies() {
+    return useQuery({
+      queryKey: ["admin", "trophies"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("trophies")
+          .select("*")
+          .order("category", { ascending: true })
+          .order("name", { ascending: true });
+        if (error) throw new Error(error.message);
+        return (data as Trophy[]) || [];
+      },
+      staleTime: 5 * 60 * 1000, // 5 min
+    });
+  }
+
+  // ─── GOTW list ───────────────────────────
+
+  function useAdminGOTW() {
+    return useQuery({
+      queryKey: ["admin", "gotw"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("glupp_of_week")
+          .select("*, beer:beers(*)")
+          .order("week_start", { ascending: false })
+          .limit(10);
+        if (error) throw new Error(error.message);
+        return (data as (GluppOfWeek & { beer?: Beer })[]) || [];
+      },
+      staleTime: 30 * 1000,
+    });
+  }
+
+  // ─── User admin detail ───────────────────
+
+  function useUserAdminDetail(userId?: string | null) {
+    return useQuery({
+      queryKey: ["admin", "user-detail", userId],
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc("get_user_admin_detail", {
+          p_user_id: userId!,
+        });
+        if (error) throw new Error(error.message);
+        return data as UserAdminDetail;
+      },
+      enabled: !!userId,
+      staleTime: 30 * 1000,
+    });
+  }
+
+  // ─── Recent activities ───────────────────
+
+  function useAdminActivities() {
+    return useQuery({
+      queryKey: ["admin", "activities"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("activities")
+          .select("*, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery)")
+          .in("type", ["glupp", "duel", "photo"])
+          .order("created_at", { ascending: false })
+          .limit(15);
+        if (error) throw new Error(error.message);
+        return (data as Activity[]) || [];
+      },
+      staleTime: 30 * 1000,
+    });
+  }
+
+  // ─── XP ──────────────────────────────────
+
   const awardXPMutation = useMutation({
     mutationFn: async ({
       userId,
@@ -625,5 +759,25 @@ export function useAdmin() {
     awardXP: (userId: string, amount: number, reason: string) =>
       awardXPMutation.mutateAsync({ userId, amount, reason }),
     awardingXP: awardXPMutation.isPending,
+    toggleBan: toggleBanMutation.mutateAsync,
+    togglingBan: toggleBanMutation.isPending,
+
+    // Trophies
+    useAdminTrophies,
+    awardTrophy: (userId: string, trophyId: string) =>
+      awardTrophyMutation.mutateAsync({ userId, trophyId }),
+    awardingTrophy: awardTrophyMutation.isPending,
+
+    // GOTW
+    useAdminGOTW,
+    setGOTW: (beerId: string, weekStart: string, weekEnd: string, bonusXp: number) =>
+      setGOTWMutation.mutateAsync({ beerId, weekStart, weekEnd, bonusXp }),
+    settingGOTW: setGOTWMutation.isPending,
+
+    // User detail
+    useUserAdminDetail,
+
+    // Activities
+    useAdminActivities,
   };
 }

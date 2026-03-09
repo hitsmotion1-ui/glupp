@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   Menu,
   X,
+  Trophy,
+  Star,
 } from "lucide-react";
 
 const navItems = [
@@ -27,6 +29,8 @@ const navItems = [
     badge: true,
   },
   { href: "/admin/users", label: "Utilisateurs", icon: Users, exact: false },
+  { href: "/admin/trophies", label: "Troph\u00e9es", icon: Trophy, exact: false },
+  { href: "/admin/gotw", label: "Glupp of Week", icon: Star, exact: false },
   {
     href: "/admin/settings",
     label: "Param\u00e8tres",

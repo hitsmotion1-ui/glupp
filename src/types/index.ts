@@ -78,6 +78,27 @@ export interface Profile {
   beers_tasted: number;
   photos_taken: number;
   created_at: string;
+  is_banned?: boolean;
+}
+
+// ─── Admin: détail utilisateur ───
+export interface UserAdminDetail {
+  profile: Profile & { is_admin?: boolean };
+  recent_beers: {
+    beer_name: string;
+    brewery: string;
+    style: string;
+    rarity: Rarity;
+    tasted_at: string;
+    rating: number | null;
+  }[];
+  trophies: {
+    name: string;
+    emoji: string;
+    category: string | null;
+    xp_reward: number;
+    completed_at: string | null;
+  }[];
 }
 
 // ─── Bar ───

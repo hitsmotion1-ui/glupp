@@ -3,16 +3,56 @@
 import { useState, useCallback } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useAdmin } from "@/lib/hooks/useAdmin";
-import { getLevel } from "@/lib/utils/xp";
+import { getLevel, getLevelProgress, getNextLevel } from "@/lib/utils/xp";
 import type { Profile } from "@/types";
 import {
   Search,
-  Gift,
+  SlidersHorizontal,
   X,
   Loader2,
   Users,
   AlertTriangle,
+  ShieldOff,
+  Shield,
+  ChevronRight,
+  Beer,
+  Swords,
+  Camera,
+  Calendar,
+  Trophy,
 } from "lucide-react";
+
+// ═══════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════
+
+function formatDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("fr-FR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days === 0) return "aujourd'hui";
+  if (days === 1) return "hier";
+  if (days < 30) return `il y a ${days}j`;
+  return formatDate(iso);
+}
+
+const RARITY_EMOJI: Record<string, string> = {
+  common: "⚪",
+  rare: "🔵",
+  epic: "🟣",
+  legendary: "🌟",
+};
 
 // ═══════════════════════════════════════════
 // Page
@@ -24,20 +64,20 @@ export default function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  // XP modal state
-  const [xpModal, setXpModal] = useState<{
-    user: Profile;
-  } | null>(null);
+  // ── XP modal ──
+  const [xpModal, setXpModal] = useState<{ user: Profile } | null>(null);
   const [xpAmount, setXpAmount] = useState<number | "">("");
   const [xpReason, setXpReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const {
-    data: users = [],
-    isLoading,
-    isError,
-    error,
-  } = admin.useAdminUsers(debouncedSearch || undefined);
+  // ── Ban confirmation ──
+  const [confirmBanId, setConfirmBanId] = useState<string | null>(null);
+
+  // ── Detail panel ──
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  const { data: users = [], isLoading, isError, error } = admin.useAdminUsers(debouncedSearch || undefined);
+  const { data: userDetail, isLoading: loadingDetail } = admin.useUserAdminDetail(selectedUserId);
 
   // ─── Search with debounce ────────────────
 
@@ -45,17 +85,16 @@ export default function UsersPage() {
     (value: string) => {
       setSearch(value);
       if (debounceTimer) clearTimeout(debounceTimer);
-      const timer = setTimeout(() => {
-        setDebouncedSearch(value.trim());
-      }, 400);
+      const timer = setTimeout(() => setDebouncedSearch(value.trim()), 400);
       setDebounceTimer(timer);
     },
     [debounceTimer]
   );
 
-  // ─── XP Modal Handlers ──────────────────
+  // ─── XP Modal ───────────────────────────
 
-  function openXpModal(user: Profile) {
+  function openXpModal(user: Profile, e?: React.MouseEvent) {
+    e?.stopPropagation();
     setXpModal({ user });
     setXpAmount("");
     setXpReason("");
@@ -70,235 +109,474 @@ export default function UsersPage() {
   }
 
   async function handleAwardXP() {
-    if (!xpModal || !xpAmount || xpAmount <= 0 || !xpReason.trim()) return;
+    if (!xpModal || xpAmount === "" || !xpReason.trim()) return;
+    const amount = Number(xpAmount);
+    if (amount === 0) return;
+    // Empêcher XP < 0
+    if (xpModal.user.xp + amount < 0) {
+      setActionError("Le résultat ne peut pas être inférieur à 0 XP.");
+      return;
+    }
     setActionError(null);
     try {
-      await admin.awardXP(xpModal.user.id, xpAmount, xpReason.trim());
+      await admin.awardXP(xpModal.user.id, amount, xpReason.trim());
       closeXpModal();
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Erreur lors de l'attribution d'XP"
-      );
+      setActionError(err instanceof Error ? err.message : "Erreur lors de l'ajustement d'XP");
     }
   }
+
+  // ─── Ban ────────────────────────────────
+
+  async function handleToggleBan(userId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (confirmBanId === userId) {
+      setConfirmBanId(null);
+      try {
+        await admin.toggleBan(userId);
+      } catch (err) {
+        console.error("Ban error:", err);
+      }
+    } else {
+      setConfirmBanId(userId);
+    }
+  }
+
+  // ─── Detail Panel ────────────────────────
+
+  const selectedUser = users.find((u) => u.id === selectedUserId);
 
   // ─── Render ──────────────────────────────
 
   return (
-    <div className="min-h-screen">
-      <AdminHeader
-        title="Utilisateurs"
-        subtitle={`${users.length} utilisateur${users.length !== 1 ? "s" : ""}`}
-      />
+    <div className="min-h-screen flex">
+      {/* ── Main content ── */}
+      <div className="flex-1 min-w-0">
+        <AdminHeader
+          title="Utilisateurs"
+          subtitle={`${users.length} utilisateur${users.length !== 1 ? "s" : ""}`}
+        />
 
-      <div className="px-4 py-6 lg:px-8 space-y-6">
-        {/* Search Bar */}
-        <div className="relative max-w-md">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6050] pointer-events-none"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Rechercher par pseudo ou nom..."
-            className="w-full pl-9 pr-4 py-2.5 bg-[#1E1B16] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
-          />
-        </div>
+        <div className="px-4 py-6 lg:px-8 space-y-6">
+          {/* Search Bar */}
+          <div className="relative max-w-md">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6050] pointer-events-none"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Rechercher par pseudo ou nom..."
+              className="w-full pl-9 pr-4 py-2.5 bg-[#1E1B16] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+            />
+          </div>
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden animate-pulse">
-            <div className="px-4 py-3 border-b border-[#3A3530]">
-              <div className="h-4 bg-[#3A3530] rounded w-full max-w-xs" />
-            </div>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 px-4 py-3 border-b border-[#3A3530]/50"
-              >
-                <div className="w-8 h-8 bg-[#3A3530] rounded-full" />
-                <div className="flex-1 space-y-1">
-                  <div className="h-3.5 bg-[#3A3530] rounded w-1/3" />
-                  <div className="h-3 bg-[#3A3530] rounded w-1/5" />
+          {/* Loading State */}
+          {isLoading && (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden animate-pulse">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-[#3A3530]/50">
+                  <div className="w-8 h-8 bg-[#3A3530] rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3.5 bg-[#3A3530] rounded w-1/3" />
+                    <div className="h-3 bg-[#3A3530] rounded w-1/5" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Error State */}
-        {isError && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <AlertTriangle
-              size={40}
-              strokeWidth={1.2}
-              className="mb-3 text-red-500/60"
-            />
-            <p className="text-sm font-medium text-red-400">
-              Erreur de chargement
-            </p>
-            <p className="mt-1 text-xs text-[#6B6050]">
-              {error instanceof Error ? error.message : "Une erreur est survenue"}
-            </p>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!isLoading && !isError && users.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Users
-              size={48}
-              strokeWidth={1.2}
-              className="mb-3 text-[#3A3530]"
-            />
-            <p className="text-sm font-medium text-[#6B6050]">
-              Aucun utilisateur trouve
-            </p>
-            {search.trim() && (
-              <p className="mt-1 text-xs text-[#6B6050]">
-                Essayez de modifier votre recherche
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Users Table */}
-        {!isLoading && !isError && users.length > 0 && (
-          <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#3A3530]">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">
-                      Utilisateur
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">
-                      XP
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">
-                      Bieres
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">
-                      Duels
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">
-                      Inscrit le
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#3A3530]/50">
-                  {users.map((user, idx) => {
-                    const level = getLevel(user.xp);
-                    return (
-                      <tr
-                        key={user.id}
-                        className={idx % 2 === 1 ? "bg-[#141210]/30" : ""}
-                      >
-                        {/* Username + Display Name */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            {/* Avatar placeholder */}
-                            <div className="w-8 h-8 rounded-full bg-[#3A3530] flex items-center justify-center shrink-0">
-                              {user.avatar_url ? (
-                                <img
-                                  src={user.avatar_url}
-                                  alt={user.username}
-                                  className="w-8 h-8 rounded-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-xs font-bold text-[#A89888]">
-                                  {(user.username || "?")[0].toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-[#F5E6D3] truncate">
-                                {user.username}
-                              </p>
-                              {user.display_name && (
-                                <p className="text-xs text-[#6B6050] truncate">
-                                  {user.display_name}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* XP + Level Badge */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-[#F0C460] tabular-nums">
-                              {user.xp.toLocaleString("fr-FR")}
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#F0C460]/10 text-[#F0C460]">
-                              {level.icon} Nv.{level.level}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Beers Tasted */}
-                        <td className="px-4 py-3 text-sm text-[#F5E6D3] tabular-nums whitespace-nowrap">
-                          {user.beers_tasted}
-                        </td>
-
-                        {/* Duels Played */}
-                        <td className="px-4 py-3 text-sm text-[#F5E6D3] tabular-nums whitespace-nowrap">
-                          {user.duels_played}
-                        </td>
-
-                        {/* Created At */}
-                        <td className="px-4 py-3 text-sm text-[#A89888] whitespace-nowrap">
-                          {formatDate(user.created_at)}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => openXpModal(user)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F0C460]/10 hover:bg-[#F0C460]/20 text-[#F0C460] text-xs font-semibold rounded-lg transition-colors"
-                          >
-                            <Gift size={12} />
-                            Donner XP
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              ))}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Error State */}
+          {isError && !isLoading && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <AlertTriangle size={40} strokeWidth={1.2} className="mb-3 text-red-500/60" />
+              <p className="text-sm font-medium text-red-400">Erreur de chargement</p>
+              <p className="mt-1 text-xs text-[#6B6050]">
+                {error instanceof Error ? error.message : "Une erreur est survenue"}
+              </p>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && !isError && users.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Users size={48} strokeWidth={1.2} className="mb-3 text-[#3A3530]" />
+              <p className="text-sm font-medium text-[#6B6050]">Aucun utilisateur trouvé</p>
+              {search.trim() && (
+                <p className="mt-1 text-xs text-[#6B6050]">Essayez de modifier votre recherche</p>
+              )}
+            </div>
+          )}
+
+          {/* Users Table */}
+          {!isLoading && !isError && users.length > 0 && (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#3A3530]">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">Utilisateur</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">XP</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">Bières</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">Duels</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">Inscrit le</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-[#A89888] uppercase tracking-wider whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#3A3530]/50">
+                    {users.map((user, idx) => {
+                      const level = getLevel(user.xp);
+                      const isBanned = user.is_banned ?? false;
+                      const isSelected = selectedUserId === user.id;
+                      const isConfirmingBan = confirmBanId === user.id;
+
+                      return (
+                        <tr
+                          key={user.id}
+                          onClick={() => {
+                            setSelectedUserId(isSelected ? null : user.id);
+                            setConfirmBanId(null);
+                          }}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-[#E08840]/8 border-l-2 border-l-[#E08840]"
+                              : idx % 2 === 1
+                                ? "bg-[#141210]/30 hover:bg-[#3A3530]/20"
+                                : "hover:bg-[#3A3530]/20"
+                          } ${isBanned ? "opacity-60" : ""}`}
+                        >
+                          {/* Username */}
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-8 h-8 rounded-full bg-[#3A3530] flex items-center justify-center shrink-0">
+                                {user.avatar_url ? (
+                                  <img src={user.avatar_url} alt={user.username} className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <span className="text-xs font-bold text-[#A89888]">
+                                    {(user.username || "?")[0].toUpperCase()}
+                                  </span>
+                                )}
+                                {isBanned && (
+                                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                                    <span className="text-[8px]">🚫</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-sm font-medium text-[#F5E6D3] truncate">{user.username}</p>
+                                  {isBanned && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/15 text-red-400">
+                                      BANNI
+                                    </span>
+                                  )}
+                                </div>
+                                {user.display_name && (
+                                  <p className="text-xs text-[#6B6050] truncate">{user.display_name}</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* XP + Level */}
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-[#F0C460] tabular-nums">
+                                {user.xp.toLocaleString("fr-FR")}
+                              </span>
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#F0C460]/10 text-[#F0C460]">
+                                {level.icon} Nv.{level.level}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Beers */}
+                          <td className="px-4 py-3 text-sm text-[#F5E6D3] tabular-nums whitespace-nowrap">
+                            {user.beers_tasted}
+                          </td>
+
+                          {/* Duels */}
+                          <td className="px-4 py-3 text-sm text-[#F5E6D3] tabular-nums whitespace-nowrap">
+                            {user.duels_played}
+                          </td>
+
+                          {/* Date */}
+                          <td className="px-4 py-3 text-sm text-[#A89888] whitespace-nowrap">
+                            {formatDate(user.created_at)}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* XP Button */}
+                              <button
+                                onClick={(e) => openXpModal(user, e)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-[#F0C460]/10 hover:bg-[#F0C460]/20 text-[#F0C460] text-xs font-semibold rounded-lg transition-colors"
+                                title="Ajuster l'XP"
+                              >
+                                <SlidersHorizontal size={12} />
+                                XP
+                              </button>
+
+                              {/* Ban Button */}
+                              {isConfirmingBan ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-[#A89888]">
+                                    {isBanned ? "Débannir ?" : "Bannir ?"}
+                                  </span>
+                                  <button
+                                    onClick={(e) => handleToggleBan(user.id, e)}
+                                    disabled={admin.togglingBan}
+                                    className="px-2 py-1 text-xs font-semibold bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-colors"
+                                  >
+                                    {admin.togglingBan ? <Loader2 size={10} className="animate-spin" /> : "Oui"}
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setConfirmBanId(null); }}
+                                    className="px-2 py-1 text-xs text-[#6B6050] hover:text-[#A89888] rounded transition-colors"
+                                  >
+                                    Non
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={(e) => handleToggleBan(user.id, e)}
+                                  className={`flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
+                                    isBanned
+                                      ? "text-[#4CAF50] bg-[#4CAF50]/10 hover:bg-[#4CAF50]/20"
+                                      : "text-[#6B6050] hover:text-red-400 hover:bg-red-400/10"
+                                  }`}
+                                  title={isBanned ? "Débannir" : "Bannir"}
+                                >
+                                  {isBanned ? <Shield size={13} /> : <ShieldOff size={13} />}
+                                </button>
+                              )}
+
+                              {/* Detail arrow */}
+                              <ChevronRight
+                                size={14}
+                                className={`transition-transform text-[#6B6050] ${isSelected ? "rotate-90 text-[#E08840]" : ""}`}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* XP Modal */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* Detail Panel (slide-over droit)            */}
+      {/* ═══════════════════════════════════════════ */}
+      {selectedUserId && (
+        <>
+          {/* Backdrop mobile */}
+          <div
+            className="fixed inset-0 z-30 lg:hidden bg-black/40"
+            onClick={() => setSelectedUserId(null)}
+          />
+          <aside className="fixed right-0 top-0 z-40 h-screen w-80 lg:w-96 bg-[#1A1814] border-l border-[#3A3530] overflow-y-auto shadow-2xl lg:relative lg:shadow-none lg:h-auto lg:sticky lg:top-0">
+            {/* Header du panel */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#3A3530]">
+              <h3 className="text-sm font-bold text-[#F5E6D3]">Profil utilisateur</h3>
+              <button
+                onClick={() => setSelectedUserId(null)}
+                className="flex items-center justify-center w-7 h-7 rounded-lg text-[#A89888] hover:text-[#F5E6D3] hover:bg-[#3A3530] transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {loadingDetail ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 size={24} className="animate-spin text-[#E08840]" />
+              </div>
+            ) : userDetail ? (
+              <div className="px-5 py-5 space-y-6">
+                {/* Avatar + infos */}
+                <div className="flex items-start gap-4">
+                  <div className="relative w-14 h-14 rounded-full bg-[#3A3530] flex items-center justify-center shrink-0 overflow-hidden">
+                    {userDetail.profile.avatar_url ? (
+                      <img src={userDetail.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl font-bold text-[#A89888]">
+                        {(userDetail.profile.username || "?")[0].toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-[#F5E6D3] truncate">
+                      {userDetail.profile.display_name || userDetail.profile.username}
+                    </p>
+                    <p className="text-xs text-[#6B6050]">@{userDetail.profile.username}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {(() => {
+                        const lvl = getLevel(userDetail.profile.xp);
+                        return (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-[#F0C460]/10 text-[#F0C460]">
+                            {lvl.icon} Niveau {lvl.level}
+                          </span>
+                        );
+                      })()}
+                      {userDetail.profile.is_banned && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/15 text-red-400">
+                          🚫 BANNI
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Barre de progression XP */}
+                {(() => {
+                  const xp = userDetail.profile.xp;
+                  const lvl = getLevel(xp);
+                  const next = getNextLevel(xp);
+                  const pct = getLevelProgress(xp);
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5 text-xs text-[#A89888]">
+                        <span className="font-semibold text-[#F0C460]">{xp.toLocaleString("fr-FR")} XP</span>
+                        {next && <span>→ {next.icon} Nv.{next.level} ({next.min.toLocaleString("fr-FR")} XP)</span>}
+                      </div>
+                      <div className="h-2 bg-[#3A3530] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#F0C460] rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      {!next && <p className="text-xs text-[#6B6050] mt-1 text-center">Niveau maximum atteint 🎉</p>}
+                    </div>
+                  );
+                })()}
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { icon: Beer, label: "Bières", value: userDetail.profile.beers_tasted, color: "#E08840" },
+                    { icon: Swords, label: "Duels", value: userDetail.profile.duels_played, color: "#A78BFA" },
+                    { icon: Camera, label: "Photos", value: userDetail.profile.photos_taken, color: "#4ECDC4" },
+                    { icon: Calendar, label: "Inscrit", value: formatDate(userDetail.profile.created_at), color: "#F0C460" },
+                  ].map(({ icon: Icon, label, value, color }) => (
+                    <div key={label} className="flex items-center gap-2.5 p-2.5 bg-[#141210] rounded-lg">
+                      <Icon size={14} style={{ color }} className="shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-[#6B6050] uppercase tracking-wider">{label}</p>
+                        <p className="text-xs font-bold text-[#F5E6D3]">{value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Dernières bières */}
+                <div>
+                  <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-3">
+                    Dernières bières
+                  </h4>
+                  {userDetail.recent_beers.length === 0 ? (
+                    <p className="text-xs text-[#6B6050] italic">Aucune bière goûtée</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {userDetail.recent_beers.map((b, i) => (
+                        <div key={i} className="flex items-center gap-2.5 p-2.5 bg-[#141210] rounded-lg">
+                          <span className="text-base shrink-0">{RARITY_EMOJI[b.rarity] ?? "⚪"}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-[#F5E6D3] truncate">{b.beer_name}</p>
+                            <p className="text-[10px] text-[#6B6050] truncate">{b.brewery}</p>
+                          </div>
+                          <span className="text-[10px] text-[#6B6050] shrink-0">{timeAgo(b.tasted_at)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Trophées */}
+                <div>
+                  <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-3">
+                    Trophées ({userDetail.trophies.length})
+                  </h4>
+                  {userDetail.trophies.length === 0 ? (
+                    <p className="text-xs text-[#6B6050] italic">Aucun trophée obtenu</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {userDetail.trophies.map((t, i) => (
+                        <div key={i} className="flex items-center gap-2 p-2 bg-[#141210] rounded-lg">
+                          <span className="text-lg shrink-0">{t.emoji}</span>
+                          <p className="text-[10px] font-medium text-[#F5E6D3] leading-tight">{t.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions rapides */}
+                <div className="border-t border-[#3A3530] pt-4 space-y-2">
+                  <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-3">
+                    Actions
+                  </h4>
+                  <button
+                    onClick={() => selectedUser && openXpModal(selectedUser)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-[#F0C460]/10 hover:bg-[#F0C460]/20 text-[#F0C460] text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <SlidersHorizontal size={14} />
+                    Ajuster l'XP
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (selectedUser) {
+                        setConfirmBanId(selectedUser.id);
+                        setSelectedUserId(null);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                      userDetail.profile.is_banned
+                        ? "bg-[#4CAF50]/10 hover:bg-[#4CAF50]/20 text-[#4CAF50]"
+                        : "bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                    }`}
+                  >
+                    {userDetail.profile.is_banned ? <Shield size={14} /> : <ShieldOff size={14} />}
+                    {userDetail.profile.is_banned ? "Débannir" : "Bannir cet utilisateur"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16">
+                <Trophy size={36} strokeWidth={1.2} className="mb-2 text-[#3A3530]" />
+                <p className="text-sm text-[#6B6050]">Données indisponibles</p>
+              </div>
+            )}
+          </aside>
+        </>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* XP Modal                                   */}
+      {/* ═══════════════════════════════════════════ */}
       {xpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={closeXpModal}
             aria-hidden="true"
           />
-
-          {/* Modal */}
           <div className="relative w-full max-w-md bg-[#1E1B16] border border-[#3A3530] rounded-2xl shadow-2xl">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#3A3530]">
               <div>
-                <h2 className="text-base font-bold text-[#F5E6D3]">
-                  Donner de l&apos;XP
-                </h2>
+                <h2 className="text-base font-bold text-[#F5E6D3]">Ajuster l'XP</h2>
                 <p className="text-xs text-[#A89888] mt-0.5">
                   {xpModal.user.username}
-                  {xpModal.user.display_name
-                    ? ` (${xpModal.user.display_name})`
-                    : ""}
+                  {xpModal.user.display_name ? ` (${xpModal.user.display_name})` : ""}
+                  {" — "}
+                  <span className="text-[#F0C460]">{xpModal.user.xp.toLocaleString("fr-FR")} XP actuels</span>
                 </p>
               </div>
               <button
@@ -322,19 +600,46 @@ export default function UsersPage() {
               {/* Amount */}
               <div>
                 <label className="block text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-1.5">
-                  Montant XP
+                  Montant XP <span className="normal-case text-[#6B6050]">(négatif pour retirer)</span>
                 </label>
                 <input
                   type="number"
-                  min={1}
+                  min={-100000}
                   max={100000}
                   value={xpAmount}
-                  onChange={(e) =>
-                    setXpAmount(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                  placeholder="ex: 500"
+                  onChange={(e) => setXpAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="ex: 500 ou -100"
                   className="w-full px-3 py-2.5 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors tabular-nums"
                 />
+                {/* Aperçu XP final */}
+                {xpAmount !== "" && xpAmount !== 0 && (
+                  <p className={`mt-1.5 text-xs font-medium ${
+                    xpModal.user.xp + Number(xpAmount) < 0
+                      ? "text-red-400"
+                      : Number(xpAmount) < 0
+                        ? "text-orange-400"
+                        : "text-[#4CAF50]"
+                  }`}>
+                    → Résultat estimé :{" "}
+                    <span className="font-bold">
+                      {Math.max(0, xpModal.user.xp + Number(xpAmount)).toLocaleString("fr-FR")} XP
+                    </span>
+                    {" "}
+                    {(() => {
+                      const finalXp = Math.max(0, xpModal.user.xp + Number(xpAmount));
+                      const newLevel = getLevel(finalXp);
+                      const oldLevel = getLevel(xpModal.user.xp);
+                      if (newLevel.level !== oldLevel.level) {
+                        return (
+                          <span className="text-[#F0C460]">
+                            → {newLevel.icon} Nv.{newLevel.level}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </p>
+                )}
               </div>
 
               {/* Reason */}
@@ -345,7 +650,7 @@ export default function UsersPage() {
                 <textarea
                   value={xpReason}
                   onChange={(e) => setXpReason(e.target.value)}
-                  placeholder="Pourquoi attribuer ces XP..."
+                  placeholder="Pourquoi cet ajustement..."
                   rows={3}
                   className="w-full px-3 py-2.5 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 resize-none transition-colors"
                 />
@@ -364,18 +669,23 @@ export default function UsersPage() {
                 onClick={handleAwardXP}
                 disabled={
                   admin.awardingXP ||
-                  !xpAmount ||
-                  xpAmount <= 0 ||
-                  !xpReason.trim()
+                  xpAmount === "" ||
+                  xpAmount === 0 ||
+                  !xpReason.trim() ||
+                  (xpModal.user.xp + Number(xpAmount) < 0)
                 }
-                className="flex items-center gap-2 px-5 py-2 bg-[#F0C460] hover:bg-[#F0C460]/90 disabled:opacity-50 disabled:cursor-not-allowed text-[#141210] text-sm font-bold rounded-lg transition-colors"
+                className={`flex items-center gap-2 px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed text-[#141210] text-sm font-bold rounded-lg transition-colors ${
+                  Number(xpAmount) < 0
+                    ? "bg-red-400 hover:bg-red-400/90"
+                    : "bg-[#F0C460] hover:bg-[#F0C460]/90"
+                }`}
               >
                 {admin.awardingXP ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
-                  <Gift size={14} />
+                  <SlidersHorizontal size={14} />
                 )}
-                Envoyer
+                {Number(xpAmount) < 0 ? "Retirer" : "Attribuer"}
               </button>
             </div>
           </div>
@@ -383,20 +693,4 @@ export default function UsersPage() {
       )}
     </div>
   );
-}
-
-// ═══════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════
-
-function formatDate(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat("fr-FR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
 }

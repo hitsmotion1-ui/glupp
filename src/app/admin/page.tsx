@@ -13,6 +13,7 @@ import {
   Star,
   Clock,
   Trophy,
+  Activity,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getLevel } from "@/lib/utils/xp";
@@ -56,6 +57,10 @@ export default function AdminDashboardPage() {
   // Fetch top users
   const { data: topUsers = [], isLoading: loadingUsers } =
     admin.useAdminUsers();
+
+  // Fetch recent activities
+  const { data: recentActivities = [], isLoading: loadingActivities } =
+    admin.useAdminActivities();
 
   const recentSubs = submissions.slice(0, 5);
   const topFive = topUsers.slice(0, 5);
@@ -285,6 +290,94 @@ export default function AdminDashboardPage() {
             )}
           </section>
         </div>
+
+        {/* ── Recent Activity Feed ── */}
+        <section>
+          <h2 className="flex items-center gap-2 mb-4 text-lg font-bold text-[#F5E6D3] font-display">
+            <Activity size={18} className="text-[#4ECDC4]" />
+            Activité récente
+          </h2>
+
+          {loadingActivities ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : recentActivities.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 bg-[#1E1B16] border border-[#3A3530] rounded-xl">
+              <Activity size={36} strokeWidth={1.2} className="mb-2 text-[#3A3530]" />
+              <p className="text-sm text-[#6B6050]">Aucune activité récente</p>
+            </div>
+          ) : (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden divide-y divide-[#3A3530]/50">
+              {recentActivities.map((act) => {
+                const typeConfig: Record<string, { label: string; icon: string; color: string }> = {
+                  glupp: { label: "Glupp", icon: "🍺", color: "#E08840" },
+                  duel: { label: "Duel", icon: "⚔️", color: "#A78BFA" },
+                  photo: { label: "Photo", icon: "📸", color: "#4ECDC4" },
+                  trophy: { label: "Trophée", icon: "🏆", color: "#F0C460" },
+                  level_up: { label: "Niveau", icon: "⬆️", color: "#4CAF50" },
+                  tag: { label: "Tag", icon: "🏷️", color: "#3B82F6" },
+                  crew_glupp: { label: "Crew", icon: "👥", color: "#EC4899" },
+                };
+                const cfg = typeConfig[act.type] ?? { label: act.type, icon: "📌", color: "#6B6050" };
+                const timeAgo = (() => {
+                  const diff = Date.now() - new Date(act.created_at).getTime();
+                  const mins = Math.floor(diff / 60000);
+                  if (mins < 60) return `il y a ${mins}min`;
+                  const hrs = Math.floor(mins / 60);
+                  if (hrs < 24) return `il y a ${hrs}h`;
+                  return `il y a ${Math.floor(hrs / 24)}j`;
+                })();
+
+                return (
+                  <div key={act.id} className="flex items-center gap-3 px-4 py-3">
+                    {/* Type badge */}
+                    <div
+                      className="flex items-center justify-center w-8 h-8 rounded-lg text-sm shrink-0"
+                      style={{ background: `${cfg.color}20` }}
+                    >
+                      {cfg.icon}
+                    </div>
+
+                    {/* Avatar */}
+                    <div className="w-7 h-7 rounded-full bg-[#3A3530] flex items-center justify-center shrink-0 overflow-hidden">
+                      {act.user?.avatar_url ? (
+                        <img src={act.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[10px] font-bold text-[#A89888]">
+                          {(act.user?.username || "?")[0].toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#F5E6D3] truncate">
+                        <span className="font-medium">{act.user?.username ?? "?"}</span>
+                        {" "}
+                        <span className="text-[#A89888]">
+                          {cfg.label === "Glupp" ? "a gluppé" :
+                           cfg.label === "Duel" ? "a joué un duel" :
+                           cfg.label === "Photo" ? "a pris une photo" :
+                           `a effectué ${cfg.label.toLowerCase()}`}
+                        </span>
+                        {act.beer && (
+                          <span className="text-[#E08840]"> · {act.beer.name}</span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Time */}
+                    <span className="text-xs text-[#6B6050] shrink-0">{timeAgo}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
       </div>
     </div>
   );
