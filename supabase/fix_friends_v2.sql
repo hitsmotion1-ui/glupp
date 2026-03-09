@@ -1,8 +1,8 @@
 -- Fix friends v2 (idempotent — safe to run multiple times)
 -- Fixes:
---   1. initiated_by column + backfill
+--   1. initiated_by column (NO backfill — legacy NULL rows stay NULL)
 --   2. send_friend_request stores the initiator
---   3. update_friend_request: only receiver can accept, notification sent to sender when accepted
+--   3. update_friend_request: only receiver can accept (NULL-safe), notification to sender when accepted
 --   4. cancel_friend_request: new RPC for the sender to withdraw their request
 --   5. get_friends: returns initiated_by
 --   6. get_notifications: only shows pending requests to the RECEIVER (not sender)
@@ -11,10 +11,11 @@
 -- ─── 1. Column ───────────────────────────────────────────────────────────────
 ALTER TABLE friendships ADD COLUMN IF NOT EXISTS initiated_by UUID REFERENCES profiles(id);
 
--- Backfill existing pending rows (user_a is a safe guess for legacy rows)
+-- Reset any wrongly backfilled rows so nobody gets blocked
+-- (user_a is NOT necessarily the initiator — it's just the lower UUID)
 UPDATE friendships
-SET initiated_by = user_a
-WHERE initiated_by IS NULL AND status = 'pending';
+SET initiated_by = NULL
+WHERE status = 'pending';
 
 -- ─── 2. Notifications type constraint ─────────────────────────────────────────
 -- Drop and recreate to include 'friend_accepted' (keeps all existing types)
@@ -67,9 +68,11 @@ DECLARE
   v_accepter_name TEXT;
 BEGIN
   -- Block the sender from accepting their own request
+  -- Only when initiated_by IS NOT NULL (legacy NULL rows can be accepted by either party)
   IF EXISTS (
     SELECT 1 FROM friendships
     WHERE id = p_friendship_id
+      AND initiated_by IS NOT NULL
       AND initiated_by = p_user_id
       AND status = 'pending'
   ) THEN
