@@ -1,18 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { useDuel } from "@/lib/hooks/useDuel";
 import { useActivities } from "@/lib/hooks/useActivities";
 import { DuelCards } from "@/components/beer/DuelCards";
+import { DuelHistoryModal } from "@/components/beer/DuelHistoryModal";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ActivityItem } from "@/components/social/ActivityItem";
 import { GluppOfWeekBanner } from "@/components/gamification/GluppOfWeekBanner";
-import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw } from "lucide-react";
+import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw, History } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect } from "react"; // 👈 Vérifie que c'est bien importé en haut
 
 export default function DuelPage() {
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  
   const {
     beerA,
     beerB,
@@ -23,13 +26,12 @@ export default function DuelPage() {
     tastedCount,
     winnerId,
     eloDeltas,
-    skipDuel, // 👈 On importe notre nouvelle fonction ici
+    skipDuel,
     submitVote,
   } = useDuel();
 
   const { activities, isLoading: activitiesLoading } = useActivities();
   const recentActivities = activities.slice(0, 4);
-
 
   if (loading) {
     return (
@@ -113,19 +115,38 @@ export default function DuelPage() {
         />
       )}
 
-      {/* 🆕 Nouveau bouton "Passer" avec icône */}
-      <div className="text-center mt-6">
+      {/* 🆕 Boutons Passer & Historique */}
+      <div className="flex items-center justify-center gap-4 mt-6">
         <Button
           variant="ghost"
           size="sm"
           onClick={skipDuel}
           disabled={submitting}
-          className="text-glupp-text-muted hover:text-glupp-cream transition-colors group flex items-center justify-center gap-2 mx-auto"
+          className="text-glupp-text-muted hover:text-glupp-cream transition-colors group flex items-center gap-2"
         >
           <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
           Passer ce duel
         </Button>
+
+        <div className="w-px h-4 bg-glupp-border"></div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsHistoryOpen(true)}
+          disabled={submitting}
+          className="text-glupp-text-muted hover:text-glupp-cream transition-colors flex items-center gap-2"
+        >
+          <History size={14} />
+          Historique
+        </Button>
       </div>
+
+      {/* 🆕 La Modale d'Historique */}
+      <DuelHistoryModal 
+        isOpen={isHistoryOpen} 
+        onClose={() => setIsHistoryOpen(false)} 
+      />
 
       {/* Pool info + suggestion */}
       <div className="mt-8 mx-4 p-3 bg-glupp-card-alt border border-glupp-border rounded-glupp text-center">

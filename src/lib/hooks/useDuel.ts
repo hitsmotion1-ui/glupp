@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/queries/queryKeys";
 import { useAppStore } from "@/lib/store/useAppStore";
@@ -15,14 +16,13 @@ export interface DuelResult {
 
 export function useDuel() {
   const queryClient = useQueryClient();
+  const pathname = usePathname(); // 👈 NOUVEAU: Permet de savoir sur quel onglet on est
   const showXPToast = useAppStore((s) => s.showXPToast);
 
-  // On ne garde que les compteurs de session dans Zustand
   const duelSessionCount = useAppStore((s) => s.duelSessionCount);
   const incrementDuelCount = useAppStore((s) => s.incrementDuelCount);
 
-  // 💥 LA CLÉ : On utilise un état local au lieu de Zustand !
-  // Ainsi, changer d'onglet réinitialise naturellement le duel.
+  // État local du duel en cours
   const [currentDuel, setCurrentDuel] = useState<{
     beerA: Beer | null;
     beerB: Beer | null;
@@ -30,12 +30,11 @@ export function useDuel() {
     prevEloA: number;
     prevEloB: number;
   }>({
-    beerA: null,
-    beerB: null,
-    winnerId: null,
-    prevEloA: 0,
-    prevEloB: 0,
+    beerA: null, beerB: null, winnerId: null, prevEloA: 0, prevEloB: 0,
   });
+
+  // 👈 NOUVEAU: Une "mémoire fantôme" pour retenir le duel affiché (immunisée aux re-rendus)
+  const displayedPairRef = useRef<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
@@ -57,12 +56,7 @@ export function useDuel() {
           .range(page * 1000, (page + 1) * 1000 - 1);
 
         if (!data || data.length === 0) break;
-
-        const beers = (data as any[])
-          .map((ub) => ub.beers)
-          .flat()
-          .filter((b): b is Beer => b !== null);
-
+        const beers = (data as any[]).map((ub) => ub.beers).flat().filter(Boolean);
         all = all.concat(beers);
         if (data.length < 1000) break;
         page++;
@@ -72,18 +66,13 @@ export function useDuel() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // 2. Récupération de l'historique
+  // 2. Récupération de l'historique de la BDD
   const { data: pastDuels = [], isLoading: loadingPastDuels } = useQuery({
     queryKey: ["past_duels_history"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
-
-      const { data } = await supabase
-        .from("duels")
-        .select("beer_a_id, beer_b_id")
-        .eq("user_id", user.id);
-
+      const { data } = await supabase.from("duels").select("beer_a_id, beer_b_id").eq("user_id", user.id);
       return data || [];
     },
     staleTime: 2 * 60 * 1000,
@@ -92,20 +81,17 @@ export function useDuel() {
   const playedPairs = useMemo(() => {
     const set = new Set<string>();
     pastDuels.forEach((d) => {
-      const [a, b] = [d.beer_a_id, d.beer_b_id].sort();
-      set.add(`${a}-${b}`);
+      const key = [d.beer_a_id, d.beer_b_id].sort().join("-");
+      set.add(key);
     });
     return set;
   }, [pastDuels]);
 
-  const loading = loadingBeers || loadingPastDuels;
-  const canDuel = tastedBeers.length >= 2;
-
-  // 🧠 L'ALGORITHME ULTIME : Mathématique et Infaillible
+  // 🧠 L'ALGORITHME ANTI-DOUBLON STRICT
   const generatePair = useCallback(() => {
     if (tastedBeers.length < 2) return;
 
-    // A. On liste TOUTES les combinaisons possibles (ex: 10 bières = 45 duels possibles)
+    // A. Toutes les combinaisons
     const allPossiblePairs: [Beer, Beer][] = [];
     for (let i = 0; i < tastedBeers.length; i++) {
       for (let j = i + 1; j < tastedBeers.length; j++) {
@@ -113,27 +99,41 @@ export function useDuel() {
       }
     }
 
-    // B. On retire celles que tu as déjà jouées
+    // B. Filtrage strict !
     const unplayedPairs = allPossiblePairs.filter(([a, b]) => {
       const key = [a.id, b.id].sort().join("-");
-      return !playedPairs.has(key);
+      
+      // 1. A-t-on déjà joué ce duel en vrai ?
+      if (playedPairs.has(key)) return false;
+      
+      // 2. Est-ce le duel actuellement à l'écran ? (On l'interdit !)
+      if (key === displayedPairRef.current && allPossiblePairs.length > 1) return false;
+
+      return true;
     });
 
     let selectedPair: [Beer, Beer];
 
     if (unplayedPairs.length > 0) {
-      // 🎯 Il reste des duels inédits ! On en prend un au hasard
+      // 🎯 Duel 100% inédit
       const randomIndex = Math.floor(Math.random() * unplayedPairs.length);
       selectedPair = unplayedPairs[randomIndex];
     } else {
-      // ♻️ Option de secours : tu as joué ABSOLUMENT tous les duels possibles de ta collection.
-      // Au lieu de faire planter l'appli, on te repropose un ancien duel au hasard.
-      const randomIndex = Math.floor(Math.random() * allPossiblePairs.length);
-      selectedPair = allPossiblePairs[randomIndex];
+      // ♻️ Plus aucun duel inédit dispo : on recycle un ancien (mais pas celui à l'écran)
+      const recyclables = allPossiblePairs.filter(([a, b]) => {
+        const key = [a.id, b.id].sort().join("-");
+        return key !== displayedPairRef.current;
+      });
+      
+      const safePool = recyclables.length > 0 ? recyclables : allPossiblePairs;
+      selectedPair = safePool[Math.floor(Math.random() * safePool.length)];
     }
 
-    // On mélange A et B pour que la même bière ne soit pas toujours affichée en haut/à gauche
+    // Mélange visuel (A/B ou B/A)
     const finalPair = Math.random() > 0.5 ? selectedPair : [selectedPair[1], selectedPair[0]];
+    
+    // On met à jour la mémoire fantôme pour le prochain clic
+    displayedPairRef.current = [finalPair[0].id, finalPair[1].id].sort().join("-");
 
     setCurrentDuel({
       beerA: finalPair[0],
@@ -145,12 +145,13 @@ export function useDuel() {
     setDuelResult(null);
   }, [tastedBeers, playedPairs]);
 
+  // 🧊 LE DÉGIVRANT NEXT.JS (S'exécute à chaque fois que tu cliques sur l'onglet "Duels")
   useEffect(() => {
-    // On génère un duel uniquement si on n'en a pas et que tout est chargé
-    if (tastedBeers.length >= 2 && !currentDuel.beerA && !loadingPastDuels) {
+    if (pathname === "/duels" && tastedBeers.length >= 2 && !loadingPastDuels) {
+      // Dès que l'utilisateur atterrit sur la page, on génère un nouveau duel de force !
       generatePair();
     }
-  }, [tastedBeers, currentDuel.beerA, loadingPastDuels, generatePair]);
+  }, [pathname, tastedBeers.length, loadingPastDuels, generatePair]);
 
   const skipDuel = useCallback(() => {
     generatePair();
@@ -158,8 +159,7 @@ export function useDuel() {
 
   const voteMutation = useMutation({
     mutationFn: async (selectedWinnerId: string) => {
-      if (!currentDuel.beerA || !currentDuel.beerB) throw new Error("Pas de duel en cours");
-
+      if (!currentDuel.beerA || !currentDuel.beerB) throw new Error("Pas de duel");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non connecté");
 
@@ -189,10 +189,7 @@ export function useDuel() {
         setSubmitting(false);
       }, 1200);
     },
-    onError: (err) => {
-      console.error("Duel error:", err.message);
-      setSubmitting(false);
-    },
+    onError: () => setSubmitting(false),
   });
 
   const submitVote = async (selectedWinnerId: string) => {
@@ -207,17 +204,16 @@ export function useDuel() {
   return {
     beerA: currentDuel.beerA,
     beerB: currentDuel.beerB,
-    loading,
+    loading: loadingBeers || loadingPastDuels,
     submitting,
     duelResult,
     winnerId: currentDuel.winnerId,
     eloDeltas,
-    canDuel,
+    canDuel: tastedBeers.length >= 2,
     duelCount: duelSessionCount,
     tastedCount: tastedBeers.length,
     generatePair,
     submitVote,
     skipDuel,
-    refreshTasted: () => queryClient.invalidateQueries({ queryKey: queryKeys.duel.tastedBeers }),
   };
 }
