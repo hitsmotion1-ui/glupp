@@ -14,6 +14,7 @@ import { TrophyGrid } from "@/components/social/TrophyGrid";
 import { FriendList } from "@/components/social/FriendList";
 import { FriendSearchModal } from "@/components/social/FriendSearchModal";
 import { CrewSection } from "@/components/social/CrewSection";
+import { SettingsModal } from "@/components/profile/SettingsModal"; // 👈 Ajout de l'import
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
   Swords,
@@ -26,6 +27,7 @@ import {
   Users,
   Shield,
   Globe,
+  Settings, // 👈 L'icône est bien là
 } from "lucide-react";
 import { formatNumber } from "@/lib/utils/xp";
 
@@ -36,6 +38,9 @@ export default function ProfilePage() {
   const { profile, loading, level, nextLevel, progress } = useProfile();
   const { allBeers, tastedIds } = useCollection();
   const [openSections, setOpenSections] = useState<Set<Section>>(new Set());
+  
+  // 🆕 État pour la modale des paramètres
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const toggleSection = (section: Section) => {
     setOpenSections((prev) => {
@@ -113,6 +118,19 @@ export default function ProfilePage() {
 
   return (
     <div className="py-6 px-4 space-y-6 pb-24">
+      {/* 🆕 Header avec titre et bouton Paramètres */}
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-2xl font-bold text-glupp-cream">
+          Mon Profil
+        </h1>
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="p-2 text-glupp-text-muted hover:text-glupp-cream hover:bg-glupp-card rounded-full transition-colors"
+        >
+          <Settings size={24} />
+        </button>
+      </div>
+
       {/* Avatar + Info */}
       <div className="flex flex-col items-center text-center">
         <Avatar
@@ -262,16 +280,14 @@ export default function ProfilePage() {
       {/* Friend Search Modal */}
       <FriendSearchModal />
 
-      {/* Sign Out */}
-      <div className="pt-8">
-        <button
-          onClick={signOut}
-          className="flex items-center justify-center gap-2 mx-auto text-xs text-glupp-text-muted hover:text-glupp-error transition-colors"
-        >
-          <LogOut size={14} />
-          Se deconnecter
-        </button>
-      </div>
+      {/* 🆕 Intégration de la Modale Paramètres */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        currentUsername={profile.username}
+        currentAvatarUrl={profile.avatar_url}
+        userId={profile.id}
+      />
     </div>
   );
 }
