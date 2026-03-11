@@ -14,7 +14,7 @@ import { TrophyGrid } from "@/components/social/TrophyGrid";
 import { FriendList } from "@/components/social/FriendList";
 import { FriendSearchModal } from "@/components/social/FriendSearchModal";
 import { CrewSection } from "@/components/social/CrewSection";
-import { SettingsModal } from "@/components/profile/SettingsModal"; // 👈 Ajout de l'import
+import { SettingsModal } from "@/components/global/SettingsModal"; // 👈 Ajout de l'import
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
   Swords,
