@@ -16,20 +16,29 @@ export interface DuelResult {
 export function useDuel() {
   const queryClient = useQueryClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
-
-  // 🛡️ ZUSTAND : On mémorise le duel globalement pour une fluidité parfaite (0 clignotement)
-  const duel = useAppStore((s) => s.duel);
-  const setDuel = useAppStore((s) => s.setDuel);
   const duelSessionCount = useAppStore((s) => s.duelSessionCount);
   const incrementDuelCount = useAppStore((s) => s.incrementDuelCount);
 
-  // Mémoire fantôme pour s'assurer qu'on ne retombe pas sur le même duel en cliquant sur "Passer"
-  const displayedPairRef = useRef<string | null>(null);
+  // 1. ÉTAT LOCAL STRICT : Si on change d'onglet, le duel est nettoyé ! Plus de cartes grisées bloquées.
+  const [currentDuel, setCurrentDuel] = useState<{
+    beerA: Beer | null;
+    beerB: Beer | null;
+    winnerId: string | null;
+    prevEloA: number;
+    prevEloB: number;
+  }>({
+    beerA: null, beerB: null, winnerId: null, prevEloA: 0, prevEloB: 0,
+  });
 
   const [submitting, setSubmitting] = useState(false);
   const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
 
-  // 1. Récupération des bières goûtées
+  // 2. MÉMOIRES ANTI-DOUBLONS INSTANTANÉES : Pour palier aux lenteurs de la base de données
+  const displayedPairRef = useRef<string | null>(null);
+  const localPlayedPairsRef = useRef<Set<string>>(new Set());
+  const generatePairRef = useRef<() => void>();
+
+  // Récupération des bières goûtées
   const { data: tastedBeers = [], isLoading: loadingBeers } = useQuery({
     queryKey: queryKeys.duel.tastedBeers,
     queryFn: async () => {
@@ -53,10 +62,10 @@ export function useDuel() {
       }
       return all;
     },
-    staleTime: 5 * 60 * 1000, // En cache pendant 5 minutes !
+    staleTime: 5 * 60 * 1000,
   });
 
-  // 2. Récupération de l'historique
+  // Récupération de l'historique
   const { data: pastDuels = [], isLoading: loadingPastDuels } = useQuery({
     queryKey: ["past_duels_history"],
     queryFn: async () => {
@@ -70,14 +79,11 @@ export function useDuel() {
 
   const playedPairs = useMemo(() => {
     const set = new Set<string>();
-    pastDuels.forEach((d) => {
-      const key = [d.beer_a_id, d.beer_b_id].sort().join("-");
-      set.add(key);
-    });
+    pastDuels.forEach((d) => set.add([d.beer_a_id, d.beer_b_id].sort().join("-")));
     return set;
   }, [pastDuels]);
 
-  // 🧠 L'ALGORITHME ANTI-DOUBLON STRICT
+  // 🧠 L'ALGORITHME INFAILLIBLE
   const generatePair = useCallback(() => {
     if (tastedBeers.length < 2) return;
 
@@ -90,20 +96,21 @@ export function useDuel() {
 
     const unplayedPairs = allPossiblePairs.filter(([a, b]) => {
       const key = [a.id, b.id].sort().join("-");
-      if (playedPairs.has(key)) return false;
-      if (key === displayedPairRef.current && allPossiblePairs.length > 1) return false;
+      // Triple sécurité :
+      if (playedPairs.has(key)) return false; // 1. Déjà joué en base de données
+      if (localPlayedPairsRef.current.has(key)) return false; // 2. Vient tout juste d'être joué
+      if (key === displayedPairRef.current && allPossiblePairs.length > 1) return false; // 3. Est à l'écran
       return true;
     });
 
     let selectedPair: [Beer, Beer];
 
     if (unplayedPairs.length > 0) {
-      const randomIndex = Math.floor(Math.random() * unplayedPairs.length);
-      selectedPair = unplayedPairs[randomIndex];
+      selectedPair = unplayedPairs[Math.floor(Math.random() * unplayedPairs.length)];
     } else {
+      // Recyclage si tout a été joué
       const recyclables = allPossiblePairs.filter(([a, b]) => {
-        const key = [a.id, b.id].sort().join("-");
-        return key !== displayedPairRef.current;
+        return [a.id, b.id].sort().join("-") !== displayedPairRef.current;
       });
       const safePool = recyclables.length > 0 ? recyclables : allPossiblePairs;
       selectedPair = safePool[Math.floor(Math.random() * safePool.length)];
@@ -113,7 +120,7 @@ export function useDuel() {
     
     displayedPairRef.current = [finalPair[0].id, finalPair[1].id].sort().join("-");
 
-    setDuel({
+    setCurrentDuel({
       beerA: finalPair[0],
       beerB: finalPair[1],
       winnerId: null,
@@ -121,14 +128,20 @@ export function useDuel() {
       prevEloB: finalPair[1].elo,
     });
     setDuelResult(null);
-  }, [tastedBeers, playedPairs, setDuel]);
+    setSubmitting(false); // On force le déblocage des cartes !
+  }, [tastedBeers, playedPairs]);
 
+  // Astuce pour que le setTimeout appelle toujours la dernière version de la fonction
   useEffect(() => {
-    // On génère un duel SEULEMENT si on n'en a pas déjà un en mémoire
-    if (tastedBeers.length >= 2 && !duel.beerA && !loadingPastDuels) {
+    generatePairRef.current = generatePair;
+  }, [generatePair]);
+
+  // Lancement automatique au chargement de la page
+  useEffect(() => {
+    if (tastedBeers.length >= 2 && !currentDuel.beerA && !loadingPastDuels) {
       generatePair();
     }
-  }, [tastedBeers.length, duel.beerA, loadingPastDuels, generatePair]);
+  }, [tastedBeers.length, currentDuel.beerA, loadingPastDuels, generatePair]);
 
   const skipDuel = useCallback(() => {
     generatePair();
@@ -136,14 +149,14 @@ export function useDuel() {
 
   const voteMutation = useMutation({
     mutationFn: async (selectedWinnerId: string) => {
-      if (!duel.beerA || !duel.beerB) throw new Error("Pas de duel");
+      if (!currentDuel.beerA || !currentDuel.beerB) throw new Error("Pas de duel");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non connecté");
 
       const { data, error } = await supabase.rpc("process_duel", {
         p_user_id: user.id,
-        p_beer_a_id: duel.beerA.id,
-        p_beer_b_id: duel.beerB.id,
+        p_beer_a_id: currentDuel.beerA.id,
+        p_beer_b_id: currentDuel.beerB.id,
         p_winner_id: selectedWinnerId,
       });
 
@@ -152,9 +165,15 @@ export function useDuel() {
     },
     onSuccess: ({ result, winnerId: wId }) => {
       setDuelResult(result);
-      setDuel({ ...duel, winnerId: wId });
+      setCurrentDuel((prev) => ({ ...prev, winnerId: wId }));
       incrementDuelCount();
       showXPToast(result.xp_gained, "Duel");
+
+      // 🛡️ SÉCURITÉ ABSOLUE : On blackliste immédiatement ce duel localement !
+      if (currentDuel.beerA && currentDuel.beerB) {
+        const currentKey = [currentDuel.beerA.id, currentDuel.beerB.id].sort().join("-");
+        localPlayedPairsRef.current.add(currentKey);
+      }
 
       queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
@@ -162,8 +181,7 @@ export function useDuel() {
       queryClient.invalidateQueries({ queryKey: ["past_duels_history"] });
 
       setTimeout(() => {
-        generatePair();
-        setSubmitting(false);
+        if (generatePairRef.current) generatePairRef.current();
       }, 1200);
     },
     onError: () => setSubmitting(false),
@@ -174,21 +192,19 @@ export function useDuel() {
     voteMutation.mutate(selectedWinnerId);
   };
 
-  const eloDeltas = duelResult && duel.beerA && duel.beerB
-      ? { a: duelResult.beer_a_elo - duel.prevEloA, b: duelResult.beer_b_elo - duel.prevEloB }
+  const eloDeltas = duelResult && currentDuel.beerA && currentDuel.beerB
+      ? { a: duelResult.beer_a_elo - currentDuel.prevEloA, b: duelResult.beer_b_elo - currentDuel.prevEloB }
       : null;
 
-  // 🚀 LE CORRECTIF EST ICI :
-  // On ne montre l'écran de chargement (le squelette) QUE si on n'a VRAIMENT aucun duel en mémoire.
-  const isLoading = (loadingBeers || loadingPastDuels) && !duel.beerA;
+  const isLoading = (loadingBeers || loadingPastDuels) && !currentDuel.beerA;
 
   return {
-    beerA: duel.beerA,
-    beerB: duel.beerB,
+    beerA: currentDuel.beerA,
+    beerB: currentDuel.beerB,
     loading: isLoading,
     submitting,
     duelResult,
-    winnerId: duel.winnerId,
+    winnerId: currentDuel.winnerId,
     eloDeltas,
     canDuel: tastedBeers.length >= 2,
     duelCount: duelSessionCount,
