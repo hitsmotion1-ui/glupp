@@ -62,6 +62,9 @@ export function useRegionFilter() {
 
   // 2. On dérive les régions et départements en local (zéro coût réseau)
   const regions = useMemo(() => {
+    // 👈 1. On rassure TypeScript : si aucun pays n'est sélectionné, on renvoie une liste vide
+    if (!selectedCountry) return []; 
+    
     const fetchedRegions = normalizeRegions(rawRegions, selectedCountry);
     
     let combined = fetchedRegions;
@@ -74,7 +77,8 @@ export function useRegionFilter() {
   }, [rawRegions, selectedCountry]);
 
   const departments = useMemo(() => {
-    if (!hasDepartments) return [];
+    // 👈 2. Même sécurité ici pour les départements
+    if (!hasDepartments || !selectedCountry) return []; 
     
     const fetchedDepartments = normalizeToDepartments(rawRegions, selectedCountry);
     
