@@ -17,11 +17,25 @@ export function useDuel() {
   const queryClient = useQueryClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
 
-  const duel = useAppStore((s) => s.duel);
-  const setDuel = useAppStore((s) => s.setDuel);
-  const clearDuel = useAppStore((s) => s.clearDuel);
+  // On ne garde que les compteurs de session dans Zustand
   const duelSessionCount = useAppStore((s) => s.duelSessionCount);
   const incrementDuelCount = useAppStore((s) => s.incrementDuelCount);
+
+  // 💥 LA CLÉ : On utilise un état local au lieu de Zustand !
+  // Ainsi, changer d'onglet réinitialise naturellement le duel.
+  const [currentDuel, setCurrentDuel] = useState<{
+    beerA: Beer | null;
+    beerB: Beer | null;
+    winnerId: string | null;
+    prevEloA: number;
+    prevEloB: number;
+  }>({
+    beerA: null,
+    beerB: null,
+    winnerId: null,
+    prevEloA: 0,
+    prevEloB: 0,
+  });
 
   const [submitting, setSubmitting] = useState(false);
   const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
@@ -58,7 +72,7 @@ export function useDuel() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // 2. 🧠 NOUVEAU : Récupération de l'historique des duels joués !
+  // 2. Récupération de l'historique
   const { data: pastDuels = [], isLoading: loadingPastDuels } = useQuery({
     queryKey: ["past_duels_history"],
     queryFn: async () => {
@@ -72,14 +86,12 @@ export function useDuel() {
 
       return data || [];
     },
-    staleTime: 2 * 60 * 1000, // On garde ça en cache 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
-  // On crée un dictionnaire des paires déjà jouées pour une vérification ultra-rapide
   const playedPairs = useMemo(() => {
     const set = new Set<string>();
     pastDuels.forEach((d) => {
-      // On trie les ID pour que A vs B et B vs A donnent la même clé
       const [a, b] = [d.beer_a_id, d.beer_b_id].sort();
       set.add(`${a}-${b}`);
     });
@@ -89,75 +101,72 @@ export function useDuel() {
   const loading = loadingBeers || loadingPastDuels;
   const canDuel = tastedBeers.length >= 2;
 
+  // 🧠 L'ALGORITHME ULTIME : Mathématique et Infaillible
   const generatePair = useCallback(() => {
     if (tastedBeers.length < 2) return;
 
-    let newBeerA: Beer;
-    let newBeerB: Beer;
-    let attempts = 0;
-    let found = false;
-
-    // 🛡️ Boucle de sécurité : on cherche une paire INÉDITE
-    do {
-      const shuffled = [...tastedBeers].sort(() => Math.random() - 0.5);
-      newBeerA = shuffled[0];
-      newBeerB = shuffled[1];
-      attempts++;
-
-      // Clé unique pour vérifier l'historique
-      const [idA, idB] = [newBeerA.id, newBeerB.id].sort();
-      const pairKey = `${idA}-${idB}`;
-
-      // Est-ce le duel actuellement à l'écran ?
-      const isCurrentDuel = duel.beerA && duel.beerB &&
-        ((newBeerA.id === duel.beerA.id && newBeerB.id === duel.beerB.id) ||
-         (newBeerA.id === duel.beerB.id && newBeerB.id === duel.beerA.id));
-
-      // Si la paire n'a JAMAIS été jouée, on valide !
-      if (!playedPairs.has(pairKey) && !isCurrentDuel) {
-        found = true;
+    // A. On liste TOUTES les combinaisons possibles (ex: 10 bières = 45 duels possibles)
+    const allPossiblePairs: [Beer, Beer][] = [];
+    for (let i = 0; i < tastedBeers.length; i++) {
+      for (let j = i + 1; j < tastedBeers.length; j++) {
+        allPossiblePairs.push([tastedBeers[i], tastedBeers[j]]);
       }
-      
-    } while (!found && attempts < 50); 
-    // Au bout de 50 essais (si tu as fait tous les duels possibles de ton beerdex), 
-    // il recyclera un ancien duel plutôt que de bloquer l'app.
+    }
 
-    setDuel({
-      beerA: newBeerA,
-      beerB: newBeerB,
+    // B. On retire celles que tu as déjà jouées
+    const unplayedPairs = allPossiblePairs.filter(([a, b]) => {
+      const key = [a.id, b.id].sort().join("-");
+      return !playedPairs.has(key);
+    });
+
+    let selectedPair: [Beer, Beer];
+
+    if (unplayedPairs.length > 0) {
+      // 🎯 Il reste des duels inédits ! On en prend un au hasard
+      const randomIndex = Math.floor(Math.random() * unplayedPairs.length);
+      selectedPair = unplayedPairs[randomIndex];
+    } else {
+      // ♻️ Option de secours : tu as joué ABSOLUMENT tous les duels possibles de ta collection.
+      // Au lieu de faire planter l'appli, on te repropose un ancien duel au hasard.
+      const randomIndex = Math.floor(Math.random() * allPossiblePairs.length);
+      selectedPair = allPossiblePairs[randomIndex];
+    }
+
+    // On mélange A et B pour que la même bière ne soit pas toujours affichée en haut/à gauche
+    const finalPair = Math.random() > 0.5 ? selectedPair : [selectedPair[1], selectedPair[0]];
+
+    setCurrentDuel({
+      beerA: finalPair[0],
+      beerB: finalPair[1],
       winnerId: null,
-      prevEloA: newBeerA.elo,
-      prevEloB: newBeerB.elo,
+      prevEloA: finalPair[0].elo,
+      prevEloB: finalPair[1].elo,
     });
     setDuelResult(null);
-  }, [tastedBeers, playedPairs, duel.beerA, duel.beerB, setDuel]);
+  }, [tastedBeers, playedPairs]);
 
   useEffect(() => {
-    if (tastedBeers.length >= 2 && !duel.beerA && !duel.beerB && !loadingPastDuels) {
+    // On génère un duel uniquement si on n'en a pas et que tout est chargé
+    if (tastedBeers.length >= 2 && !currentDuel.beerA && !loadingPastDuels) {
       generatePair();
     }
-  }, [tastedBeers, generatePair, duel.beerA, duel.beerB, loadingPastDuels]);
+  }, [tastedBeers, currentDuel.beerA, loadingPastDuels, generatePair]);
 
   const skipDuel = useCallback(() => {
     generatePair();
   }, [generatePair]);
 
-  // 🧹 NOUVEAU : Fonction pour forcer l'oubli du duel
-  const resetDuelState = useCallback(() => {
-    clearDuel();
-  }, [clearDuel]);
-
   const voteMutation = useMutation({
     mutationFn: async (selectedWinnerId: string) => {
-      if (!duel.beerA || !duel.beerB) throw new Error("Pas de duel en cours");
+      if (!currentDuel.beerA || !currentDuel.beerB) throw new Error("Pas de duel en cours");
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non connecté");
 
       const { data, error } = await supabase.rpc("process_duel", {
         p_user_id: user.id,
-        p_beer_a_id: duel.beerA.id,
-        p_beer_b_id: duel.beerB.id,
+        p_beer_a_id: currentDuel.beerA.id,
+        p_beer_b_id: currentDuel.beerB.id,
         p_winner_id: selectedWinnerId,
       });
 
@@ -166,14 +175,13 @@ export function useDuel() {
     },
     onSuccess: ({ result, winnerId: wId }) => {
       setDuelResult(result);
-      setDuel({ ...duel, winnerId: wId });
+      setCurrentDuel((prev) => ({ ...prev, winnerId: wId }));
       incrementDuelCount();
       showXPToast(result.xp_gained, "Duel");
 
       queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
       queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
-      // On prévient React Query qu'on a un nouveau duel dans l'historique
       queryClient.invalidateQueries({ queryKey: ["past_duels_history"] });
 
       setTimeout(() => {
@@ -192,17 +200,17 @@ export function useDuel() {
     voteMutation.mutate(selectedWinnerId);
   };
 
-  const eloDeltas = duelResult && duel.beerA && duel.beerB
-      ? { a: duelResult.beer_a_elo - duel.prevEloA, b: duelResult.beer_b_elo - duel.prevEloB }
+  const eloDeltas = duelResult && currentDuel.beerA && currentDuel.beerB
+      ? { a: duelResult.beer_a_elo - currentDuel.prevEloA, b: duelResult.beer_b_elo - currentDuel.prevEloB }
       : null;
 
   return {
-    beerA: duel.beerA,
-    beerB: duel.beerB,
+    beerA: currentDuel.beerA,
+    beerB: currentDuel.beerB,
     loading,
     submitting,
     duelResult,
-    winnerId: duel.winnerId,
+    winnerId: currentDuel.winnerId,
     eloDeltas,
     canDuel,
     duelCount: duelSessionCount,
@@ -210,7 +218,6 @@ export function useDuel() {
     generatePair,
     submitVote,
     skipDuel,
-    resetDuelState, // 👈 Exporté pour nettoyer en quittant la page
     refreshTasted: () => queryClient.invalidateQueries({ queryKey: queryKeys.duel.tastedBeers }),
   };
 }
