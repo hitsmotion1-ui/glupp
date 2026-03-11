@@ -36,7 +36,7 @@ export function useDuel() {
   // 2. MÉMOIRES ANTI-DOUBLONS INSTANTANÉES : Pour palier aux lenteurs de la base de données
   const displayedPairRef = useRef<string | null>(null);
   const localPlayedPairsRef = useRef<Set<string>>(new Set());
-  const generatePairRef = useRef<() => void>();
+  const generatePairRef = useRef<(() => void) | null>(null);
 
   // Récupération des bières goûtées
   const { data: tastedBeers = [], isLoading: loadingBeers } = useQuery({
