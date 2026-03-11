@@ -39,8 +39,9 @@ interface SearchResult {
 export function useFriends() {
   const queryClient = useQueryClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
+  
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // ❌ Plus besoin de la variable currentUserId qui causait le bug !
 
   // Fetch all friendships (accepted + pending)
   const { data: allFriendships = [], isLoading } = useQuery({
@@ -50,7 +51,8 @@ export function useFriends() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return [];
-      setCurrentUserId(user.id);
+      
+      // On n'appelle plus setCurrentUserId(user.id) ici
 
       const { data, error } = await supabase.rpc("get_friends", {
         p_user_id: user.id,
@@ -71,27 +73,31 @@ export function useFriends() {
     [allFriendships]
   );
 
-  // Only show RECEIVED requests (where current user is NOT the initiator)
+  // Demandes REÇUES : l'expéditeur (initiated_by) est notre ami (friend_id)
+  // (On inclut les 'null' par sécurité pour les anciennes demandes en base de données)
   const requests = useMemo(
     () =>
       allFriendships.filter(
         (f) =>
           f.friendship_status === "pending" &&
-          f.initiated_by !== currentUserId
+          (f.initiated_by === f.friend_id || f.initiated_by === null)
       ),
-    [allFriendships, currentUserId]
+    [allFriendships]
   );
 
-  // Sent requests (where current user IS the initiator)
+  // Demandes ENVOYÉES : l'expéditeur N'EST PAS notre ami (donc c'est nous)
   const sentRequests = useMemo(
     () =>
       allFriendships.filter(
         (f) =>
           f.friendship_status === "pending" &&
-          f.initiated_by === currentUserId
+          f.initiated_by !== f.friend_id &&
+          f.initiated_by !== null
       ),
-    [allFriendships, currentUserId]
+    [allFriendships]
   );
+
+  // ... (Garde le reste du fichier intact à partir d'ici : Search users, etc.)
 
   // Search users
   const { data: searchResults = [], isLoading: searching } = useQuery({
