@@ -186,7 +186,7 @@ function MyTopView() {
           Ton classement perso
         </h3>
         <p className="text-sm text-glupp-text-soft max-w-xs">
-          Gluppe des bieres et joue des duels pour voir ton classement personnel ici !
+          Gluppe des bières et joue des duels pour voir ton classement personnel ici !
         </p>
       </div>
     );
@@ -211,7 +211,7 @@ function MyTopView() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-glupp-gold font-medium mb-0.5">
-                #1 — Ta biere preferee
+                #1 — Ta bière préférée
               </p>
               <p className="font-display text-lg font-bold text-glupp-cream truncate">
                 {topBeer.name}
@@ -220,9 +220,14 @@ function MyTopView() {
                 {topBeer.brewery} · {topBeer.country}
               </p>
             </div>
+            {/* 🆕 ICI : On affiche le nouveau score de l'algorithme et les re-glupps */}
             <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-glupp-gold">{topBeer.wins}W</p>
-              <p className="text-[10px] text-glupp-text-muted">{topBeer.duels}D</p>
+              <p className="text-sm font-bold text-glupp-gold">
+                {Math.round(topBeer.score)} pts
+              </p>
+              <p className="text-[10px] text-glupp-text-muted">
+                {topBeer.glupps} glupp{topBeer.glupps > 1 ? "s" : ""} · {topBeer.wins}W
+              </p>
             </div>
           </div>
         </motion.button>

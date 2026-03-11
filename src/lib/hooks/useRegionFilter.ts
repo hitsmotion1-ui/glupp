@@ -12,21 +12,21 @@ import {
 } from "@/lib/utils/regionMapping";
 
 export const COUNTRIES = [
-  { code: "FR", flag: "\u{1F1EB}\u{1F1F7}", name: "France" },
-  { code: "BE", flag: "\u{1F1E7}\u{1F1EA}", name: "Belgique" },
-  { code: "DE", flag: "\u{1F1E9}\u{1F1EA}", name: "Allemagne" },
-  { code: "US", flag: "\u{1F1FA}\u{1F1F8}", name: "USA" },
-  { code: "GB", flag: "\u{1F1EC}\u{1F1E7}", name: "UK" },
-  { code: "IE", flag: "\u{1F1EE}\u{1F1EA}", name: "Irlande" },
-  { code: "NL", flag: "\u{1F1F3}\u{1F1F1}", name: "Pays-Bas" },
-  { code: "CZ", flag: "\u{1F1E8}\u{1F1FF}", name: "Tchequie" },
-  { code: "JP", flag: "\u{1F1EF}\u{1F1F5}", name: "Japon" },
-  { code: "MX", flag: "\u{1F1F2}\u{1F1FD}", name: "Mexique" },
-  { code: "ES", flag: "\u{1F1EA}\u{1F1F8}", name: "Espagne" },
-  { code: "IT", flag: "\u{1F1EE}\u{1F1F9}", name: "Italie" },
-  { code: "NO", flag: "\u{1F1F3}\u{1F1F4}", name: "Norvege" },
-  { code: "DK", flag: "\u{1F1E9}\u{1F1F0}", name: "Danemark" },
-  { code: "AU", flag: "\u{1F1E6}\u{1F1FA}", name: "Australie" },
+  { code: "FR", flag: "🇫🇷", name: "France" },
+  { code: "BE", flag: "🇧🇪", name: "Belgique" },
+  { code: "DE", flag: "🇩🇪", name: "Allemagne" },
+  { code: "US", flag: "🇺🇸", name: "USA" },
+  { code: "GB", flag: "🇬🇧", name: "UK" },
+  { code: "IE", flag: "🇮🇪", name: "Irlande" },
+  { code: "NL", flag: "🇳🇱", name: "Pays-Bas" },
+  { code: "CZ", flag: "🇨🇿", name: "Tchéquie" },
+  { code: "JP", flag: "🇯🇵", name: "Japon" },
+  { code: "MX", flag: "🇲🇽", name: "Mexique" },
+  { code: "ES", flag: "🇪🇸", name: "Espagne" },
+  { code: "IT", flag: "🇮🇹", name: "Italie" },
+  { code: "NO", flag: "🇳🇴", name: "Norvège" },
+  { code: "DK", flag: "🇩🇰", name: "Danemark" },
+  { code: "AU", flag: "🇦🇺", name: "Australie" },
 ] as const;
 
 export type RegionMode = "regions" | "departments";
@@ -36,13 +36,13 @@ export function useRegionFilter() {
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [regionMode, setRegionMode] = useState<RegionMode>("regions");
 
-  // Whether current country supports department mode
+  // Vérifie si le pays gère les départements
   const hasDepartments =
     selectedCountry != null && COUNTRIES_WITH_DEPARTMENTS.has(selectedCountry);
 
-  // Fetch raw regions from DB then normalize them
-  const { data: fetchedRegions = [] } = useQuery({
-    queryKey: ["regions", selectedCountry],
+  // 1. UNE SEULE REQUÊTE POUR TOUT : On récupère les régions brutes
+  const { data: rawRegions = [], isLoading } = useQuery({
+    queryKey: ["raw-regions", selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return [];
       const { data } = await supabase
@@ -54,50 +54,38 @@ export function useRegionFilter() {
         .not("region", "is", null);
 
       if (!data) return [];
-      const rawRegions = data.map((d) => d.region as string).filter(Boolean);
-      // Normalise les adresses/codes postaux en noms de régions
-      return normalizeRegions(rawRegions, selectedCountry);
+      return data.map((d) => d.region as string).filter(Boolean);
     },
     enabled: !!selectedCountry,
     staleTime: 10 * 60 * 1000,
   });
 
-  // Fetch departments from DB (only for countries that support it)
-  const { data: fetchedDepartments = [] } = useQuery({
-    queryKey: ["departments", selectedCountry],
-    queryFn: async () => {
-      if (!selectedCountry) return [];
-      const { data } = await supabase
-        .from("beers")
-        .select("region")
-        .eq("country_code", selectedCountry)
-        .eq("is_active", true)
-        .eq("status", "approved")
-        .not("region", "is", null);
-
-      if (!data) return [];
-      const rawRegions = data.map((d) => d.region as string).filter(Boolean);
-      return normalizeToDepartments(rawRegions, selectedCountry);
-    },
-    enabled: !!selectedCountry && hasDepartments,
-    staleTime: 10 * 60 * 1000,
-  });
-
-  // Pour la France, toujours afficher TOUTES les régions et départements
-  // même s'il n'y a pas encore de bières recensées
+  // 2. On dérive les régions et départements en local (zéro coût réseau)
   const regions = useMemo(() => {
+    const fetchedRegions = normalizeRegions(rawRegions, selectedCountry);
+    
+    let combined = fetchedRegions;
     if (selectedCountry === "FR") {
-      return [...new Set([...ALL_FR_REGIONS, ...fetchedRegions])].sort();
+      combined = [...new Set([...ALL_FR_REGIONS, ...fetchedRegions])];
     }
-    return fetchedRegions;
-  }, [selectedCountry, fetchedRegions]);
+    
+    // Tri alphabétique gérant les accents français
+    return combined.sort((a, b) => a.localeCompare(b, "fr"));
+  }, [rawRegions, selectedCountry]);
 
   const departments = useMemo(() => {
+    if (!hasDepartments) return [];
+    
+    const fetchedDepartments = normalizeToDepartments(rawRegions, selectedCountry);
+    
+    let combined = fetchedDepartments;
     if (selectedCountry === "FR") {
-      return [...new Set([...ALL_FR_DEPARTMENTS, ...fetchedDepartments])].sort();
+      combined = [...new Set([...ALL_FR_DEPARTMENTS, ...fetchedDepartments])];
     }
-    return fetchedDepartments;
-  }, [selectedCountry, fetchedDepartments]);
+    
+    // Tri alphabétique gérant les accents français
+    return combined.sort((a, b) => a.localeCompare(b, "fr"));
+  }, [rawRegions, selectedCountry, hasDepartments]);
 
   const handleSetCountry = (code: string | null) => {
     setSelectedCountry(code);
@@ -110,7 +98,6 @@ export function useRegionFilter() {
     setSelectedRegion(null);
   };
 
-  // Active list depends on mode
   const activeList = regionMode === "departments" ? departments : regions;
 
   return {
@@ -125,5 +112,6 @@ export function useRegionFilter() {
     regionMode,
     setRegionMode: handleSetRegionMode,
     hasDepartments,
+    isLoading, // Ajouté pour permettre d'afficher un loader dans l'UI si besoin
   };
 }

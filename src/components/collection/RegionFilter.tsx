@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import type { RegionMode } from "@/lib/hooks/useRegionFilter";
+import { Loader2 } from "lucide-react"; // Ajout de l'icône de chargement
 
 interface Country {
   readonly code: string;
@@ -20,6 +21,7 @@ interface RegionFilterProps {
   regionMode?: RegionMode;
   setRegionMode?: (mode: RegionMode) => void;
   hasDepartments?: boolean;
+  isLoading?: boolean; // 👈 Nouvel ajout !
 }
 
 export function RegionFilter({
@@ -33,10 +35,11 @@ export function RegionFilter({
   regionMode = "regions",
   setRegionMode,
   hasDepartments = false,
+  isLoading = false, // 👈 Par défaut à false
 }: RegionFilterProps) {
   return (
     <div className="space-y-2">
-      {/* Country row */}
+      {/* Ligne des Pays */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-1">
         <button
           onClick={() => setSelectedCountry(null)}
@@ -48,6 +51,7 @@ export function RegionFilter({
         >
           Tous
         </button>
+        
         {countries.map((c) => {
           const stats = countryStats?.get(c.code);
           return (
@@ -74,17 +78,17 @@ export function RegionFilter({
         })}
       </div>
 
-      {/* Region/Department toggle + list (only when country selected and regions exist) */}
-      {selectedCountry && regions.length > 0 && (
+      {/* Zone Régions / Départements (Affichée seulement si un pays est sélectionné) */}
+      {selectedCountry && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
-          className="space-y-1.5"
+          className="space-y-1.5 overflow-hidden"
         >
-          {/* Toggle: Regions / Departements (only for countries that support it) */}
-          {hasDepartments && setRegionMode && (
-            <div className="flex items-center gap-1.5 px-4">
+          {/* Toggle : Régions vs Départements (Seulement pour les pays compatibles) */}
+          {hasDepartments && setRegionMode && !isLoading && regions.length > 0 && (
+            <div className="flex items-center gap-1.5 px-4 mt-1">
               <button
                 onClick={() => setRegionMode("regions")}
                 className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
@@ -93,7 +97,7 @@ export function RegionFilter({
                     : "text-glupp-text-muted hover:text-glupp-text-soft"
                 }`}
               >
-                Regions
+                Régions
               </button>
               <button
                 onClick={() => setRegionMode("departments")}
@@ -103,38 +107,54 @@ export function RegionFilter({
                     : "text-glupp-text-muted hover:text-glupp-text-soft"
                 }`}
               >
-                Departements
+                Départements
               </button>
             </div>
           )}
 
-          {/* Region/Department pills */}
+          {/* État de chargement OU Liste des pilules */}
           <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-1">
-            <button
-              onClick={() => setSelectedRegion(null)}
-              className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                !selectedRegion
-                  ? "bg-glupp-accent/20 text-glupp-accent border border-glupp-accent/30"
-                  : "bg-glupp-card-alt text-glupp-text-muted border border-transparent hover:border-glupp-border"
-              }`}
-            >
-              {regionMode === "departments" ? "Tous departements" : "Toutes regions"}
-            </button>
-            {regions.map((r) => (
-              <button
-                key={r}
-                onClick={() =>
-                  setSelectedRegion(selectedRegion === r ? null : r)
-                }
-                className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                  selectedRegion === r
-                    ? "bg-glupp-accent/20 text-glupp-accent border border-glupp-accent/30"
-                    : "bg-glupp-card-alt text-glupp-text-muted border border-transparent hover:border-glupp-border"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
+            {isLoading ? (
+              // Affichage d'un petit loader discret pendant la requête Supabase
+              <div className="flex items-center gap-2 px-2 py-1 text-glupp-text-muted text-[11px]">
+                <Loader2 size={12} className="animate-spin" />
+                <span>Chargement des filtres...</span>
+              </div>
+            ) : regions.length > 0 ? (
+              // Affichage normal des filtres (si on a des résultats)
+              <>
+                <button
+                  onClick={() => setSelectedRegion(null)}
+                  className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    !selectedRegion
+                      ? "bg-glupp-accent/20 text-glupp-accent border border-glupp-accent/30"
+                      : "bg-glupp-card-alt text-glupp-text-muted border border-transparent hover:border-glupp-border"
+                  }`}
+                >
+                  {regionMode === "departments" ? "Tous départements" : "Toutes régions"}
+                </button>
+                {regions.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() =>
+                      setSelectedRegion(selectedRegion === r ? null : r)
+                    }
+                    className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                      selectedRegion === r
+                        ? "bg-glupp-accent/20 text-glupp-accent border border-glupp-accent/30"
+                        : "bg-glupp-card-alt text-glupp-text-muted border border-transparent hover:border-glupp-border"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </>
+            ) : (
+              // Si le pays est sélectionné mais n'a aucune donnée enregistrée
+              <span className="text-[11px] text-glupp-text-muted px-2 py-1">
+                Aucun filtre disponible pour ce pays.
+              </span>
+            )}
           </div>
         </motion.div>
       )}
