@@ -13,6 +13,7 @@ interface DuelCardsProps {
   disabled: boolean;
   winnerId?: string | null;
   eloDeltas?: { a: number; b: number } | null;
+  duelKey: number; // 👈 C'EST CETTE LIGNE QUI MANQUAIT !
 }
 
 export function DuelCards({
@@ -22,21 +23,23 @@ export function DuelCards({
   disabled,
   winnerId: externalWinnerId,
   eloDeltas,
+  duelKey, // 👈 ET CELLE-CI POUR LA RÉCUPÉRER !
 }: DuelCardsProps) {
   const [localSelected, setLocalSelected] = useState<string | null>(null);
   const selected = externalWinnerId || localSelected;
 
-  // 🧹 LE CORRECTIF MAGIQUE EST ICI :
-  // Dès que l'on reçoit une nouvelle paire de bières, on efface le vote local précédent !
+  // 🧹 Grâce à duelKey, React efface tout même si c'est la même bière !
   useEffect(() => {
     setLocalSelected(null);
-  }, [beerA.id, beerB.id]);
+  }, [duelKey]);
 
   const handleSelect = (id: string) => {
     if (disabled || selected) return;
     setLocalSelected(id);
     onSelect(id);
   };
+
+  // ... (le reste du fichier reste identique, jusqu'au <motion.div key={duelKey}>)
 
   const pairKey = `${beerA.id}-${beerB.id}`;
 
