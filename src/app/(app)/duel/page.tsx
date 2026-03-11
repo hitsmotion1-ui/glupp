@@ -10,6 +10,7 @@ import { GluppOfWeekBanner } from "@/components/gamification/GluppOfWeekBanner";
 import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useEffect } from "react"; // 👈 Vérifie que c'est bien importé en haut
 
 export default function DuelPage() {
   const {
@@ -24,11 +25,22 @@ export default function DuelPage() {
     eloDeltas,
     skipDuel, // 👈 On importe notre nouvelle fonction ici
     submitVote,
+    resetDuelState, // 👈 N'oublie pas de l'importer depuis le hook !
   } = useDuel();
 
   const { activities, isLoading: activitiesLoading } = useActivities();
   const recentActivities = activities.slice(0, 4);
 
+
+  // 🧹 Le coup de balai au changement d'onglet
+  useEffect(() => {
+    return () => {
+      // Cette fonction s'exécute uniquement quand le composant est "démonté"
+      // (c'est-à-dire quand tu changes d'onglet)
+      resetDuelState();
+    };
+  }, [resetDuelState]);
+  
   if (loading) {
     return (
       <div className="px-4 py-8 space-y-6">
