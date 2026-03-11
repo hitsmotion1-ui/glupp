@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Beer } from "@/types";
 import { beerEmoji, formatNumber } from "@/lib/utils/xp";
@@ -26,17 +26,23 @@ export function DuelCards({
   const [localSelected, setLocalSelected] = useState<string | null>(null);
   const selected = externalWinnerId || localSelected;
 
+  // 🧹 LE CORRECTIF MAGIQUE EST ICI :
+  // Dès que l'on reçoit une nouvelle paire de bières, on efface le vote local précédent !
+  useEffect(() => {
+    setLocalSelected(null);
+  }, [beerA.id, beerB.id]);
+
   const handleSelect = (id: string) => {
     if (disabled || selected) return;
     setLocalSelected(id);
     onSelect(id);
   };
 
-  // Reset local selected when new pair arrives
   const pairKey = `${beerA.id}-${beerB.id}`;
 
   const renderCard = (beer: Beer, side: "a" | "b") => {
     const isWinner = selected === beer.id;
+    // Si un vote a été fait ET que ce n'est pas cette bière, c'est la perdante
     const isLoser = selected && selected !== beer.id;
     const delta = eloDeltas ? eloDeltas[side] : null;
 
