@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ActivityItem } from "@/components/social/ActivityItem";
 import { GluppOfWeekBanner } from "@/components/gamification/GluppOfWeekBanner";
-import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw, History } from "lucide-react";
+import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw, History, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -22,12 +22,14 @@ export default function DuelPage() {
     loading,
     submitting,
     canDuel,
+    hasFinishedAllDuels,
     duelCount,
     tastedCount,
     winnerId,
     eloDeltas,
     skipDuel,
     submitVote,
+    duelKey,
   } = useDuel();
 
   const { activities, isLoading: activitiesLoading } = useActivities();
@@ -67,6 +69,49 @@ export default function DuelPage() {
             <ArrowRight size={16} className="ml-2" />
           </Button>
         </Link>
+      </div>
+    );
+  }
+
+  // 🎯 NOUVEL ÉCRAN DE VICTOIRE !
+  if (hasFinishedAllDuels) {
+    return (
+      <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", bounce: 0.5 }}
+        >
+          <Trophy size={56} className="text-glupp-gold mb-4" />
+        </motion.div>
+        <h2 className="font-display text-xl font-bold text-glupp-cream mb-2">
+          Tu as tout joué !
+        </h2>
+        <p className="text-glupp-text-soft text-sm mb-6 max-w-xs">
+          Tu as duelé toutes les bières de ta collection. Ajoute de nouvelles bières pour débloquer de nouveaux affrontements !
+        </p>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <Link href="/collection">
+            <Button variant="primary" size="lg" className="w-full">
+              Voir la Collection
+              <ArrowRight size={16} className="ml-2" />
+            </Button>
+          </Link>
+          <Button 
+            variant="ghost" 
+            onClick={() => setIsHistoryOpen(true)}
+            className="text-glupp-text-muted hover:text-glupp-cream"
+          >
+            <History size={16} className="mr-2" />
+            Voir mon historique
+          </Button>
+        </div>
+        
+        {/* On garde la modale ici pour pouvoir l'ouvrir depuis l'écran de fin */}
+        <DuelHistoryModal 
+          isOpen={isHistoryOpen} 
+          onClose={() => setIsHistoryOpen(false)} 
+        />
       </div>
     );
   }
@@ -112,6 +157,7 @@ export default function DuelPage() {
           disabled={submitting}
           winnerId={winnerId}
           eloDeltas={eloDeltas}
+          duelKey={duelKey}
         />
       )}
 
