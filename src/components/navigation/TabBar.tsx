@@ -25,6 +25,7 @@ export function TabBar() {
             <Link
               key={tab.href}
               href={tab.href}
+              prefetch={true}
               className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-colors ${
                 isActive
                   ? "text-glupp-accent"

@@ -8,6 +8,9 @@ import { AuthGuard } from "@/components/global/AuthGuard";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 
+// 1. 🚀 Ajoute l'import de ton QueryProvider ici :
+import { QueryProvider } from "@/lib/providers/QueryProvider";
+
 export default async function AppLayout({
   children,
 }: {
@@ -23,17 +26,20 @@ export default async function AppLayout({
   }
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-glupp-bg flex flex-col">
-        <Header />
-        <main className="flex-1 pb-20 overflow-y-auto">
-          <ErrorBoundary>{children}</ErrorBoundary>
-        </main>
-        <TabBar />
-        <GlobalModals />
-        <PWAInstallPrompt />
-        <OnboardingFlow />
-      </div>
-    </AuthGuard>
+    // 2. 🚀 Enveloppe AuthGuard et tout le reste avec QueryProvider :
+    <QueryProvider>
+      <AuthGuard>
+        <div className="min-h-screen bg-glupp-bg flex flex-col">
+          <Header />
+          <main className="flex-1 pb-20 overflow-y-auto">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
+          <TabBar />
+          <GlobalModals />
+          <PWAInstallPrompt />
+          <OnboardingFlow />
+        </div>
+      </AuthGuard>
+    </QueryProvider>
   );
 }
