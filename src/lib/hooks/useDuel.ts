@@ -37,7 +37,6 @@ export function useDuel() {
 
       if (!user) return [];
 
-      // Paginate to get all tasted beers
       let all: Beer[] = [];
       let page = 0;
       while (true) {
@@ -69,16 +68,37 @@ export function useDuel() {
   const generatePair = useCallback(() => {
     if (tastedBeers.length < 2) return;
 
-    const shuffled = [...tastedBeers].sort(() => Math.random() - 0.5);
+    let newBeerA: Beer;
+    let newBeerB: Beer;
+    let attempts = 0;
+
+    // 🧠 Boucle intelligente : on cherche une paire valide
+    do {
+      const shuffled = [...tastedBeers].sort(() => Math.random() - 0.5);
+      newBeerA = shuffled[0];
+      newBeerB = shuffled[1];
+      attempts++;
+
+      // On s'assure que :
+      // 1. A et B sont différentes (géré par le shuffle)
+      // 2. Ce n'est pas EXACTEMENT la même paire que le duel actuel
+      // On s'arrête si on a trouvé, ou si on a fait 10 tentatives (sécurité)
+    } while (
+      attempts < 10 &&
+      duel.beerA && duel.beerB &&
+      ((newBeerA.id === duel.beerA.id && newBeerB.id === duel.beerB.id) ||
+       (newBeerA.id === duel.beerB.id && newBeerB.id === duel.beerA.id))
+    );
+
     setDuel({
-      beerA: shuffled[0],
-      beerB: shuffled[1],
+      beerA: newBeerA,
+      beerB: newBeerB,
       winnerId: null,
-      prevEloA: shuffled[0].elo,
-      prevEloB: shuffled[1].elo,
+      prevEloA: newBeerA.elo,
+      prevEloB: newBeerB.elo,
     });
     setDuelResult(null);
-  }, [tastedBeers, setDuel]);
+  }, [tastedBeers, duel.beerA, duel.beerB, setDuel]);
 
   // Auto-generate pair when tasted beers are loaded AND no duel in progress
   useEffect(() => {
@@ -86,6 +106,11 @@ export function useDuel() {
       generatePair();
     }
   }, [tastedBeers, generatePair, duel.beerA, duel.beerB]);
+
+  // 🆕 Nouvelle fonction : Passer le duel
+  const skipDuel = useCallback(() => {
+    generatePair();
+  }, [generatePair]);
 
   // Vote mutation
   const voteMutation = useMutation({
@@ -115,12 +140,10 @@ export function useDuel() {
       incrementDuelCount();
       showXPToast(result.xp_gained, "Duel");
 
-      // Invalidate ranking since ELOs changed
       queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
       queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
 
-      // Generate next pair after animation
       setTimeout(() => {
         generatePair();
         setSubmitting(false);
@@ -137,7 +160,6 @@ export function useDuel() {
     voteMutation.mutate(selectedWinnerId);
   };
 
-  // Compute ELO deltas
   const eloDeltas =
     duelResult && duel.beerA && duel.beerB
       ? {
@@ -159,6 +181,7 @@ export function useDuel() {
     tastedCount: tastedBeers.length,
     generatePair,
     submitVote,
+    skipDuel, // 👈 On expose la nouvelle fonction
     refreshTasted: () =>
       queryClient.invalidateQueries({
         queryKey: queryKeys.duel.tastedBeers,

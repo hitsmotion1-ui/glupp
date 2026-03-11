@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ActivityItem } from "@/components/social/ActivityItem";
 import { GluppOfWeekBanner } from "@/components/gamification/GluppOfWeekBanner";
-import { Swords, ArrowRight, Beer, Flame, ChevronRight } from "lucide-react";
+import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -22,7 +22,7 @@ export default function DuelPage() {
     tastedCount,
     winnerId,
     eloDeltas,
-    generatePair,
+    skipDuel, // 👈 On importe notre nouvelle fonction ici
     submitVote,
   } = useDuel();
 
@@ -111,15 +111,17 @@ export default function DuelPage() {
         />
       )}
 
-      {/* Skip button */}
+      {/* 🆕 Nouveau bouton "Passer" avec icône */}
       <div className="text-center mt-6">
         <Button
           variant="ghost"
           size="sm"
-          onClick={generatePair}
+          onClick={skipDuel}
           disabled={submitting}
+          className="text-glupp-text-muted hover:text-glupp-cream transition-colors group flex items-center justify-center gap-2 mx-auto"
         >
-          Passer
+          <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
+          Passer ce duel
         </Button>
       </div>
 
@@ -144,7 +146,7 @@ export default function DuelPage() {
 
       {/* Recent Activity */}
       {recentActivities.length > 0 && (
-        <div className="mt-6 px-4">
+        <div className="mt-6 px-4 space-y-3">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-glupp-cream">
               Activite recente
