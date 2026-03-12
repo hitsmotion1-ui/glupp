@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { useAppStore } from "@/lib/store/useAppStore";
-import { LogOut, Camera, Loader2, Save, MapPin, Shield, User as UserIcon } from "lucide-react";
+import { LogOut, Camera, Loader2, Save, MapPin, Shield, User as UserIcon, Bell } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -18,7 +18,7 @@ interface SettingsModalProps {
   userId?: string;
 }
 
-// 🌍 Liste des suggestions de villes (Tu peux en ajouter d'autres !)
+// 🌍 Liste des suggestions de villes
 const POPULAR_CITIES = [
   "Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", 
   "Montpellier", "Strasbourg", "Bordeaux", "Lille", "Rennes", 
@@ -47,6 +47,9 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 🔔 Nouvel état pour les notifications Push
+  const [pushEnabled, setPushEnabled] = useState(false);
+
   useEffect(() => {
     if (isOpen && userId) {
       setUsername(currentUsername || "");
@@ -65,6 +68,11 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
           .eq("id", userId)
           .single();
         if (profile?.city) setCity(profile.city);
+        
+        // Simuler la récupération du statut des notifications push (à connecter au Service Worker plus tard)
+        if (typeof window !== "undefined" && "Notification" in window) {
+           setPushEnabled(Notification.permission === "granted");
+        }
       };
       fetchExtraData();
     }
@@ -95,6 +103,28 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
       setErrorMsg("Erreur lors de l'envoi de l'image.");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // 🔔 Fonction pour demander la permission d'envoyer des notifications
+  const handlePushToggle = async () => {
+    if (!pushEnabled) {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          setPushEnabled(true);
+          // Ici, on ajoutera plus tard l'abonnement au Service Worker
+          console.log("Permission Push accordée !");
+        } else {
+          setErrorMsg("Permission de notification refusée dans le navigateur.");
+        }
+      } catch (err) {
+         setErrorMsg("Erreur lors de la demande de permission.");
+      }
+    } else {
+        // Désactivation locale
+        setPushEnabled(false);
+        console.log("Push désactivé");
     }
   };
 
@@ -154,6 +184,7 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
       queryClient.invalidateQueries({ queryKey: ["ranking"] });
       
       setSuccessMsg("Modifications sauvegardées !" + authMessage);
+      // 🛑 J'ai supprimé la ligne showXPToast ici !
       
       setTimeout(() => {
         if (!authMessage) onClose();
@@ -179,7 +210,7 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
             onClick={() => setActiveTab("profile")}
           >
             <UserIcon size={14} />
-            Profil Public
+            Préférences & Notifs
           </button>
           <button
             className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-md transition-colors ${
@@ -243,7 +274,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                 />
               </div>
               
-              {/* 🆕 CHAMP VILLE MODIFIÉ AVEC DATALIST ET COMMENTAIRE */}
               <div>
                 <label className="block text-xs font-semibold text-glupp-text-soft mb-1 flex items-center gap-1">
                   <MapPin size={12} /> Ville
@@ -264,6 +294,31 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                 <p className="text-[10px] text-glupp-accent/80 mt-1.5 flex items-center gap-1">
                   💡 Pratique pour voir les gluppers pas loin de chez toi !
                 </p>
+              </div>
+
+              {/* 🔔 SECTION NOTIFICATIONS */}
+              <div className="space-y-4 pt-4 border-t border-glupp-border">
+                <h3 className="text-sm font-bold text-glupp-text flex items-center gap-2">
+                  <Bell size={16} /> Notifications
+                </h3>
+                
+                <div className="flex items-center justify-between p-4 rounded-xl bg-glupp-bg border border-glupp-border">
+                  <div>
+                    <p className="font-medium text-sm text-glupp-text">Alertes Push</p>
+                    <p className="text-xs text-glupp-text-soft mt-1 max-w-[200px]">
+                      Recevoir des alertes sur mon écran pour les likes et commentaires.
+                    </p>
+                  </div>
+                  
+                  {/* Le bouton Toggle */}
+                  <button 
+                    onClick={handlePushToggle}
+                    className={`w-12 h-6 rounded-full relative transition-colors ${pushEnabled ? 'bg-glupp-accent' : 'bg-glupp-border'}`}
+                    aria-label="Activer les notifications push"
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 left-0.5 transition-transform ${pushEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

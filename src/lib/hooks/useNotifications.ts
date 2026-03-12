@@ -39,7 +39,9 @@ export interface PersistentNotification {
     | "system"
     | "trophy"
     | "ban_status"
-    | "friend_accepted";
+    | "friend_accepted"
+    | "reaction" // 🆕 Ajouté
+    | "comment"; // 🆕 Ajouté
   title: string;
   message: string | null;
   metadata: Record<string, unknown>;
