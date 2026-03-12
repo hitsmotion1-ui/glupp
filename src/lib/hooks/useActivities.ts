@@ -99,16 +99,19 @@ export function useActivities() {
     };
   }, [queryClient]);
 
-  // 🧹 FILTRAGE: On cache les reglupps pour avoir un flux plus propre
+// 🧹 FILTRAGE: On personnalise le flux
   const activities = useMemo(() => {
     const rawActivities = data?.pages.flatMap((page) => page) ?? [];
     
     return rawActivities.filter((activity) => {
       const meta = activity.metadata || {};
-      // Si c'est un reglupp, on le dégage !
-      if (activity.activity_type === "glupp" && meta.reglupp) {
-        return false;
-      }
+      
+      // 1. On cache les reglupps
+      if (activity.activity_type === "glupp" && meta.reglupp) return false;
+      
+      // 2. 🆕 On cache les duels du flux principal
+      if (activity.activity_type === "duel") return false;
+      
       return true;
     });
   }, [data]);

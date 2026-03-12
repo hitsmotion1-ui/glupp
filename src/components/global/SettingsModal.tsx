@@ -154,7 +154,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
       queryClient.invalidateQueries({ queryKey: ["ranking"] });
       
       setSuccessMsg("Modifications sauvegardées !" + authMessage);
-      showXPToast(0, "Profil mis à jour");
       
       setTimeout(() => {
         if (!authMessage) onClose();
