@@ -284,7 +284,7 @@ const PAGE_SIZE = 20;
               </div>
 
               <div className="divide-y divide-[#3A3530]/50">
-                {glupps.map((g) => {
+                {glupps.map((g: any) => {
                   const meta = g.metadata as Record<string, unknown> | null;
                   const bar = (meta?.bar as string) || null;
                   const rarity = (g.beer as { rarity?: string } | null)?.rarity ?? "common";
