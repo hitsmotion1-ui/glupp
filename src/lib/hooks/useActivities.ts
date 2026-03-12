@@ -81,35 +81,15 @@ export function useActivities() {
     staleTime: 30 * 1000,
   });
 
-// Real-time subscriptions (Canal Unique pour la stabilité)
+// Real-time subscription (Uniquement pour les nouveaux posts)
   useEffect(() => {
     const channel = supabase
-      .channel("social-feed")
-      // 1. Écoute des nouveaux Glupps
+      .channel("new-activities")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activities" },
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.activities.feed });
-        }
-      )
-      // 2. Écoute des nouvelles réactions
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "activity_reactions" },
-        () => {
-          // On invalide TOUTES les réactions pour forcer la mise à jour
-          queryClient.invalidateQueries({ queryKey: ["reactions"] });
-        }
-      )
-      // 3. Écoute des nouveaux commentaires
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "activity_comments" },
-        () => {
-          // On invalide les commentaires et les compteurs globaux
-          queryClient.invalidateQueries({ queryKey: ["comments"] });
-          queryClient.invalidateQueries({ queryKey: ["comments_count"] });
         }
       )
       .subscribe();

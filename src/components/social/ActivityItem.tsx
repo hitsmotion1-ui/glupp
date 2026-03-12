@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
@@ -8,7 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { RarityBadge } from "@/components/beer/RarityBadge";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { beerEmoji } from "@/lib/utils/xp";
-import { Swords, Trophy, TrendingUp, MessageCircle, Send, Plus, Loader2 } from "lucide-react";
+import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2 } from "lucide-react";
 import type { ActivityEntry } from "@/lib/hooks/useActivities";
 import type { Rarity } from "@/types";
 
@@ -99,59 +99,78 @@ function LevelUpContent({ activity }: { activity: ActivityEntry }) {
 export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry; index?: number }) {
   const queryClient = useQueryClient();
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
-  const emojiInputRef = useRef<HTMLInputElement>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
   }, []);
 
-  const [showEmojiInput, setShowEmojiInput] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState("");
 
   // ==========================================
-  // 1. RÉACTIONS
+  // 🔌 ÉCOUTEUR TEMPS RÉEL (Spécifique à CETTE carte)
   // ==========================================
-  const { data: rawReactions = [] } = useQuery({
+  useEffect(() => {
+    const channel = supabase
+      .channel(`activity-${activity.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "activity_reactions", filter: `activity_id=eq.${activity.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["reactions", activity.id] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "activity_comments", filter: `activity_id=eq.${activity.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["comments", activity.id] });
+          queryClient.invalidateQueries({ queryKey: ["comments_count", activity.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activity.id, queryClient]);
+
+  // ==========================================
+  // 1. RÉACTION (Simplifiée : juste 🍻)
+  // ==========================================
+  const { data: reactionsData = [] } = useQuery({
     queryKey: ["reactions", activity.id],
     queryFn: async () => {
-      const { data } = await supabase.from("activity_reactions").select("emoji, user_id").eq("activity_id", activity.id);
+      const { data } = await supabase.from("activity_reactions").select("user_id").eq("activity_id", activity.id).eq("emoji", "🍻");
       return data || [];
     }
   });
 
-  const reactions = useMemo(() => {
-    const acc: Record<string, { count: number; reacted: boolean }> = {};
-    rawReactions.forEach((r) => {
-      if (!acc[r.emoji]) acc[r.emoji] = { count: 0, reacted: false };
-      acc[r.emoji].count += 1;
-      if (r.user_id === currentUserId) acc[r.emoji].reacted = true;
-    });
-    return acc;
-  }, [rawReactions, currentUserId]);
+  const hasReacted = reactionsData.some((r) => r.user_id === currentUserId);
+  const reactionCount = reactionsData.length;
 
   const toggleReactionMutation = useMutation({
-    mutationFn: async (emoji: string) => {
+    mutationFn: async () => {
       if (!currentUserId) throw new Error("Non connecté");
-      const isReacted = reactions[emoji]?.reacted;
-      if (isReacted) {
-        await supabase.from("activity_reactions").delete().match({ activity_id: activity.id, user_id: currentUserId, emoji });
+      if (hasReacted) {
+        await supabase.from("activity_reactions").delete().match({ activity_id: activity.id, user_id: currentUserId, emoji: "🍻" });
       } else {
-        await supabase.from("activity_reactions").insert({ activity_id: activity.id, user_id: currentUserId, emoji });
+        await supabase.from("activity_reactions").insert({ activity_id: activity.id, user_id: currentUserId, emoji: "🍻" });
       }
     },
+    onMutate: () => {
+      // Met à jour l'UI instantanément pour l'utilisateur qui clique (Optimistic Update)
+      queryClient.setQueryData(["reactions", activity.id], (old: any) => {
+        if (!old) return [];
+        if (hasReacted) return old.filter((r: any) => r.user_id !== currentUserId);
+        return [...old, { user_id: currentUserId }];
+      });
+    },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["reactions"] });
+      queryClient.invalidateQueries({ queryKey: ["reactions", activity.id] });
     }
   });
-
-  // Focus automatique sur l'input emoji quand on clique sur +
-  useEffect(() => {
-    if (showEmojiInput && emojiInputRef.current) {
-      emojiInputRef.current.focus();
-    }
-  }, [showEmojiInput]);
 
   // ==========================================
   // 2. COMMENTAIRES
@@ -186,8 +205,6 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
     },
     onSuccess: () => {
       setCommentText("");
-      queryClient.invalidateQueries({ queryKey: ["comments"] });
-      queryClient.invalidateQueries({ queryKey: ["comments_count"] });
     }
   });
 
@@ -223,58 +240,20 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
 
       <div className="pt-3 mt-2 border-t border-glupp-border/50 flex flex-wrap items-center gap-3">
         
+        {/* BOUTON 🍻 UNIQUE */}
         <button 
-          onClick={() => toggleReactionMutation.mutate("🍻")}
-          disabled={toggleReactionMutation.isPending}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
-            reactions["🍻"]?.reacted ? "bg-glupp-gold/20 text-glupp-gold border border-glupp-gold/30" : "bg-glupp-bg border border-glupp-border text-glupp-text-muted hover:text-glupp-cream"
+          onClick={() => toggleReactionMutation.mutate()}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            hasReacted ? "bg-glupp-gold/20 text-glupp-gold border border-glupp-gold/30" : "bg-glupp-bg border border-glupp-border text-glupp-text-muted hover:text-glupp-cream"
           }`}
         >
-          <motion.div animate={reactions["🍻"]?.reacted ? { y: [0, -12, 0], rotate: [0, -15, 10, 0], scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.5 }} className="text-sm origin-bottom-right">
+          <motion.div animate={hasReacted ? { y: [0, -12, 0], rotate: [0, -15, 10, 0], scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.5 }} className="origin-bottom-right">
             🍻
           </motion.div>
-          {reactions["🍻"]?.count > 0 && <span>{reactions["🍻"].count}</span>}
+          {reactionCount > 0 && <span>{reactionCount}</span>}
         </button>
 
-        {Object.entries(reactions).map(([emoji, data]) => {
-          if (emoji === "🍻") return null;
-          return (
-            <button 
-              key={emoji} onClick={() => toggleReactionMutation.mutate(emoji)} disabled={toggleReactionMutation.isPending}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all ${
-                data.reacted ? "bg-glupp-accent/20 text-glupp-accent border border-glupp-accent/30" : "bg-glupp-bg border border-glupp-border text-glupp-text-muted"
-              }`}
-            >
-              <span>{emoji}</span><span>{data.count}</span>
-            </button>
-          );
-        })}
-
-        {/* 🆕 CHAMP ÉMOJI NATIF */}
-        {showEmojiInput ? (
-          <motion.input
-            ref={emojiInputRef}
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 40, opacity: 1 }}
-            type="text"
-            maxLength={2}
-            className="h-7 w-10 text-center text-sm bg-glupp-bg border border-glupp-accent rounded-full text-glupp-cream focus:outline-none"
-            placeholder="😀"
-            onChange={(e) => {
-              const val = e.target.value.trim();
-              if (val) {
-                toggleReactionMutation.mutate(val);
-                setShowEmojiInput(false);
-              }
-            }}
-            onBlur={() => setShowEmojiInput(false)}
-          />
-        ) : (
-          <button onClick={() => setShowEmojiInput(true)} className="p-1 rounded-full text-glupp-text-muted hover:bg-glupp-bg hover:text-glupp-cream transition-colors">
-            <Plus size={14} />
-          </button>
-        )}
-
+        {/* BOUTON COMMENTAIRE */}
         <button 
           onClick={() => setShowCommentInput(!showCommentInput)}
           className={`flex items-center gap-1.5 text-xs font-medium transition-colors ml-auto ${
