@@ -81,7 +81,6 @@ export function useActivities() {
     staleTime: 30 * 1000,
   });
 
-// Real-time subscriptions for new activities, comments, and reactions
   // Real-time subscriptions (Canal Unique pour la stabilité)
   useEffect(() => {
     const channel = supabase
@@ -121,29 +120,6 @@ export function useActivities() {
 
     return () => {
       channel.unsubscribe();
-    };
-  }, [queryClient]);
-
-    // 3. Écoute des nouveaux commentaires
-    const commentsChannel = supabase
-      .channel("comments-feed")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "activity_comments" },
-        (payload: any) => {
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          if (activityId) {
-            queryClient.invalidateQueries({ queryKey: ["comments", activityId] });
-            queryClient.invalidateQueries({ queryKey: ["comments_count", activityId] });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      activitiesChannel.unsubscribe();
-      reactionsChannel.unsubscribe();
-      commentsChannel.unsubscribe();
     };
   }, [queryClient]);
 
