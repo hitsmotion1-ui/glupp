@@ -81,7 +81,7 @@ export function useActivities() {
     staleTime: 30 * 1000,
   });
 
-  // Real-time subscriptions (Canal Unique pour la stabilité)
+// Real-time subscriptions
   useEffect(() => {
     const channel = supabase
       .channel("social-feed")
@@ -89,7 +89,8 @@ export function useActivities() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activities" },
-        () => {
+        (payload) => {
+          console.log("👀 NOUVEAU GLUPP REÇU EN DIRECT :", payload);
           queryClient.invalidateQueries({ queryKey: queryKeys.activities.feed });
         }
       )
@@ -97,26 +98,25 @@ export function useActivities() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "activity_reactions" },
-        (payload: any) => {
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          if (activityId) {
-            queryClient.invalidateQueries({ queryKey: ["reactions", activityId] });
-          }
+        (payload) => {
+          console.log("👀 NOUVELLE RÉACTION REÇUE EN DIRECT :", payload);
+          // On invalide TOUTES les réactions pour forcer la mise à jour immédiate
+          queryClient.invalidateQueries({ queryKey: ["reactions"] });
         }
       )
       // 3. Écoute des nouveaux commentaires
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "activity_comments" },
-        (payload: any) => {
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          if (activityId) {
-            queryClient.invalidateQueries({ queryKey: ["comments", activityId] });
-            queryClient.invalidateQueries({ queryKey: ["comments_count", activityId] });
-          }
+        (payload) => {
+          console.log("👀 NOUVEAU COMMENTAIRE REÇU EN DIRECT :", payload);
+          queryClient.invalidateQueries({ queryKey: ["comments"] });
+          queryClient.invalidateQueries({ queryKey: ["comments_count"] });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("🔌 Statut de la connexion temps réel :", status);
+      });
 
     return () => {
       channel.unsubscribe();
