@@ -82,10 +82,11 @@ export function useActivities() {
   });
 
 // Real-time subscriptions for new activities, comments, and reactions
+  // Real-time subscriptions (Canal Unique pour la stabilité)
   useEffect(() => {
-    // 1. Écoute des nouveaux Glupps
-    const activitiesChannel = supabase
-      .channel("activities-feed")
+    const channel = supabase
+      .channel("social-feed")
+      // 1. Écoute des nouveaux Glupps
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activities" },
@@ -93,23 +94,35 @@ export function useActivities() {
           queryClient.invalidateQueries({ queryKey: queryKeys.activities.feed });
         }
       )
-      .subscribe();
-
-    // 2. Écoute des nouvelles réactions (les emojis)
-    const reactionsChannel = supabase
-      .channel("reactions-feed")
+      // 2. Écoute des nouvelles réactions
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "activity_reactions" },
         (payload: any) => {
-          // On rafraîchit uniquement la carte qui a reçu la réaction
           const activityId = payload.new?.activity_id || payload.old?.activity_id;
           if (activityId) {
             queryClient.invalidateQueries({ queryKey: ["reactions", activityId] });
           }
         }
       )
+      // 3. Écoute des nouveaux commentaires
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "activity_comments" },
+        (payload: any) => {
+          const activityId = payload.new?.activity_id || payload.old?.activity_id;
+          if (activityId) {
+            queryClient.invalidateQueries({ queryKey: ["comments", activityId] });
+            queryClient.invalidateQueries({ queryKey: ["comments_count", activityId] });
+          }
+        }
+      )
       .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [queryClient]);
 
     // 3. Écoute des nouveaux commentaires
     const commentsChannel = supabase

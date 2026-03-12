@@ -266,9 +266,20 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
           </button>
           <AnimatePresence>
             {showEmojiPicker && (
-              <motion.div initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.8 }} className="absolute left-0 bottom-full mb-2 bg-glupp-card border border-glupp-border rounded-full p-2 flex gap-2 shadow-xl z-10">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8, y: 10 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.8 }} 
+                className="absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 bg-glupp-card border border-glupp-border rounded-full p-2 flex gap-2 shadow-xl w-max max-w-[85vw] overflow-x-auto origin-bottom"
+              >
                 {QUICK_EMOJIS.map(emoji => (
-                  <button key={emoji} onClick={() => toggleReactionMutation.mutate(emoji)} className="text-lg hover:scale-125 transition-transform">{emoji}</button>
+                  <button 
+                    key={emoji} 
+                    onClick={() => toggleReactionMutation.mutate(emoji)} 
+                    className="text-lg hover:scale-125 transition-transform"
+                  >
+                    {emoji}
+                  </button>
                 ))}
               </motion.div>
             )}
