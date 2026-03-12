@@ -81,7 +81,6 @@ export function useActivities() {
     staleTime: 30 * 1000,
   });
 
-  // Real-time subscription for new activities
   useEffect(() => {
     const channel = supabase
       .channel("activities-feed")
@@ -101,10 +100,19 @@ export function useActivities() {
     };
   }, [queryClient]);
 
-  const activities = useMemo(
-    () => data?.pages.flatMap((page) => page) ?? [],
-    [data]
-  );
+  // 🧹 FILTRAGE: On cache les reglupps pour avoir un flux plus propre
+  const activities = useMemo(() => {
+    const rawActivities = data?.pages.flatMap((page) => page) ?? [];
+    
+    return rawActivities.filter((activity) => {
+      const meta = activity.metadata || {};
+      // Si c'est un reglupp, on le dégage !
+      if (activity.activity_type === "glupp" && meta.reglupp) {
+        return false;
+      }
+      return true;
+    });
+  }, [data]);
 
   return {
     activities,

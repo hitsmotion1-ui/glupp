@@ -18,21 +18,27 @@ interface SettingsModalProps {
   userId?: string;
 }
 
+// 🌍 Liste des suggestions de villes (Tu peux en ajouter d'autres !)
+const POPULAR_CITIES = [
+  "Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", 
+  "Montpellier", "Strasbourg", "Bordeaux", "Lille", "Rennes", 
+  "Reims", "Saint-Étienne", "Toulon", "Le Havre", "Grenoble", 
+  "Dijon", "Angers", "Nîmes", "Clermont-Ferrand", "Aix-en-Provence",
+  "Bruxelles", "Liège", "Namur", "Genève", "Lausanne", "Montréal", "Québec"
+].sort();
+
 export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarUrl, userId }: SettingsModalProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
   
-  // États du profil public
   const [username, setUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [city, setCity] = useState("");
   
-  // États de sécurité
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   
-  // États UI
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -41,7 +47,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Charger les données à l'ouverture
   useEffect(() => {
     if (isOpen && userId) {
       setUsername(currentUsername || "");
@@ -50,7 +55,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
       setSuccessMsg("");
       setNewPassword("");
       
-      // On récupère l'email et la ville (qui n'étaient pas dans les props de base)
       const fetchExtraData = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.email) setEmail(user.email);
@@ -101,12 +105,11 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
       setErrorMsg("");
       setSuccessMsg("");
 
-      // 1. VÉRIFICATION DU PSEUDO UNIQUE
       if (username !== currentUsername) {
         const { data: existingUser } = await supabase
           .from("profiles")
           .select("id")
-          .ilike("username", username) // ilike = insensible à la casse (Admin = admin)
+          .ilike("username", username)
           .neq("id", userId)
           .single();
 
@@ -117,7 +120,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
         }
       }
 
-      // 2. MISE À JOUR DU PROFIL PUBLIC
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ 
@@ -130,7 +132,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
 
       if (profileError) throw profileError;
 
-      // 3. MISE À JOUR SÉCURITÉ (Email / Mot de passe)
       let authMessage = "";
       if (activeTab === "security") {
         const updates: { email?: string; password?: string } = {};
@@ -149,14 +150,12 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
         }
       }
 
-      // 4. SUCCÈS
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["ranking"] });
       
       setSuccessMsg("Modifications sauvegardées !" + authMessage);
       showXPToast(0, "Profil mis à jour");
       
-      // On ferme après 2 secondes si tout s'est bien passé
       setTimeout(() => {
         if (!authMessage) onClose();
       }, 2000);
@@ -173,7 +172,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
     <Modal isOpen={isOpen} onClose={onClose} title="Paramètres">
       <div className="space-y-6 pb-4">
         
-        {/* Navigation Tabs */}
         <div className="flex bg-glupp-bg rounded-lg p-1 border border-glupp-border">
           <button
             className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-md transition-colors ${
@@ -195,24 +193,20 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
           </button>
         </div>
 
-        {/* ❌ Message d'erreur */}
         {errorMsg && (
           <div className="p-3 bg-glupp-error/10 border border-glupp-error/30 rounded-lg text-xs text-glupp-error text-center">
             {errorMsg}
           </div>
         )}
 
-        {/* ✅ Message de succès */}
         {successMsg && (
           <div className="p-3 bg-glupp-success/10 border border-glupp-success/30 rounded-lg text-xs text-glupp-success text-center">
             {successMsg}
           </div>
         )}
 
-        {/* --- ONGLET PROFIL --- */}
         {activeTab === "profile" && (
           <div className="space-y-5 animate-in fade-in slide-in-from-left-2 duration-300">
-            {/* Photo de profil */}
             <div className="flex flex-col items-center gap-3">
               <div className="relative group">
                 <div className="w-24 h-24 rounded-full overflow-hidden bg-glupp-card border-2 border-glupp-border relative">
@@ -238,7 +232,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
               </div>
             </div>
 
-            {/* Pseudo & Ville */}
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-glupp-text-soft mb-1">Pseudo</label>
@@ -250,23 +243,33 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                   placeholder="Ton pseudo..."
                 />
               </div>
+              
+              {/* 🆕 CHAMP VILLE MODIFIÉ AVEC DATALIST ET COMMENTAIRE */}
               <div>
                 <label className="block text-xs font-semibold text-glupp-text-soft mb-1 flex items-center gap-1">
                   <MapPin size={12} /> Ville
                 </label>
                 <input
                   type="text"
+                  list="city-suggestions"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full bg-glupp-bg border border-glupp-border rounded-lg px-4 py-2 text-glupp-cream focus:outline-none focus:border-glupp-accent"
                   placeholder="Ex: Paris, Lyon, Bordeaux..."
                 />
+                <datalist id="city-suggestions">
+                  {POPULAR_CITIES.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                <p className="text-[10px] text-glupp-accent/80 mt-1.5 flex items-center gap-1">
+                  💡 Pratique pour voir les gluppers pas loin de chez toi !
+                </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* --- ONGLET SÉCURITÉ --- */}
         {activeTab === "security" && (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
             <div>
@@ -292,7 +295,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
               />
             </div>
             
-            {/* Bouton déconnexion déplacé ici par logique de sécurité */}
             <div className="pt-4 mt-4 border-t border-glupp-border/50">
               <Button 
                 variant="ghost" 
@@ -306,7 +308,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
           </div>
         )}
 
-        {/* Bouton Sauvegarder (Commun aux deux onglets) */}
         <div className="pt-4 border-t border-glupp-border/50">
           <Button 
             variant="primary" 
