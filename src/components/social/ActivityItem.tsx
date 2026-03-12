@@ -106,58 +106,9 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
 
   // ID de l'utilisateur connecté
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-// Real-time subscriptions for new activities, comments, and reactions
   useEffect(() => {
-    // 1. Écoute des nouveaux Glupps
-    const activitiesChannel = supabase
-      .channel("activities-feed")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "activities" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.activities.feed });
-        }
-      )
-      .subscribe();
-
-    // 2. Écoute des nouvelles réactions (les emojis)
-    const reactionsChannel = supabase
-      .channel("reactions-feed")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "activity_reactions" },
-        (payload: any) => {
-          // On rafraîchit uniquement la carte qui a reçu la réaction
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          if (activityId) {
-            queryClient.invalidateQueries({ queryKey: ["reactions", activityId] });
-          }
-        }
-      )
-      .subscribe();
-
-    // 3. Écoute des nouveaux commentaires
-    const commentsChannel = supabase
-      .channel("comments-feed")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "activity_comments" },
-        (payload: any) => {
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          if (activityId) {
-            queryClient.invalidateQueries({ queryKey: ["comments", activityId] });
-            queryClient.invalidateQueries({ queryKey: ["comments_count", activityId] });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      activitiesChannel.unsubscribe();
-      reactionsChannel.unsubscribe();
-      commentsChannel.unsubscribe();
-    };
-  }, [queryClient]);
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
+  }, []);
 
   // UI States
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);

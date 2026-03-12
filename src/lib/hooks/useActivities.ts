@@ -81,22 +81,56 @@ export function useActivities() {
     staleTime: 30 * 1000,
   });
 
+// Real-time subscriptions for new activities, comments, and reactions
   useEffect(() => {
-    const channel = supabase
+    // 1. Écoute des nouveaux Glupps
+    const activitiesChannel = supabase
       .channel("activities-feed")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activities" },
         () => {
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.activities.feed,
-          });
+          queryClient.invalidateQueries({ queryKey: queryKeys.activities.feed });
+        }
+      )
+      .subscribe();
+
+    // 2. Écoute des nouvelles réactions (les emojis)
+    const reactionsChannel = supabase
+      .channel("reactions-feed")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "activity_reactions" },
+        (payload: any) => {
+          // On rafraîchit uniquement la carte qui a reçu la réaction
+          const activityId = payload.new?.activity_id || payload.old?.activity_id;
+          if (activityId) {
+            queryClient.invalidateQueries({ queryKey: ["reactions", activityId] });
+          }
+        }
+      )
+      .subscribe();
+
+    // 3. Écoute des nouveaux commentaires
+    const commentsChannel = supabase
+      .channel("comments-feed")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "activity_comments" },
+        (payload: any) => {
+          const activityId = payload.new?.activity_id || payload.old?.activity_id;
+          if (activityId) {
+            queryClient.invalidateQueries({ queryKey: ["comments", activityId] });
+            queryClient.invalidateQueries({ queryKey: ["comments_count", activityId] });
+          }
         }
       )
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      activitiesChannel.unsubscribe();
+      reactionsChannel.unsubscribe();
+      commentsChannel.unsubscribe();
     };
   }, [queryClient]);
 
