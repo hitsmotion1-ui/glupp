@@ -24,6 +24,8 @@ import {
   MapPin,
   Megaphone,
   Eye,
+  MessageCircle,
+  Heart,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -52,7 +54,7 @@ function PersistentNotifCard({
 }) {
   const p = notif.persistent!;
 
-  const configMap: Record<
+const configMap: Record<
     string,
     {
       icon: typeof Bell;
@@ -96,6 +98,20 @@ function PersistentNotifCard({
       iconBg: "bg-green-500/15",
       iconColor: "text-green-500",
       accentBorder: "border-l-green-500",
+    },
+    // 🆕 AJOUT ICI : Le design pour les likes
+    reaction: {
+      icon: Heart,
+      iconBg: "bg-[#E08840]/15",
+      iconColor: "text-[#E08840]",
+      accentBorder: "border-l-[#E08840]",
+    },
+    // 🆕 AJOUT ICI : Le design pour les commentaires
+    comment: {
+      icon: MessageCircle,
+      iconBg: "bg-[#4ECDC4]/15",
+      iconColor: "text-[#4ECDC4]",
+      accentBorder: "border-l-[#4ECDC4]",
     },
   };
 
