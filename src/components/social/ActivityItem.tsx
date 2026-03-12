@@ -127,13 +127,24 @@ function LevelUpContent({ activity }: { activity: ActivityEntry }) {
   );
 }
 
+// Structure temporaire pour afficher les commentaires avant d'avoir la BDD
+interface Comment {
+  id: number;
+  author: string;
+  text: string;
+}
+
 export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry; index?: number }) {
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
 
+  // 1. On initialise le compteur à 0 (Fini les chiffres aléatoires !)
   const [hasLiked, setHasLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 5));
+  const [likeCount, setLikeCount] = useState(0); 
+  
+  // 2. États pour les commentaires
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [comments, setComments] = useState<Comment[]>([]);
 
   const content = useMemo(() => {
     switch (activity.activity_type) {
@@ -157,9 +168,16 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
 
   const submitComment = () => {
     if (!commentText.trim()) return;
+    
+    // On ajoute le commentaire à notre liste locale pour le voir tout de suite
+    const newComment: Comment = {
+      id: Date.now(),
+      author: "Moi", // Plus tard, on mettra le pseudo de l'utilisateur connecté
+      text: commentText.trim()
+    };
+    
+    setComments(prev => [...prev, newComment]);
     setCommentText("");
-    setShowCommentInput(false);
-    alert("Commentaire envoyé !");
   };
 
   return (
@@ -190,7 +208,7 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
 
       <div className="pt-3 mt-2 border-t border-glupp-border/50 flex items-center gap-5">
         
-        {/* 🍻 NOUVELLE ANIMATION DU VERRE QUI SE LÈVE */}
+        {/* Bouton Tchin (Like) */}
         <button 
           onClick={handleLike}
           className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
@@ -199,26 +217,27 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
         >
           <motion.div 
             animate={hasLiked ? { 
-              y: [0, -12, 0], // Le verre monte puis redescend
-              rotate: [0, -15, 10, 0], // Incline le verre comme pour trinquer
-              scale: [1, 1.2, 1] // Effet de rebond
+              y: [0, -12, 0], 
+              rotate: [0, -15, 10, 0], 
+              scale: [1, 1.2, 1] 
             } : {}} 
             transition={{ duration: 0.5, ease: "easeInOut" }}
-            className="text-lg origin-bottom-right" // Le point de pivot est à la base du verre
+            className="text-lg origin-bottom-right"
           >
             🍺
           </motion.div>
-          <span>{likeCount > 0 ? likeCount : "Trinquer"}</span>
+          {/* Affiche le chiffre si > 0, sinon "Tchin" */}
+          <span>{likeCount > 0 ? likeCount : "Tchin"}</span>
         </button>
 
         <button 
           onClick={() => setShowCommentInput(!showCommentInput)}
           className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-            showCommentInput ? "text-glupp-accent" : "text-glupp-text-muted hover:text-glupp-cream"
+            showCommentInput || comments.length > 0 ? "text-glupp-accent" : "text-glupp-text-muted hover:text-glupp-cream"
           }`}
         >
           <MessageCircle size={14} />
-          <span>Commenter</span>
+          <span>{comments.length > 0 ? `${comments.length} commentaire${comments.length > 1 ? 's' : ''}` : "Commenter"}</span>
         </button>
       </div>
 
@@ -230,22 +249,38 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex items-center gap-2 mt-3">
-              <input
-                type="text"
-                placeholder="Un petit mot sympa ?"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submitComment()}
-                className="flex-1 bg-glupp-bg border border-glupp-border rounded-full px-4 py-1.5 text-xs text-glupp-cream focus:outline-none focus:border-glupp-accent"
-              />
-              <button 
-                onClick={submitComment}
-                disabled={!commentText.trim()}
-                className="p-1.5 rounded-full bg-glupp-accent text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-              >
-                <Send size={14} />
-              </button>
+            <div className="pt-3">
+              {/* 🆕 Affichage des commentaires existants */}
+              {comments.length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {comments.map(c => (
+                    <div key={c.id} className="bg-glupp-bg/50 rounded-lg p-2.5 text-xs">
+                      <span className="font-semibold text-glupp-accent">{c.author}</span>
+                      <span className="text-glupp-text-muted mx-1">•</span>
+                      <span className="text-glupp-cream">{c.text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Champ pour écrire un nouveau commentaire */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Un petit mot sympa ?"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submitComment()}
+                  className="flex-1 bg-glupp-bg border border-glupp-border rounded-full px-4 py-1.5 text-xs text-glupp-cream focus:outline-none focus:border-glupp-accent"
+                />
+                <button 
+                  onClick={submitComment}
+                  disabled={!commentText.trim()}
+                  className="p-1.5 rounded-full bg-glupp-accent text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                >
+                  <Send size={14} />
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
