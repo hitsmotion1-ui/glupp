@@ -81,7 +81,7 @@ export function useActivities() {
     staleTime: 30 * 1000,
   });
 
-// Real-time subscriptions
+// Real-time subscriptions (Canal Unique pour la stabilité)
   useEffect(() => {
     const channel = supabase
       .channel("social-feed")
@@ -89,8 +89,7 @@ export function useActivities() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activities" },
-        (payload) => {
-          console.log("👀 NOUVEAU GLUPP REÇU EN DIRECT :", payload);
+        () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.activities.feed });
         }
       )
@@ -98,9 +97,8 @@ export function useActivities() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "activity_reactions" },
-        (payload) => {
-          console.log("👀 NOUVELLE RÉACTION REÇUE EN DIRECT :", payload);
-          // On invalide TOUTES les réactions pour forcer la mise à jour immédiate
+        () => {
+          // On invalide TOUTES les réactions pour forcer la mise à jour
           queryClient.invalidateQueries({ queryKey: ["reactions"] });
         }
       )
@@ -108,15 +106,13 @@ export function useActivities() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "activity_comments" },
-        (payload) => {
-          console.log("👀 NOUVEAU COMMENTAIRE REÇU EN DIRECT :", payload);
+        () => {
+          // On invalide les commentaires et les compteurs globaux
           queryClient.invalidateQueries({ queryKey: ["comments"] });
           queryClient.invalidateQueries({ queryKey: ["comments_count"] });
         }
       )
-      .subscribe((status) => {
-        console.log("🔌 Statut de la connexion temps réel :", status);
-      });
+      .subscribe();
 
     return () => {
       channel.unsubscribe();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
@@ -12,7 +12,6 @@ import { Swords, Trophy, TrendingUp, MessageCircle, Send, Plus, Loader2 } from "
 import type { ActivityEntry } from "@/lib/hooks/useActivities";
 import type { Rarity } from "@/types";
 
-// --- Helpers pour le texte ---
 function timeAgo(dateStr: string): string {
   const now = Date.now();
   const diff = now - new Date(dateStr).getTime();
@@ -27,7 +26,6 @@ function timeAgo(dateStr: string): string {
   return `${weeks}sem`;
 }
 
-// --- Sous-composants d'affichage ---
 function GluppContent({ activity }: { activity: ActivityEntry }) {
   const openBeerModal = useAppStore((s) => s.openBeerModal);
   const meta = activity.metadata as Record<string, unknown>;
@@ -98,25 +96,22 @@ function LevelUpContent({ activity }: { activity: ActivityEntry }) {
   );
 }
 
-const QUICK_EMOJIS = ["🔥", "🤤", "😍", "🤮", "👑", "🚀"];
-
 export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry; index?: number }) {
   const queryClient = useQueryClient();
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
+  const emojiInputRef = useRef<HTMLInputElement>(null);
 
-  // ID de l'utilisateur connecté
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
   }, []);
 
-  // UI States
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showEmojiInput, setShowEmojiInput] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState("");
 
   // ==========================================
-  // 1. GESTION DES RÉACTIONS (Base de données)
+  // 1. RÉACTIONS
   // ==========================================
   const { data: rawReactions = [] } = useQuery({
     queryKey: ["reactions", activity.id],
@@ -140,24 +135,26 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
     mutationFn: async (emoji: string) => {
       if (!currentUserId) throw new Error("Non connecté");
       const isReacted = reactions[emoji]?.reacted;
-      
       if (isReacted) {
         await supabase.from("activity_reactions").delete().match({ activity_id: activity.id, user_id: currentUserId, emoji });
       } else {
         await supabase.from("activity_reactions").insert({ activity_id: activity.id, user_id: currentUserId, emoji });
       }
     },
-    onMutate: async (emoji) => {
-      // Optimistic Update : L'UI change instantanément avant la réponse du serveur
-      setShowEmojiPicker(false);
-    },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["reactions", activity.id] });
+      queryClient.invalidateQueries({ queryKey: ["reactions"] });
     }
   });
 
+  // Focus automatique sur l'input emoji quand on clique sur +
+  useEffect(() => {
+    if (showEmojiInput && emojiInputRef.current) {
+      emojiInputRef.current.focus();
+    }
+  }, [showEmojiInput]);
+
   // ==========================================
-  // 2. GESTION DES COMMENTAIRES (Base de données)
+  // 2. COMMENTAIRES
   // ==========================================
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ["comments", activity.id],
@@ -170,7 +167,7 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
       if (error) throw error;
       return data || [];
     },
-    enabled: showCommentInput // ⚡ Ne télécharge les commentaires que si l'utilisateur ouvre la zone !
+    enabled: showCommentInput
   });
 
   const { data: commentsCount = 0 } = useQuery({
@@ -189,15 +186,11 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
     },
     onSuccess: () => {
       setCommentText("");
-      queryClient.invalidateQueries({ queryKey: ["comments", activity.id] });
-      queryClient.invalidateQueries({ queryKey: ["comments_count", activity.id] });
+      queryClient.invalidateQueries({ queryKey: ["comments"] });
+      queryClient.invalidateQueries({ queryKey: ["comments_count"] });
     }
   });
 
-
-  // ==========================================
-  // RENDU VISUEL
-  // ==========================================
   const content = useMemo(() => {
     switch (activity.activity_type) {
       case "glupp": return <GluppContent activity={activity} />;
@@ -230,7 +223,6 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
 
       <div className="pt-3 mt-2 border-t border-glupp-border/50 flex flex-wrap items-center gap-3">
         
-        {/* BOUTON PRINCIPAL 🍻 */}
         <button 
           onClick={() => toggleReactionMutation.mutate("🍻")}
           disabled={toggleReactionMutation.isPending}
@@ -244,7 +236,6 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
           {reactions["🍻"]?.count > 0 && <span>{reactions["🍻"].count}</span>}
         </button>
 
-        {/* AUTRES RÉACTIONS */}
         {Object.entries(reactions).map(([emoji, data]) => {
           if (emoji === "🍻") return null;
           return (
@@ -259,35 +250,31 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
           );
         })}
 
-        {/* AJOUTER UN EMOJI */}
-        <div className="relative">
-          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-1 rounded-full text-glupp-text-muted hover:bg-glupp-bg hover:text-glupp-cream transition-colors">
+        {/* 🆕 CHAMP ÉMOJI NATIF */}
+        {showEmojiInput ? (
+          <motion.input
+            ref={emojiInputRef}
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 40, opacity: 1 }}
+            type="text"
+            maxLength={2}
+            className="h-7 w-10 text-center text-sm bg-glupp-bg border border-glupp-accent rounded-full text-glupp-cream focus:outline-none"
+            placeholder="😀"
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              if (val) {
+                toggleReactionMutation.mutate(val);
+                setShowEmojiInput(false);
+              }
+            }}
+            onBlur={() => setShowEmojiInput(false)}
+          />
+        ) : (
+          <button onClick={() => setShowEmojiInput(true)} className="p-1 rounded-full text-glupp-text-muted hover:bg-glupp-bg hover:text-glupp-cream transition-colors">
             <Plus size={14} />
           </button>
-         <AnimatePresence>
-            {showEmojiPicker && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.8, y: 10 }} 
-                animate={{ opacity: 1, scale: 1, y: 0 }} 
-                exit={{ opacity: 0, scale: 0.8 }} 
-                /* 🆕 FIX UI : On aligne à gauche, on donne une largeur fixe (w-44) et on fait passer à la ligne (flex-wrap) */
-                className="absolute z-50 bottom-full mb-2 left-0 bg-glupp-card border border-glupp-border rounded-xl p-2.5 flex flex-wrap gap-3 shadow-xl w-44 origin-bottom-left"
-              >
-                {QUICK_EMOJIS.map(emoji => (
-                  <button 
-                    key={emoji} 
-                    onClick={() => toggleReactionMutation.mutate(emoji)} 
-                    className="text-xl hover:scale-125 transition-transform"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        )}
 
-        {/* BOUTON COMMENTAIRE */}
         <button 
           onClick={() => setShowCommentInput(!showCommentInput)}
           className={`flex items-center gap-1.5 text-xs font-medium transition-colors ml-auto ${
@@ -299,12 +286,10 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
         </button>
       </div>
 
-      {/* ZONE DE COMMENTAIRES */}
       <AnimatePresence>
         {showCommentInput && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="pt-3">
-              
               {commentsLoading ? (
                 <div className="flex justify-center p-4"><Loader2 className="animate-spin text-glupp-accent" size={16} /></div>
               ) : comments.length > 0 ? (
