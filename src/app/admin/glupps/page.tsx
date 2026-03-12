@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useAdmin } from "@/lib/hooks/useAdmin";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
 import {
   Camera,
   ChevronLeft,
@@ -11,6 +13,9 @@ import {
   Sparkles,
   MapPin,
   ExternalLink,
+  Trash2,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -30,6 +35,14 @@ function timeAgo(iso: string): string {
   );
 }
 
+// 🛠️ Sécurité pour les URLs d'images (Répare les liens relatifs de Supabase)
+function getValidImageUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  // Si c'est juste un nom de fichier, on génère l'URL publique Supabase
+  return supabase.storage.from("glupps").getPublicUrl(url).data.publicUrl;
+}
+
 const RARITY_CONFIG: Record<string, { label: string; color: string }> = {
   common: { label: "Commune", color: "#A89888" },
   rare: { label: "Rare", color: "#3B82F6" },
@@ -46,37 +59,54 @@ function Skeleton({ className = "" }: { className?: string }) {
 // ═══════════════════════════════════════════
 
 interface LightboxEntry {
+  id: string;
   photo_url: string;
   username: string;
+  userId: string;
   beerName: string;
   bar: string | null;
   createdAt: string;
 }
 
-function Lightbox({ entry, onClose }: { entry: LightboxEntry; onClose: () => void }) {
+function Lightbox({ entry, onClose, onDelete, isDeleting }: { entry: LightboxEntry; onClose: () => void; onDelete: (id: string) => void; isDeleting: boolean }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative max-w-2xl w-full bg-[#1E1B16] rounded-xl overflow-hidden shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
-        >
-          <X size={16} />
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={onClose}>
+      <div className="relative max-w-2xl w-full bg-[#1E1B16] rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        
+        {/* Actions Supérieures */}
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+          <button 
+            onClick={() => {
+              if (window.confirm("Avertir cet utilisateur pour contenu inapproprié ?")) {
+                alert(`Un avertissement a été envoyé à @${entry.username} !`);
+              }
+            }}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-black/60 text-[#F0C460] hover:bg-black/80 transition-colors"
+            title="Avertir l'utilisateur"
+          >
+            <AlertTriangle size={14} />
+          </button>
+          
+          <button 
+            onClick={() => {
+              if (window.confirm("Es-tu sûr de vouloir supprimer définitivement cette photo ?")) {
+                onDelete(entry.id);
+              }
+            }}
+            disabled={isDeleting}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-black/60 text-red-500 hover:bg-black/80 disabled:opacity-50 transition-colors"
+            title="Supprimer la photo"
+          >
+            {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+          </button>
+
+          <button onClick={onClose} className="flex items-center justify-center w-8 h-8 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
 
         {/* Photo */}
-        <img
-          src={entry.photo_url}
-          alt="Photo glupp"
-          className="w-full max-h-[70vh] object-contain bg-black"
-        />
+        <img src={entry.photo_url} alt="Photo glupp" className="w-full max-h-[70vh] object-contain bg-black" />
 
         {/* Info */}
         <div className="px-4 py-3 flex items-center gap-3 border-t border-[#3A3530]">
@@ -97,9 +127,7 @@ function Lightbox({ entry, onClose }: { entry: LightboxEntry; onClose: () => voi
             </p>
           </div>
           <a
-            href={entry.photo_url}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={entry.photo_url} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-[#3A3530] text-[#A89888] hover:text-[#F5E6D3] hover:bg-[#4A4540] transition-colors shrink-0"
           >
             <ExternalLink size={12} />
@@ -117,6 +145,7 @@ function Lightbox({ entry, onClose }: { entry: LightboxEntry; onClose: () => voi
 
 export default function AdminGluppsPage() {
   const admin = useAdmin();
+  const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);
   const [onlyWithPhoto, setOnlyWithPhoto] = useState(false);
@@ -133,10 +162,36 @@ export default function AdminGluppsPage() {
     setPage(0);
   };
 
+  // 🗑️ Mutation pour supprimer un Glupp
+  const deleteGluppMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("activities").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // On rafraîchit la liste de l'admin ET le flux social des utilisateurs
+      queryClient.invalidateQueries({ queryKey: ["admin-glupps"] });
+      queryClient.invalidateQueries({ queryKey: ["activities-feed"] });
+      setLightbox(null);
+    }
+  });
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Supprimer définitivement ce Glupp ? (Cette action est irréversible)")) {
+      deleteGluppMutation.mutate(id);
+    }
+  };
+
+  const handleWarn = (username: string) => {
+    if (window.confirm(`Envoyer un avertissement à @${username} ?`)) {
+      alert(`Avertissement envoyé à @${username} (Préparation backend requise)`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#141210]">
       <AdminHeader
-        title="Glupps"
+        title="Modération des Glupps"
         subtitle={`${total} glupp${total > 1 ? "s" : ""} au total`}
       />
 
@@ -192,13 +247,14 @@ export default function AdminGluppsPage() {
             </div>
           ) : (
             <>
-              {/* Header row */}
-              <div className="hidden lg:grid grid-cols-[56px_1fr_1fr_1fr_100px] gap-3 px-4 py-2.5 border-b border-[#3A3530] text-[10px] font-semibold uppercase tracking-wider text-[#6B6050]">
+              {/* Header row (Ajout de la colonne Actions) */}
+              <div className="hidden lg:grid grid-cols-[56px_1fr_1fr_1fr_100px_80px] gap-3 px-4 py-2.5 border-b border-[#3A3530] text-[10px] font-semibold uppercase tracking-wider text-[#6B6050]">
                 <span>Photo</span>
                 <span>Utilisateur</span>
                 <span>Bière</span>
                 <span>Localisation</span>
                 <span className="text-right">Date</span>
+                <span className="text-right">Actions</span>
               </div>
 
               <div className="divide-y divide-[#3A3530]/50">
@@ -207,8 +263,11 @@ export default function AdminGluppsPage() {
                   const bar = (meta?.bar as string) || null;
                   const rarity = (g.beer as { rarity?: string } | null)?.rarity ?? "common";
                   const rc = RARITY_CONFIG[rarity] ?? RARITY_CONFIG.common;
-                  const user = g.user as { username?: string; display_name?: string; avatar_url?: string | null } | null;
+                  const user = g.user as { id?: string; username?: string; display_name?: string; avatar_url?: string | null } | null;
                   const beer = g.beer as { name?: string; brewery?: string } | null;
+                  
+                  // Récupération sécurisée de l'image
+                  const safeImageUrl = getValidImageUrl(g.photo_url);
 
                   return (
                     <div
@@ -216,12 +275,14 @@ export default function AdminGluppsPage() {
                       className="flex items-center gap-3 px-4 py-3 hover:bg-[#3A3530]/20 transition-colors"
                     >
                       {/* Photo thumbnail / placeholder */}
-                      {g.photo_url ? (
+                      {safeImageUrl ? (
                         <button
                           onClick={() =>
                             setLightbox({
-                              photo_url: g.photo_url!,
+                              id: g.id,
+                              photo_url: safeImageUrl,
                               username: user?.username ?? "?",
+                              userId: user?.id ?? "",
                               beerName: beer?.name ?? "Bière inconnue",
                               bar,
                               createdAt: g.created_at,
@@ -231,7 +292,7 @@ export default function AdminGluppsPage() {
                           title="Voir la photo"
                         >
                           <img
-                            src={g.photo_url}
+                            src={safeImageUrl}
                             alt=""
                             className="w-full h-full object-cover"
                           />
@@ -246,7 +307,7 @@ export default function AdminGluppsPage() {
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <div className="w-7 h-7 rounded-full bg-[#3A3530] shrink-0 overflow-hidden flex items-center justify-center">
                           {user?.avatar_url ? (
-                            <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                            <img src={getValidImageUrl(user.avatar_url) || ""} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <span className="text-[10px] font-bold text-[#A89888]">
                               {(user?.username ?? "?")[0].toUpperCase()}
@@ -287,6 +348,30 @@ export default function AdminGluppsPage() {
                       <p className="text-xs text-[#6B6050] shrink-0 text-right w-24">
                         {timeAgo(g.created_at)}
                       </p>
+
+                      {/* 🛡️ Actions Admin */}
+                      <div className="flex items-center justify-end gap-1.5 shrink-0 w-20">
+                        <button 
+                          onClick={() => handleWarn(user?.username || "Inconnu")} 
+                          className="p-1.5 text-[#6B6050] hover:text-[#F0C460] hover:bg-[#F0C460]/10 rounded-md transition-colors" 
+                          title="Avertir l'utilisateur"
+                        >
+                          <AlertTriangle size={15} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(g.id)} 
+                          disabled={deleteGluppMutation.isPending && deleteGluppMutation.variables === g.id}
+                          className="p-1.5 text-[#6B6050] hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50" 
+                          title="Supprimer le Glupp"
+                        >
+                          {deleteGluppMutation.isPending && deleteGluppMutation.variables === g.id ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={15} />
+                          )}
+                        </button>
+                      </div>
+
                     </div>
                   );
                 })}
@@ -325,7 +410,12 @@ export default function AdminGluppsPage() {
 
       {/* Lightbox */}
       {lightbox && (
-        <Lightbox entry={lightbox} onClose={() => setLightbox(null)} />
+        <Lightbox 
+          entry={lightbox} 
+          onClose={() => setLightbox(null)} 
+          onDelete={handleDelete}
+          isDeleting={deleteGluppMutation.isPending}
+        />
       )}
     </div>
   );
