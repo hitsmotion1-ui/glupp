@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useAdmin } from "@/lib/hooks/useAdmin"; // 👈 On importe ton hook d'administration
+import { useAdmin } from "@/lib/hooks/useAdmin";
 import { Check, Bug, Lightbulb, MessageSquare, AlertCircle, Gift, Loader2 } from "lucide-react";
 
 export function AdminFeedbacks() {
@@ -10,10 +10,9 @@ export function AdminFeedbacks() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // 🆕 Outils pour donner de l'XP
   const { awardXP } = useAdmin();
-  const [rewardingId, setRewardingId] = useState<string | null>(null); // Quel feedback on est en train de récompenser
-  const [xpAmount, setXpAmount] = useState<string>("50"); // Montant par défaut
+  const [rewardingId, setRewardingId] = useState<string | null>(null);
+  const [xpAmount, setXpAmount] = useState<string>("50");
   const [isSubmittingXp, setIsSubmittingXp] = useState(false);
 
   const fetchFeedbacks = async () => {
@@ -66,23 +65,19 @@ export function AdminFeedbacks() {
     fetchFeedbacks(); 
   };
 
-// 🆕 Fonction pour valider le don d'XP ET notifier l'utilisateur
   const handleAwardXP = async (userId: string, feedbackId: string) => {
     const amount = Number(xpAmount);
     if (!amount || isNaN(amount) || amount <= 0) return;
 
     setIsSubmittingXp(true);
     try {
-      // 1. On donne l'XP via ta fonction existante
       await awardXP(userId, amount, "Récompense pour un feedback pertinent");
       
-      // 2. On crée une activité (notification in-app) pour l'utilisateur
-      // Assure-toi que la structure correspond bien à ta table 'activities'
       const { error: activityError } = await supabase
         .from('activities')
         .insert([{
           user_id: userId,
-          type: 'glupp', // Ou un type spécial genre 'reward' ou 'admin_message' si tu en as un
+          type: 'glupp',
           data: { 
             message: `L'équipe t'a récompensé de ${amount} XP pour ton retour ! Merci de nous aider à améliorer l'appli 🍻` 
           }
@@ -92,12 +87,11 @@ export function AdminFeedbacks() {
         console.warn("L'XP a été donné, mais la notification a échoué :", activityError);
       }
 
-      // 3. (Optionnel) On marque le feedback comme traité
       await supabase.from("feedbacks").update({ status: "resolved" }).eq("id", feedbackId);
 
       alert(`${amount} XP ont bien été envoyés à l'utilisateur !`);
       setRewardingId(null); 
-      fetchFeedbacks(); // On recharge pour voir le statut "Traité"
+      fetchFeedbacks(); 
       
     } catch (error) {
       console.error("Erreur XP:", error);
@@ -106,6 +100,19 @@ export function AdminFeedbacks() {
       setIsSubmittingXp(false);
     }
   };
+
+  if (loading) {
+    return <div className="text-[#8C8273] animate-pulse">Chargement des messages...</div>;
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-500 flex items-center gap-2">
+        <AlertCircle size={20} />
+        <p>Erreur : {errorMsg}</p>
+      </div>
+    );
+  }
 
   if (feedbacks.length === 0) {
     return (
@@ -121,10 +128,12 @@ export function AdminFeedbacks() {
     <div className="space-y-4">      
       {feedbacks.map((f) => (
         <div key={f.id} className={`p-4 rounded-xl border ${f.status === 'resolved' ? 'bg-[#10B981]/5 border-[#10B981]/20 opacity-70' : 'bg-[#1E1B16] border-[#3A3530]'}`}>
-          <div className="flex justify-between items-start mb-2">
+          
+          {/* 🛠️ MODIFICATION : flex-col sur mobile, flex-row sur écran plus grand */}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
             
             {/* Infos de gauche */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {f.type === 'bug' && <Bug size={16} className="text-red-500" />}
               {f.type === 'suggestion' && <Lightbulb size={16} className="text-[#4ECDC4]" />}
               {f.type === 'problem' && <MessageSquare size={16} className="text-[#F0C460]" />}
@@ -136,8 +145,8 @@ export function AdminFeedbacks() {
               </span>
             </div>
             
-            {/* Boutons d'actions de droite */}
-            <div className="flex items-center gap-2">
+            {/* Boutons d'actions de droite (qui passeront en dessous sur mobile) */}
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
               
               {/* Le module de récompense XP */}
               {rewardingId === f.id ? (
