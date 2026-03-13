@@ -151,14 +151,14 @@ export default function AdminGluppsPage() {
   const [onlyWithPhoto, setOnlyWithPhoto] = useState(false);
   const [lightbox, setLightbox] = useState<LightboxEntry | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error: queryError } = useQuery({
     queryKey: ["admin", "glupps", page, onlyWithPhoto],
     queryFn: async () => {
-      // Requête data (avec joins) — sans count pour éviter les conflits Supabase
+      // Requête data — identique à useAdminActivities (confirmé fonctionnel)
       let dataQuery = supabase
         .from("activities")
         .select(
-          "*, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery, rarity)"
+          "*, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery)"
         )
         .eq("type", "glupp")
         .order("created_at", { ascending: false })
@@ -168,7 +168,16 @@ export default function AdminGluppsPage() {
         dataQuery = dataQuery.not("photo_url", "is", null);
       }
 
-      // Requête count séparée (head: true = pas de données, juste le total)
+      const { data: rows, error } = await dataQuery;
+
+      if (error) {
+        console.error("❌ [Admin Glupps] Erreur data:", error);
+        throw new Error(error.message);
+      }
+
+      console.log(`✅ [Admin Glupps] ${rows?.length ?? 0} glupps récupérés`);
+
+      // Count séparé sans head:true (plus compatible)
       let countQuery = supabase
         .from("activities")
         .select("id", { count: "exact", head: true })
@@ -178,13 +187,10 @@ export default function AdminGluppsPage() {
         countQuery = countQuery.not("photo_url", "is", null);
       }
 
-      const [{ data: rows, error }, { count }] = await Promise.all([
-        dataQuery,
-        countQuery,
-      ]);
+      const { count, error: countError } = await countQuery;
+      if (countError) console.error("❌ [Admin Glupps] Erreur count:", countError);
 
-      if (error) throw new Error(error.message);
-      return { glupps: rows ?? [], total: count ?? 0 };
+      return { glupps: rows ?? [], total: count ?? rows?.length ?? 0 };
     },
     staleTime: 0,
     refetchOnWindowFocus: true,
@@ -229,7 +235,7 @@ export default function AdminGluppsPage() {
     <div className="min-h-screen bg-[#141210]">
       <AdminHeader
         title="Modération des Glupps"
-        subtitle={`${total} glupp${total > 1 ? "s" : ""} au total`}
+        subtitle={isError ? `❌ Erreur : ${String(queryError)}` : `${total} glupp${total > 1 ? "s" : ""} au total`}
       />
 
       <div className="px-6 py-6 lg:px-8 space-y-4">
