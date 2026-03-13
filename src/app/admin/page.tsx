@@ -2,6 +2,7 @@
 
 import { useAdmin } from "@/lib/hooks/useAdmin";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { supabase } from "@/lib/supabase/client"; // 👈 Import ajouté pour la notification
 import {
   Users,
   Beer,
@@ -18,7 +19,7 @@ import {
 import { motion } from "framer-motion";
 import { getLevel } from "@/lib/utils/xp";
 import Link from "next/link";
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 // ═══════════════════════════════════════════
 // Skeleton placeholders
@@ -49,7 +50,6 @@ function StatCardSkeleton() {
 // ═══════════════════════════════════════════
 
 export default function AdminDashboardPage() {
-  // 1. Récupération des données et des hooks depuis useAdmin
   const { 
     loadingStats, 
     stats, 
@@ -57,9 +57,28 @@ export default function AdminDashboardPage() {
     useAdminActivities 
   } = useAdmin();
 
-  // 2. Appel des hooks pour obtenir le Leaderboard et l'Activité
   const { data: topUsers = [], isLoading: loadingUsers } = useAdminUsers();
   const { data: recentActivity = [], isLoading: loadingActivity } = useAdminActivities();
+
+  // 🆕 État pour stocker le nombre de feedbacks non lus
+  const [pendingFeedbacksCount, setPendingFeedbacksCount] = useState(0);
+
+  // 🆕 Récupération du nombre de feedbacks "pending" au chargement
+  useEffect(() => {
+    const fetchPendingFeedbacksCount = async () => {
+      // On récupère juste les ID, c'est très léger et ça évite les bugs de comptage
+      const { data } = await supabase
+        .from("feedbacks")
+        .select("id")
+        .eq("status", "pending");
+      
+      if (data) {
+        setPendingFeedbacksCount(data.length);
+      }
+    };
+    
+    fetchPendingFeedbacksCount();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#14120F] text-[#E8E1D5] pb-24">
@@ -69,7 +88,7 @@ export default function AdminDashboardPage() {
       {/* ── MAIN CONTENT ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-        {/* ── BOUTON FEEDBACKS ── */}
+        {/* ── BOUTON FEEDBACKS AVEC NOTIFICATION ── */}
         <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-[#F7F3EE] flex items-center gap-2">
@@ -82,9 +101,16 @@ export default function AdminDashboardPage() {
           </div>
           <Link
             href="/admin/feedbacks"
-            className="shrink-0 inline-flex items-center gap-2 px-6 py-2.5 bg-[#E08840] text-[#1E1B16] font-bold rounded-lg hover:bg-opacity-90 transition-colors"
+            className="relative shrink-0 inline-flex items-center gap-2 px-6 py-2.5 bg-[#E08840] text-[#1E1B16] font-bold rounded-lg hover:bg-opacity-90 transition-colors"
           >
             Voir les messages
+            
+            {/* 🔴 La pastille de notification s'affiche seulement si > 0 */}
+            {pendingFeedbacksCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-[#1E1B16] shadow-md animate-pulse">
+                {pendingFeedbacksCount}
+              </span>
+            )}
           </Link>
         </div>
 
