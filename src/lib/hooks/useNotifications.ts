@@ -199,36 +199,33 @@ export function useNotifications() {
     });
   }, [queryClient]);
 
-  // ── 4. Real-time subscriptions ──
+  // ── 4. Real-time subscriptions corrigées (Canal unique) ──
   useEffect(() => {
+    // 🆕 On crée un nom de canal aléatoire unique pour chaque composant
+    const uniqueChannelId = `realtime-${Math.random().toString(36).substring(2, 9)}`;
+    
     const channel = supabase
-      .channel("notifications-live")
+      .channel(uniqueChannelId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "friendships" },
         () => {
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.notifications.all,
-          });
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.friends.all,
-          });
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+          queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
         }
       )
-      // 🆕 NOUVEAU: Écoute sur tous les événements
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications" },
         () => {
-          queryClient.invalidateQueries({
-            queryKey: ["notifications", "persistent"],
-          });
+          queryClient.invalidateQueries({ queryKey: ["notifications", "persistent"] });
         }
       )
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      // 🆕 Nettoyage strict à la destruction du composant
+      supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
