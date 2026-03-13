@@ -158,7 +158,7 @@ export default function AdminGluppsPage() {
       let dataQuery = supabase
         .from("activities")
         .select(
-          "*, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery)"
+          "*, user:profiles!user_id(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery)"
         )
         .eq("type", "glupp")
         .order("created_at", { ascending: false })

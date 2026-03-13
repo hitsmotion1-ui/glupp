@@ -670,7 +670,7 @@ export function useAdmin() {
       queryFn: async () => {
         const { data, error } = await supabase
           .from("activities")
-          .select("*, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery)")
+          .select("*, user:profiles!user_id(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery)")
           .in("type", ["glupp", "duel", "photo"])
           .order("created_at", { ascending: false })
           .limit(15);
@@ -696,7 +696,7 @@ export function useAdmin() {
         let query = supabase
           .from("activities")
           .select(
-            "id, user_id, beer_id, photo_url, created_at, metadata, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery, rarity)",
+            "id, user_id, beer_id, photo_url, created_at, metadata, user:profiles!user_id(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery, rarity)",
             { count: "exact" }
           )
           .eq("type", "glupp")
