@@ -154,21 +154,35 @@ export default function AdminGluppsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "glupps", page, onlyWithPhoto],
     queryFn: async () => {
-      let query = supabase
+      // Requête data (avec joins) — sans count pour éviter les conflits Supabase
+      let dataQuery = supabase
         .from("activities")
         .select(
-          "id, user_id, beer_id, photo_url, created_at, metadata, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery, rarity)",
-          { count: "exact" }
+          "*, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery, rarity)"
         )
         .eq("type", "glupp")
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (onlyWithPhoto) {
-        query = query.not("photo_url", "is", null);
+        dataQuery = dataQuery.not("photo_url", "is", null);
       }
 
-      const { data: rows, error, count } = await query;
+      // Requête count séparée (head: true = pas de données, juste le total)
+      let countQuery = supabase
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("type", "glupp");
+
+      if (onlyWithPhoto) {
+        countQuery = countQuery.not("photo_url", "is", null);
+      }
+
+      const [{ data: rows, error }, { count }] = await Promise.all([
+        dataQuery,
+        countQuery,
+      ]);
+
       if (error) throw new Error(error.message);
       return { glupps: rows ?? [], total: count ?? 0 };
     },
