@@ -63,6 +63,9 @@ export function useNotifications() {
 
   const celebratedIds = useRef<Set<string>>(new Set());
 
+  // Génération d'un ID de canal unique pour que la Modal et le Header ne se marchent pas dessus !
+  const channelId = useRef(`notifs-${Math.random().toString(36).substring(2, 10)}`).current;
+
   const { data: legacyNotifs = [], isLoading: loadingLegacy } = useQuery({
     queryKey: queryKeys.notifications.all,
     queryFn: async () => {
@@ -199,47 +202,40 @@ export function useNotifications() {
     });
   }, [queryClient]);
 
-  // ── 4. Real-time subscriptions corrigées (Canal sécurisé) ──
+  // ── 4. Real-time subscriptions corrigées (Canaux indépendants) ──
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel>;
-
-    const setupRealtime = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      channel = supabase
-        .channel(`notifications-${user.id}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "friendships" },
-          () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
-            queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
-          }
-        )
-        .on(
-          "postgres_changes",
-          { 
-            event: "*", 
-            schema: "public", 
-            table: "notifications",
-          },
-          (payload) => {
-            console.log("🔔 Bip Bip ! Événement Temps Réel reçu :", payload);
-            queryClient.invalidateQueries({ queryKey: ["notifications", "persistent"] });
-          }
-        )
-        .subscribe((status) => {
-          console.log("📡 Statut de la connexion Temps Réel :", status);
-        });
-    };
-
-    setupRealtime();
+    const channel = supabase
+      .channel(channelId)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friendships" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+          queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "notifications",
+        },
+        (payload) => {
+          console.log("🔔 Temps Réel reçu :", payload);
+          queryClient.invalidateQueries({ queryKey: ["notifications", "persistent"] });
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+           console.log(`📡 Connecté au Temps Réel (${channelId})`);
+        }
+      });
 
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, channelId]);
 
   const celebrateUnreadApprovals = useCallback(async () => {
     const unreadApprovals = persistentNotifs.filter(

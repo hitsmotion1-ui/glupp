@@ -27,7 +27,7 @@ import {
   MessageCircle,
   Heart,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -198,19 +198,13 @@ export function NotificationModal() {
 
   const hasUnread = notifications.some((n) => !n.is_read);
 
-  // 🆕 Le détecteur intelligent de fermeture de la modale
-  const wasOpen = useRef(showNotifications);
-
-  useEffect(() => {
-    // Si la fenêtre passe spécifiquement de l'état Ouvert à l'état Fermé
-    if (wasOpen.current === true && showNotifications === false) {
-      if (hasUnread && !isLoading) {
-        markAllAsRead();
-      }
+  // Fonction pour marquer comme lu UNIQUEMENT lors de la fermeture intentionnelle
+  const handleClose = () => {
+    if (hasUnread && !isLoading) {
+      markAllAsRead();
     }
-    // On met à jour la mémoire
-    wasOpen.current = showNotifications;
-  }, [showNotifications, hasUnread, isLoading, markAllAsRead]);
+    setShowNotifications(false);
+  };
 
   const { acceptRequest, rejectRequest } = useFriends();
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
@@ -244,7 +238,7 @@ export function NotificationModal() {
   return (
     <Modal
       isOpen={showNotifications}
-      onClose={() => setShowNotifications(false)}
+      onClose={handleClose}
       title="Notifications"
     >
       {hasUnread && !isLoading && (
