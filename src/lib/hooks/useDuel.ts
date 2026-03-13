@@ -52,8 +52,9 @@ export function useDuel() {
       while (true) {
         const { data } = await supabase
           .from("user_beers")
-          .select("beer_id, beers(*)")
+          .select("beer_id, beers!inner(*)")
           .eq("user_id", user.id)
+          .eq("beers.is_active", true)
           .range(page * 1000, (page + 1) * 1000 - 1);
         if (!data || data.length === 0) break;
         const beers = (data as any[]).map((ub) => ub.beers).flat().filter(Boolean);

@@ -63,8 +63,9 @@ export function useCollection() {
         while (true) {
           const { data: collectionData } = await supabase
             .from("user_beers")
-            .select("*, beers(*)")
+            .select("*, beers!inner(*)")
             .eq("user_id", user.id)
+            .eq("beers.is_active", true)
             .range(collPage * PAGE_SIZE, (collPage + 1) * PAGE_SIZE - 1);
 
           if (!collectionData || collectionData.length === 0) break;
