@@ -73,143 +73,144 @@ export default function DuelPage() {
     );
   }
 
-  // 🎯 NOUVEL ÉCRAN DE VICTOIRE !
-  if (hasFinishedAllDuels) {
-    return (
-      <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", bounce: 0.5 }}
-        >
-          <Trophy size={56} className="text-glupp-gold mb-4" />
-        </motion.div>
-        <h2 className="font-display text-xl font-bold text-glupp-cream mb-2">
-          Tu as tout joué !
-        </h2>
-        <p className="text-glupp-text-soft text-sm mb-6 max-w-xs">
-          Tu as duelé toutes les bières de ta collection. Ajoute de nouvelles bières pour débloquer de nouveaux affrontements !
-        </p>
-        <div className="flex flex-col gap-3 w-full max-w-xs">
-          <Link href="/collection">
-            <Button variant="primary" size="lg" className="w-full">
-              Voir la Collection
-              <ArrowRight size={16} className="ml-2" />
-            </Button>
-          </Link>
-          <Button 
-            variant="ghost" 
-            onClick={() => setIsHistoryOpen(true)}
-            className="text-glupp-text-muted hover:text-glupp-cream"
-          >
-            <History size={16} className="mr-2" />
-            Voir mon historique
-          </Button>
-        </div>
-        
-        {/* On garde la modale ici pour pouvoir l'ouvrir depuis l'écran de fin */}
-        <DuelHistoryModal 
-          isOpen={isHistoryOpen} 
-          onClose={() => setIsHistoryOpen(false)} 
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="py-6 pb-24">
-      {/* Header with stats */}
-      <div className="text-center mb-6">
-        <h2 className="font-display text-xl font-bold text-glupp-cream">
-          Laquelle tu preferes ?
-        </h2>
-        <p className="text-xs text-glupp-text-muted mt-1">
-          Choisis ta biere preferee pour mettre a jour le classement
-        </p>
-
-        {/* Session counter */}
-        {duelCount > 0 && (
+      {/* 🎯 GESTION DE LA VICTOIRE VS DUEL NORMAL */}
+      {hasFinishedAllDuels ? (
+        <div className="flex flex-col items-center justify-center px-6 py-8 text-center">
           <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-center gap-3 mt-3"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", bounce: 0.5 }}
           >
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-glupp-accent/10 text-glupp-accent text-xs font-medium">
-              <Swords size={12} />
-              {duelCount} duel{duelCount > 1 ? "s" : ""}
-            </div>
-            {duelCount >= 3 && (
-              <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-glupp-gold/10 text-glupp-gold text-xs font-medium">
-                <Flame size={12} />
-                En feu !
-              </div>
-            )}
+            <Trophy size={56} className="text-glupp-gold mb-4 mx-auto" />
           </motion.div>
-        )}
-      </div>
+          <h2 className="font-display text-xl font-bold text-glupp-cream mb-2">
+            Tu as tout joué !
+          </h2>
+          <p className="text-glupp-text-soft text-sm mb-6 max-w-xs mx-auto">
+            Tu as duelé toutes les bières de ta collection. Ajoute de nouvelles bières pour débloquer de nouveaux affrontements !
+          </p>
+          <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+            <Link href="/collection">
+              <Button variant="primary" size="lg" className="w-full">
+                Voir la Collection
+                <ArrowRight size={16} className="ml-2" />
+              </Button>
+            </Link>
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsHistoryOpen(true)}
+              className="text-glupp-text-muted hover:text-glupp-cream"
+            >
+              <History size={16} className="mr-2" />
+              Voir mon historique
+            </Button>
+          </div>
+          
+          <DuelHistoryModal 
+            isOpen={isHistoryOpen} 
+            onClose={() => setIsHistoryOpen(false)} 
+          />
+        </div>
+      ) : (
+        <>
+          {/* Header with stats */}
+          <div className="text-center mb-6">
+            <h2 className="font-display text-xl font-bold text-glupp-cream">
+              Laquelle tu preferes ?
+            </h2>
+            <p className="text-xs text-glupp-text-muted mt-1">
+              Choisis ta biere preferee pour mettre a jour le classement
+            </p>
 
-      {/* Duel Cards */}
-      {beerA && beerB && (
-        <DuelCards
-          beerA={beerA}
-          beerB={beerB}
-          onSelect={submitVote}
-          disabled={submitting}
-          winnerId={winnerId}
-          eloDeltas={eloDeltas}
-          duelKey={duelKey}
-        />
+            {/* Session counter */}
+            {duelCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center justify-center gap-3 mt-3"
+              >
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-glupp-accent/10 text-glupp-accent text-xs font-medium">
+                  <Swords size={12} />
+                  {duelCount} duel{duelCount > 1 ? "s" : ""}
+                </div>
+                {duelCount >= 3 && (
+                  <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-glupp-gold/10 text-glupp-gold text-xs font-medium">
+                    <Flame size={12} />
+                    En feu !
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Duel Cards */}
+          {beerA && beerB && (
+            <DuelCards
+              beerA={beerA}
+              beerB={beerB}
+              onSelect={submitVote}
+              disabled={submitting}
+              winnerId={winnerId}
+              eloDeltas={eloDeltas}
+              duelKey={duelKey}
+            />
+          )}
+
+          {/* Boutons Passer & Historique */}
+          <div className="flex items-center justify-center gap-4 mt-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={skipDuel}
+              disabled={submitting}
+              className="text-glupp-text-muted hover:text-glupp-cream transition-colors group flex items-center gap-2"
+            >
+              <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
+              Passer ce duel
+            </Button>
+
+            <div className="w-px h-4 bg-glupp-border"></div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsHistoryOpen(true)}
+              disabled={submitting}
+              className="text-glupp-text-muted hover:text-glupp-cream transition-colors flex items-center gap-2"
+            >
+              <History size={14} />
+              Historique
+            </Button>
+          </div>
+
+          {/* La Modale d'Historique */}
+          <DuelHistoryModal 
+            isOpen={isHistoryOpen} 
+            onClose={() => setIsHistoryOpen(false)} 
+          />
+
+          {/* Pool info + suggestion */}
+          <div className="mt-8 mx-4 p-3 bg-glupp-card-alt border border-glupp-border rounded-glupp text-center">
+            <p className="text-xs text-glupp-text-soft mb-1">
+              {tastedCount} biere{tastedCount > 1 ? "s" : ""} dans ton pool de duels
+            </p>
+            <Link
+              href="/collection"
+              className="text-xs text-glupp-accent font-medium hover:underline inline-flex items-center gap-1"
+            >
+              <Beer size={12} />
+              Gluppe de nouvelles bieres pour plus de duels !
+            </Link>
+          </div>
+        </>
       )}
 
-      {/* 🆕 Boutons Passer & Historique */}
-      <div className="flex items-center justify-center gap-4 mt-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={skipDuel}
-          disabled={submitting}
-          className="text-glupp-text-muted hover:text-glupp-cream transition-colors group flex items-center gap-2"
-        >
-          <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
-          Passer ce duel
-        </Button>
-
-        <div className="w-px h-4 bg-glupp-border"></div>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsHistoryOpen(true)}
-          disabled={submitting}
-          className="text-glupp-text-muted hover:text-glupp-cream transition-colors flex items-center gap-2"
-        >
-          <History size={14} />
-          Historique
-        </Button>
-      </div>
-
-      {/* 🆕 La Modale d'Historique */}
-      <DuelHistoryModal 
-        isOpen={isHistoryOpen} 
-        onClose={() => setIsHistoryOpen(false)} 
-      />
-
-      {/* Pool info + suggestion */}
-      <div className="mt-8 mx-4 p-3 bg-glupp-card-alt border border-glupp-border rounded-glupp text-center">
-        <p className="text-xs text-glupp-text-soft mb-1">
-          {tastedCount} biere{tastedCount > 1 ? "s" : ""} dans ton pool de duels
-        </p>
-        <Link
-          href="/collection"
-          className="text-xs text-glupp-accent font-medium hover:underline inline-flex items-center gap-1"
-        >
-          <Beer size={12} />
-          Gluppe de nouvelles bieres pour plus de duels !
-        </Link>
-      </div>
+      {/* ⏬ LES SECTIONS QUI S'AFFICHERONT TOUT LE TEMPS ⏬ */}
 
       {/* Glupp of the Week */}
-      <div className="px-4 mt-6">
+      <div className="px-4 mt-8">
         <GluppOfWeekBanner />
       </div>
 
