@@ -199,33 +199,46 @@ export function useNotifications() {
     });
   }, [queryClient]);
 
-  // ── 4. Real-time subscriptions corrigées (Canal unique) ──
+  // ── 4. Real-time subscriptions corrigées (Canal sécurisé) ──
   useEffect(() => {
-    // 🆕 On crée un nom de canal aléatoire unique pour chaque composant
-    const uniqueChannelId = `realtime-${Math.random().toString(36).substring(2, 9)}`;
-    
-    const channel = supabase
-      .channel(uniqueChannelId)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "friendships" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
-          queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["notifications", "persistent"] });
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel>;
+
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      channel = supabase
+        .channel(`notifications-${user.id}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "friendships" },
+          () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+          }
+        )
+        .on(
+          "postgres_changes",
+          { 
+            event: "*", 
+            schema: "public", 
+            table: "notifications",
+            filter: `user_id=eq.${user.id}` // 🎯 On filtre pour NE recevoir QUE ses propres notifications
+          },
+          (payload) => {
+            console.log("🔔 Bip Bip ! Événement Temps Réel reçu :", payload);
+            queryClient.invalidateQueries({ queryKey: ["notifications", "persistent"] });
+          }
+        )
+        .subscribe((status) => {
+          console.log("📡 Statut de la connexion Temps Réel :", status);
+        });
+    };
+
+    setupRealtime();
 
     return () => {
-      // 🆕 Nettoyage strict à la destruction du composant
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
