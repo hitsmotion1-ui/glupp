@@ -199,33 +199,44 @@ export function useNotifications() {
     });
   }, [queryClient]);
 
-  // ── 4. Real-time subscriptions - VERSION BASIQUE ──
+// ── 4. Real-time subscriptions (DOUBLE CANAL ANTI-CRASH) ──
   useEffect(() => {
-    console.log("🛠️ Initialisation du canal Temps Réel (Notifications)...");
-    
-    // On utilise un nom de canal simple et générique
-    const channel = supabase
-      .channel("public:notifications")
+    console.log("🛠️ Démarrage du Temps Réel...");
+
+    // 📡 Canal 1 : Réservé EXCLUSIVEMENT aux notifications
+    const notifChannel = supabase
+      .channel(`canal-notifs-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications" },
         (payload) => {
-          console.log("🔔 Temps Réel reçu sur la table notifications :", payload);
+          console.log("🔔 Temps Réel (Notif) :", payload);
           queryClient.invalidateQueries({ queryKey: ["notifications", "persistent"] });
         }
       )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-           console.log("📡 SUBSCRIBED: Connecté au Temps Réel pour les notifications.");
-        }
-        if (status === 'CHANNEL_ERROR') {
-           console.error("❌ CHANNEL_ERROR: Supabase a refusé la connexion.", err);
-        }
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log("✅ Canal Notifs connecté");
       });
 
+    // 🤝 Canal 2 : Réservé EXCLUSIVEMENT aux demandes d'amis
+    const friendChannel = supabase
+      .channel(`canal-amis-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friendships" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+          queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log("✅ Canal Amis connecté");
+      });
+
+    // Nettoyage à la fermeture
     return () => {
-      console.log("🧹 Nettoyage du canal Temps Réel...");
-      supabase.removeChannel(channel);
+      supabase.removeChannel(notifChannel);
+      supabase.removeChannel(friendChannel);
     };
   }, [queryClient]);
 
