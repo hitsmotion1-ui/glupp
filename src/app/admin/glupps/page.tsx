@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAdmin } from "@/lib/hooks/useAdmin";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import {
   Camera,
@@ -143,17 +142,39 @@ function Lightbox({ entry, onClose, onDelete, isDeleting }: { entry: LightboxEnt
 // Page
 // ═══════════════════════════════════════════
 
+const PAGE_SIZE = 25;
+
 export default function AdminGluppsPage() {
-  const admin = useAdmin();
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);
   const [onlyWithPhoto, setOnlyWithPhoto] = useState(false);
   const [lightbox, setLightbox] = useState<LightboxEntry | null>(null);
 
-  const PAGE_SIZE = admin.GLUPPS_PAGE_SIZE;
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "glupps", page, onlyWithPhoto],
+    queryFn: async () => {
+      let query = supabase
+        .from("activities")
+        .select(
+          "id, user_id, beer_id, photo_url, created_at, metadata, user:profiles(id, username, display_name, avatar_url), beer:beers(id, name, brewery, rarity)",
+          { count: "exact" }
+        )
+        .eq("type", "glupp")
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-  const { data, isLoading } = admin.useAdminGlupps({ page, onlyWithPhoto });
+      if (onlyWithPhoto) {
+        query = query.not("photo_url", "is", null);
+      }
+
+      const { data: rows, error, count } = await query;
+      if (error) throw new Error(error.message);
+      return { glupps: rows ?? [], total: count ?? 0 };
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
 
   const glupps = data?.glupps ?? [];
   const total = data?.total ?? 0;
