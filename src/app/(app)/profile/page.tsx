@@ -14,7 +14,8 @@ import { TrophyGrid } from "@/components/social/TrophyGrid";
 import { FriendList } from "@/components/social/FriendList";
 import { FriendSearchModal } from "@/components/social/FriendSearchModal";
 import { CrewSection } from "@/components/social/CrewSection";
-import { SettingsModal } from "@/components/global/SettingsModal"; // 👈 Ajout de l'import
+import { SettingsModal } from "@/components/global/SettingsModal";
+import { FeedbackModal } from "@/components/settings/FeedbackModal"; // 👈 L'import de la modale
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
   Swords,
@@ -27,7 +28,8 @@ import {
   Users,
   Shield,
   Globe,
-  Settings, // 👈 L'icône est bien là
+  Settings,
+  MessageSquarePlus, // 👈 L'icône du feedback
 } from "lucide-react";
 import { formatNumber } from "@/lib/utils/xp";
 
@@ -39,8 +41,9 @@ export default function ProfilePage() {
   const { allBeers, tastedIds } = useCollection();
   const [openSections, setOpenSections] = useState<Set<Section>>(new Set());
   
-  // 🆕 État pour la modale des paramètres
+  // États pour les modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false); // 🆕 État du feedback
 
   const toggleSection = (section: Section) => {
     setOpenSections((prev) => {
@@ -118,7 +121,7 @@ export default function ProfilePage() {
 
   return (
     <div className="py-6 px-4 space-y-6 pb-24">
-      {/* 🆕 Header avec titre et bouton Paramètres */}
+      {/* Header avec titre et bouton Paramètres */}
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold text-glupp-cream">
           Mon Profil
@@ -193,6 +196,18 @@ export default function ProfilePage() {
           </p>
           <p className="text-[10px] text-glupp-text-muted">Photos</p>
         </Card>
+      </div>
+
+      {/* 🆕 Bouton Feedback */}
+      <div>
+        <Button 
+          variant="outline" 
+          className="w-full flex items-center justify-center gap-2 border-glupp-border text-glupp-text-muted hover:text-glupp-cream hover:bg-glupp-card-alt"
+          onClick={() => setIsFeedbackOpen(true)}
+        >
+          <MessageSquarePlus size={18} />
+          Donner mon avis / Signaler un bug
+        </Button>
       </div>
 
       {/* Progression — collapsible */}
@@ -280,13 +295,19 @@ export default function ProfilePage() {
       {/* Friend Search Modal */}
       <FriendSearchModal />
 
-      {/* 🆕 Intégration de la Modale Paramètres */}
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         currentUsername={profile.username}
         currentAvatarUrl={profile.avatar_url}
         userId={profile.id}
+      />
+
+      {/* 🆕 Feedback Modal */}
+      <FeedbackModal 
+        isOpen={isFeedbackOpen} 
+        onClose={() => setIsFeedbackOpen(false)} 
       />
     </div>
   );
