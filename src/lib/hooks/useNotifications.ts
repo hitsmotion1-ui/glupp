@@ -63,9 +63,6 @@ export function useNotifications() {
 
   const celebratedIds = useRef<Set<string>>(new Set());
 
-  // Génération d'un ID de canal unique pour que la Modal et le Header ne se marchent pas dessus !
-  const channelId = useRef(`notifs-${Math.random().toString(36).substring(2, 10)}`).current;
-
   const { data: legacyNotifs = [], isLoading: loadingLegacy } = useQuery({
     queryKey: queryKeys.notifications.all,
     queryFn: async () => {
@@ -202,40 +199,35 @@ export function useNotifications() {
     });
   }, [queryClient]);
 
-  // ── 4. Real-time subscriptions corrigées (Canaux indépendants) ──
+  // ── 4. Real-time subscriptions - VERSION BASIQUE ──
   useEffect(() => {
+    console.log("🛠️ Initialisation du canal Temps Réel (Notifications)...");
+    
+    // On utilise un nom de canal simple et générique
     const channel = supabase
-      .channel(channelId)
+      .channel("public:notifications")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "friendships" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
-          queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { 
-          event: "*", 
-          schema: "public", 
-          table: "notifications",
-        },
+        { event: "*", schema: "public", table: "notifications" },
         (payload) => {
-          console.log("🔔 Temps Réel reçu :", payload);
+          console.log("🔔 Temps Réel reçu sur la table notifications :", payload);
           queryClient.invalidateQueries({ queryKey: ["notifications", "persistent"] });
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
-           console.log(`📡 Connecté au Temps Réel (${channelId})`);
+           console.log("📡 SUBSCRIBED: Connecté au Temps Réel pour les notifications.");
+        }
+        if (status === 'CHANNEL_ERROR') {
+           console.error("❌ CHANNEL_ERROR: Supabase a refusé la connexion.", err);
         }
       });
 
     return () => {
+      console.log("🧹 Nettoyage du canal Temps Réel...");
       supabase.removeChannel(channel);
     };
-  }, [queryClient, channelId]);
+  }, [queryClient]);
 
   const celebrateUnreadApprovals = useCallback(async () => {
     const unreadApprovals = persistentNotifs.filter(
