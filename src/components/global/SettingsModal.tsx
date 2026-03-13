@@ -18,15 +18,6 @@ interface SettingsModalProps {
   userId?: string;
 }
 
-// 🌍 Liste des suggestions de villes
-const POPULAR_CITIES = [
-  "Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", 
-  "Montpellier", "Strasbourg", "Bordeaux", "Lille", "Rennes", 
-  "Reims", "Saint-Étienne", "Toulon", "Le Havre", "Grenoble", 
-  "Dijon", "Angers", "Nîmes", "Clermont-Ferrand", "Aix-en-Provence",
-  "Bruxelles", "Liège", "Namur", "Genève", "Lausanne", "Montréal", "Québec"
-].sort();
-
 export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarUrl, userId }: SettingsModalProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -47,8 +38,33 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🔔 Nouvel état pour les notifications Push
+  // 🔔 État pour les notifications Push
   const [pushEnabled, setPushEnabled] = useState(false);
+
+  // 🌍 État pour l'autocomplétion des villes
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+
+  // 🌍 Appel à l'API Géo du gouvernement français quand l'utilisateur tape sa ville
+  useEffect(() => {
+    if (city.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+    
+    // On met un petit délai (debounce) pour ne pas spammer l'API à chaque touche pressée
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://geo.api.gouv.fr/communes?nom=${city}&fields=departement&boost=population&limit=5`);
+        const data = await res.json();
+        // On formate pour avoir "Nom de la ville (Numéro de département)"
+        setCitySuggestions(data.map((c: any) => `${c.nom} (${c.departement?.code || ''})`));
+      } catch (err) {
+        console.error("Erreur API Villes :", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [city]);
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -69,7 +85,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
           .single();
         if (profile?.city) setCity(profile.city);
         
-        // Simuler la récupération du statut des notifications push (à connecter au Service Worker plus tard)
         if (typeof window !== "undefined" && "Notification" in window) {
            setPushEnabled(Notification.permission === "granted");
         }
@@ -106,14 +121,12 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
     }
   };
 
-  // 🔔 Fonction pour demander la permission d'envoyer des notifications
   const handlePushToggle = async () => {
     if (!pushEnabled) {
       try {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
           setPushEnabled(true);
-          // Ici, on ajoutera plus tard l'abonnement au Service Worker
           console.log("Permission Push accordée !");
         } else {
           setErrorMsg("Permission de notification refusée dans le navigateur.");
@@ -122,7 +135,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
          setErrorMsg("Erreur lors de la demande de permission.");
       }
     } else {
-        // Désactivation locale
         setPushEnabled(false);
         console.log("Push désactivé");
     }
@@ -184,7 +196,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
       queryClient.invalidateQueries({ queryKey: ["ranking"] });
       
       setSuccessMsg("Modifications sauvegardées !" + authMessage);
-      // 🛑 J'ai supprimé la ligne showXPToast ici !
       
       setTimeout(() => {
         if (!authMessage) onClose();
@@ -287,7 +298,7 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                   placeholder="Ex: Paris, Lyon, Bordeaux..."
                 />
                 <datalist id="city-suggestions">
-                  {POPULAR_CITIES.map((c) => (
+                  {citySuggestions.map((c) => (
                     <option key={c} value={c} />
                   ))}
                 </datalist>
@@ -296,7 +307,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                 </p>
               </div>
 
-              {/* 🔔 SECTION NOTIFICATIONS */}
               <div className="space-y-4 pt-4 border-t border-glupp-border">
                 <h3 className="text-sm font-bold text-glupp-text flex items-center gap-2">
                   <Bell size={16} /> Notifications
@@ -310,7 +320,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                     </p>
                   </div>
                   
-                  {/* Le bouton Toggle */}
                   <button 
                     onClick={handlePushToggle}
                     className={`w-12 h-6 rounded-full relative transition-colors ${pushEnabled ? 'bg-glupp-accent' : 'bg-glupp-border'}`}

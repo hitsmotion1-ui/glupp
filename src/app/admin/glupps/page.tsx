@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
@@ -14,7 +14,9 @@ import {
   ExternalLink,
   Trash2,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Search,
+  Filter
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -34,11 +36,9 @@ function timeAgo(iso: string): string {
   );
 }
 
-// 🛠️ Sécurité pour les URLs d'images (Répare les liens relatifs de Supabase)
 function getValidImageUrl(url: string | null): string | null {
   if (!url) return null;
   if (url.startsWith("http")) return url;
-  // Si c'est juste un nom de fichier, on génère l'URL publique Supabase
   return supabase.storage.from("glupps").getPublicUrl(url).data.publicUrl;
 }
 
@@ -72,7 +72,6 @@ function Lightbox({ entry, onClose, onDelete, isDeleting }: { entry: LightboxEnt
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={onClose}>
       <div className="relative max-w-2xl w-full bg-[#1E1B16] rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
         
-        {/* Actions Supérieures */}
         <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
           <button 
             onClick={() => {
@@ -104,10 +103,8 @@ function Lightbox({ entry, onClose, onDelete, isDeleting }: { entry: LightboxEnt
           </button>
         </div>
 
-        {/* Photo */}
         <img src={entry.photo_url} alt="Photo glupp" className="w-full max-h-[70vh] object-contain bg-black" />
 
-        {/* Info */}
         <div className="px-4 py-3 flex items-center gap-3 border-t border-[#3A3530]">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[#F5E6D3] truncate">
@@ -148,24 +145,51 @@ export default function AdminGluppsPage() {
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);
+  
+  // Nouveaux états pour les filtres
+  const [activityType, setActivityType] = useState<"all" | "glupp" | "reglupp">("all");
   const [onlyWithPhoto, setOnlyWithPhoto] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
   const [lightbox, setLightbox] = useState<LightboxEntry | null>(null);
 
+  // Debounce pour la recherche utilisateur
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(userSearch);
+      setPage(0); // Retour à la page 1 si on change la recherche
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [userSearch]);
+
   const { data, isLoading, isError, error: queryError } = useQuery({
-    queryKey: ["admin", "glupps", page, onlyWithPhoto],
+    queryKey: ["admin", "glupps", page, onlyWithPhoto, activityType, debouncedSearch],
     queryFn: async () => {
-      // Requête data — identique à useAdminActivities (confirmé fonctionnel)
+      // Pour pouvoir filtrer sur le nom d'utilisateur, on force un INNER JOIN sur profiles
       let dataQuery = supabase
         .from("activities")
         .select(
-          "*, user:profiles!user_id(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery)"
+          "*, user:profiles!inner(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery)"
         )
-        .eq("type", "glupp")
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
+      // Filtre Type d'activité
+      if (activityType === "all") {
+        dataQuery = dataQuery.in("type", ["glupp", "reglupp"]);
+      } else {
+        dataQuery = dataQuery.eq("type", activityType);
+      }
+
+      // Filtre Photo
       if (onlyWithPhoto) {
         dataQuery = dataQuery.not("photo_url", "is", null);
+      }
+
+      // Filtre Recherche Utilisateur
+      if (debouncedSearch) {
+        dataQuery = dataQuery.ilike("user.username", `%${debouncedSearch}%`);
       }
 
       const { data: rows, error } = await dataQuery;
@@ -175,16 +199,23 @@ export default function AdminGluppsPage() {
         throw new Error(error.message);
       }
 
-      console.log(`✅ [Admin Glupps] ${rows?.length ?? 0} glupps récupérés`);
-
-      // Count séparé sans head:true (plus compatible)
+      // Requête pour compter le total (avec les mêmes filtres)
       let countQuery = supabase
         .from("activities")
-        .select("id", { count: "exact", head: true })
-        .eq("type", "glupp");
+        .select("id, user:profiles!inner(username)", { count: "exact", head: true });
+
+      if (activityType === "all") {
+        countQuery = countQuery.in("type", ["glupp", "reglupp"]);
+      } else {
+        countQuery = countQuery.eq("type", activityType);
+      }
 
       if (onlyWithPhoto) {
         countQuery = countQuery.not("photo_url", "is", null);
+      }
+
+      if (debouncedSearch) {
+        countQuery = countQuery.ilike("user.username", `%${debouncedSearch}%`);
       }
 
       const { count, error: countError } = await countQuery;
@@ -200,12 +231,6 @@ export default function AdminGluppsPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  const handleFilterChange = (withPhoto: boolean) => {
-    setOnlyWithPhoto(withPhoto);
-    setPage(0);
-  };
-
-  // 🗑️ Mutation pour supprimer un Glupp (via RPC SECURITY DEFINER)
   const deleteGluppMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.rpc("admin_delete_glupp", { p_activity_id: id });
@@ -235,40 +260,66 @@ export default function AdminGluppsPage() {
     <div className="min-h-screen bg-[#141210]">
       <AdminHeader
         title="Modération des Glupps"
-        subtitle={isError ? `❌ Erreur : ${String(queryError)}` : `${total} glupp${total > 1 ? "s" : ""} au total`}
+        subtitle={isError ? `❌ Erreur : ${String(queryError)}` : `${total} activité${total > 1 ? "s" : ""} au total`}
       />
 
       <div className="px-6 py-6 lg:px-8 space-y-4">
-        {/* Filters */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => handleFilterChange(false)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              !onlyWithPhoto
-                ? "bg-[#E08840] text-[#141210]"
-                : "bg-[#1E1B16] border border-[#3A3530] text-[#A89888] hover:text-[#F5E6D3]"
-            }`}
-          >
-            Tous
-          </button>
-          <button
-            onClick={() => handleFilterChange(true)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              onlyWithPhoto
-                ? "bg-[#E08840] text-[#141210]"
-                : "bg-[#1E1B16] border border-[#3A3530] text-[#A89888] hover:text-[#F5E6D3]"
-            }`}
-          >
-            <Camera size={14} />
-            Avec photo
-          </button>
+        
+        {/* ── BARRE D'OUTILS (Filtres et Recherche) ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#1E1B16] border border-[#3A3530] p-4 rounded-xl">
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Onglets Type d'activité */}
+            <div className="flex bg-[#141210] border border-[#3A3530] rounded-lg p-1 mr-4">
+              <button
+                onClick={() => { setActivityType("all"); setPage(0); }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activityType === "all" ? "bg-[#3A3530] text-[#F5E6D3]" : "text-[#A89888] hover:text-[#F5E6D3]"}`}
+              >
+                Tout
+              </button>
+              <button
+                onClick={() => { setActivityType("glupp"); setPage(0); }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activityType === "glupp" ? "bg-[#3A3530] text-[#F5E6D3]" : "text-[#A89888] hover:text-[#F5E6D3]"}`}
+              >
+                Glupps
+              </button>
+              <button
+                onClick={() => { setActivityType("reglupp"); setPage(0); }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activityType === "reglupp" ? "bg-[#3A3530] text-[#F5E6D3]" : "text-[#A89888] hover:text-[#F5E6D3]"}`}
+              >
+                Reglupps
+              </button>
+            </div>
 
-          <span className="ml-auto text-xs text-[#6B6050]">
-            {total} résultat{total > 1 ? "s" : ""}
-          </span>
+            {/* Filtre Photo */}
+            <button
+              onClick={() => { setOnlyWithPhoto(!onlyWithPhoto); setPage(0); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                onlyWithPhoto
+                  ? "bg-[#E08840]/10 border-[#E08840] text-[#E08840]"
+                  : "bg-[#141210] border-[#3A3530] text-[#A89888] hover:text-[#F5E6D3]"
+              }`}
+            >
+              <Camera size={14} />
+              Avec photo
+            </button>
+          </div>
+
+          {/* Recherche Utilisateur */}
+          <div className="relative w-full md:w-64">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6050]" />
+            <input 
+              type="text" 
+              placeholder="Chercher un pseudo..."
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              className="w-full bg-[#141210] border border-[#3A3530] rounded-lg pl-9 pr-4 py-2 text-sm text-[#F5E6D3] focus:outline-none focus:border-[#E08840] transition-colors"
+            />
+          </div>
+
         </div>
 
-        {/* Table */}
+        {/* ── TABLEAU ── */}
         <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden">
           {isLoading ? (
             <div className="divide-y divide-[#3A3530]/50">
@@ -285,12 +336,11 @@ export default function AdminGluppsPage() {
             </div>
           ) : glupps.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <Sparkles size={36} strokeWidth={1.2} className="mb-2 text-[#3A3530]" />
-              <p className="text-sm text-[#6B6050]">Aucun glupp trouvé</p>
+              <Filter size={36} strokeWidth={1.2} className="mb-2 text-[#3A3530]" />
+              <p className="text-sm text-[#6B6050]">Aucun résultat pour cette recherche</p>
             </div>
           ) : (
             <>
-              {/* Header row (Ajout de la colonne Actions) */}
               <div className="hidden lg:grid grid-cols-[56px_1fr_1fr_1fr_100px_80px] gap-3 px-4 py-2.5 border-b border-[#3A3530] text-[10px] font-semibold uppercase tracking-wider text-[#6B6050]">
                 <span>Photo</span>
                 <span>Utilisateur</span>
@@ -308,8 +358,6 @@ export default function AdminGluppsPage() {
                   const rc = RARITY_CONFIG[rarity] ?? RARITY_CONFIG.common;
                   const user = g.user as { id?: string; username?: string; display_name?: string; avatar_url?: string | null } | null;
                   const beer = g.beer as { name?: string; brewery?: string } | null;
-                  
-                  // Récupération sécurisée de l'image
                   const safeImageUrl = getValidImageUrl(g.photo_url);
 
                   return (
@@ -341,7 +389,8 @@ export default function AdminGluppsPage() {
                           />
                         </button>
                       ) : (
-                        <div className="w-12 h-12 rounded-lg shrink-0 bg-[#3A3530]/40 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-lg shrink-0 bg-[#3A3530]/40 flex items-center justify-center relative">
+                          {g.type === "reglupp" && <div className="absolute top-1 left-1 text-[8px] bg-[#E08840] text-black px-1 rounded-sm font-bold">RE</div>}
                           <Camera size={16} className="text-[#6B6050]" />
                         </div>
                       )}
@@ -360,6 +409,7 @@ export default function AdminGluppsPage() {
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-[#F5E6D3] truncate">
                             {user?.display_name || user?.username || "?"}
+                            {g.type === "reglupp" && <span className="ml-2 text-[10px] text-[#A89888] font-normal border border-[#3A3530] rounded px-1 py-0.5">Reglupp</span>}
                           </p>
                           <p className="text-xs text-[#6B6050] truncate">
                             @{user?.username ?? "?"}
@@ -392,7 +442,7 @@ export default function AdminGluppsPage() {
                         {timeAgo(g.created_at)}
                       </p>
 
-                      {/* 🛡️ Actions Admin */}
+                      {/* Actions Admin */}
                       <div className="flex items-center justify-end gap-1.5 shrink-0 w-20">
                         <button 
                           onClick={() => handleWarn(user?.username || "Inconnu")} 
@@ -451,7 +501,6 @@ export default function AdminGluppsPage() {
         )}
       </div>
 
-      {/* Lightbox */}
       {lightbox && (
         <Lightbox 
           entry={lightbox} 
