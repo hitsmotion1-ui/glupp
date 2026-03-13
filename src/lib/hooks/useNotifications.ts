@@ -223,7 +223,6 @@ export function useNotifications() {
             event: "*", 
             schema: "public", 
             table: "notifications",
-            filter: `user_id=eq.${user.id}` // 🎯 On filtre pour NE recevoir QUE ses propres notifications
           },
           (payload) => {
             console.log("🔔 Bip Bip ! Événement Temps Réel reçu :", payload);
