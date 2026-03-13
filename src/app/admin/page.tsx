@@ -14,9 +14,11 @@ import {
   Clock,
   Trophy,
   Activity,
+  MessageSquarePlus, // 👈 Ajout de l'icône
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getLevel } from "@/lib/utils/xp";
+import Link from "next/link"; // 👈 Ajout de Link pour la navigation
 
 // ═══════════════════════════════════════════
 // Skeleton placeholder for loading state
@@ -47,319 +49,240 @@ function StatCardSkeleton() {
 // ═══════════════════════════════════════════
 
 export default function AdminDashboardPage() {
-  const admin = useAdmin();
-  const { stats, loadingStats } = admin;
-
-  // Fetch recent pending submissions
-  const { data: submissions = [], isLoading: loadingSubs } =
-    admin.useAdminSubmissions("pending");
-
-  // Fetch top users
-  const { data: topUsers = [], isLoading: loadingUsers } =
-    admin.useAdminUsers();
-
-  // Fetch recent activities
-  const { data: recentActivities = [], isLoading: loadingActivities } =
-    admin.useAdminActivities();
-
-  const recentSubs = submissions.slice(0, 5);
-  const topFive = topUsers.slice(0, 5);
+  const {
+    loading,
+    stats,
+    topUsers,
+    recentActivity,
+  } = useAdmin();
 
   return (
-    <div className="min-h-screen bg-[#141210]">
-      <AdminHeader title="Dashboard" subtitle="Vue d'ensemble de Glupp" />
+    <div className="min-h-screen bg-[#14120F] text-[#E8E1D5] pb-24">
+      {/* ── HEADER NAVIGATION ── */}
+      <AdminHeader />
 
-      <div className="px-6 py-6 lg:px-8 space-y-8">
-        {/* ── Stat Cards Grid ─────────────────── */}
+      {/* ── MAIN CONTENT ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        {/* ── HEADER TEXT ── */}
+        <div>
+          <h1 className="text-3xl font-bold font-display tracking-tight text-[#F7F3EE]">
+            Dashboard
+          </h1>
+          <p className="text-sm text-[#8C8273] mt-1">
+            Overview of the Glupp platform.
+          </p>
+        </div>
+
+        {/* 🆕 BOUTON FEEDBACKS */}
+        <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-[#F7F3EE] flex items-center gap-2">
+              <MessageSquarePlus size={20} className="text-[#E08840]" />
+              Retours utilisateurs
+            </h2>
+            <p className="text-sm text-[#8C8273] mt-1">
+              Consulte les bugs, suggestions et problèmes signalés par la communauté.
+            </p>
+          </div>
+          <Link
+            href="/admin/feedbacks"
+            className="shrink-0 inline-flex items-center gap-2 px-6 py-2.5 bg-[#E08840] text-[#1E1B16] font-bold rounded-lg hover:bg-opacity-90 transition-colors"
+          >
+            Voir les messages
+          </Link>
+        </div>
+
+        {/* ── OVERVIEW STATS ── */}
         <section>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            {loadingStats ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <StatCardSkeleton key={i} />
-              ))
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="text-[#8C8273]" size={20} />
+            <h2 className="text-xl font-semibold text-[#F7F3EE]">Overview</h2>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {loading ? (
+              <>
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+              </>
             ) : (
               <>
                 <StatCard
-                  label="Utilisateurs"
-                  value={stats?.total_users ?? 0}
-                  icon={Users}
-                  color="#3B82F6"
+                  title="Total Users"
+                  value={stats?.totalUsers || 0}
+                  icon={<Users size={20} className="text-[#4ECDC4]" />}
+                  trend="+12 this week" // placeholder
+                  trendUp={true}
                 />
                 <StatCard
-                  label="Bieres"
-                  value={stats?.total_beers ?? 0}
-                  icon={Beer}
-                  color="#E08840"
+                  title="Total Beers"
+                  value={stats?.totalBeers || 0}
+                  icon={<Beer size={20} className="text-[#E08840]" />}
                 />
                 <StatCard
-                  label="Bars"
-                  value={stats?.total_bars ?? 0}
-                  icon={MapPin}
-                  color="#4ECDC4"
+                  title="Submissions"
+                  value={stats?.pendingSubmissions || 0}
+                  icon={<Inbox size={20} className="text-[#F0C460]" />}
+                  alert={stats?.pendingSubmissions ? stats.pendingSubmissions > 0 : false}
                 />
                 <StatCard
-                  label="Glupps"
-                  value={stats?.total_glupps ?? 0}
-                  icon={Sparkles}
-                  color="#F0C460"
+                  title="Check-ins"
+                  value={stats?.totalCheckins || 0}
+                  icon={<MapPin size={20} className="text-[#8B5CF6]" />}
                 />
                 <StatCard
-                  label="Duels"
-                  value={stats?.total_duels ?? 0}
-                  icon={Swords}
-                  color="#A78BFA"
+                  title="Duels Played"
+                  value={stats?.totalDuels || 0}
+                  icon={<Swords size={20} className="text-[#EF4444]" />}
                 />
                 <StatCard
-                  label="En attente"
-                  value={stats?.pending_submissions ?? 0}
-                  icon={Inbox}
-                  color="#EF4444"
+                  title="Photos"
+                  value={stats?.totalPhotos || 0}
+                  icon={<Sparkles size={20} className="text-[#10B981]" />}
                 />
               </>
             )}
           </div>
         </section>
 
-        {/* ── Two-column layout: Submissions + Top Users ── */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Submissions */}
-          <section>
-            <h2 className="flex items-center gap-2 mb-4 text-lg font-bold text-[#F5E6D3] font-display">
-              <Clock size={18} className="text-[#E08840]" />
-              Soumissions en attente
-            </h2>
-
-            {loadingSubs ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
-                ))}
-              </div>
-            ) : recentSubs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 bg-[#1E1B16] border border-[#3A3530] rounded-xl">
-                <Inbox
-                  size={36}
-                  strokeWidth={1.2}
-                  className="mb-2 text-[#3A3530]"
-                />
-                <p className="text-sm text-[#6B6050]">
-                  Aucune soumission en attente
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentSubs.map((sub) => (
-                  <motion.div
-                    key={sub.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-4 p-4 bg-[#1E1B16] border border-[#3A3530] rounded-xl"
-                  >
-                    {/* Type badge */}
-                    <div
-                      className={`flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold shrink-0 ${
-                        sub.type === "beer"
-                          ? "bg-[#E08840]/15 text-[#E08840]"
-                          : sub.type === "bar"
-                            ? "bg-[#4ECDC4]/15 text-[#4ECDC4]"
-                            : "bg-[#A78BFA]/15 text-[#A78BFA]"
-                      }`}
-                    >
-                      {sub.type === "beer" ? (
-                        <Beer size={16} />
-                      ) : sub.type === "bar" ? (
-                        <MapPin size={16} />
-                      ) : (
-                        <Star size={16} />
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#F5E6D3] truncate">
-                        {(sub.data?.name as string) ?? sub.type}
-                      </p>
-                      <p className="text-xs text-[#A89888] truncate">
-                        par{" "}
-                        {sub.user?.display_name ?? sub.user?.username ?? "?"}
-                        {" — "}
-                        {new Date(sub.created_at).toLocaleDateString("fr-FR")}
-                      </p>
-                    </div>
-
-                    {/* Status badge */}
-                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold shrink-0 bg-[#F0C460]/15 text-[#F0C460]">
-                      En attente
-                    </span>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Top Users Leaderboard */}
-          <section>
-            <h2 className="flex items-center gap-2 mb-4 text-lg font-bold text-[#F5E6D3] font-display">
-              <Trophy size={18} className="text-[#F0C460]" />
-              Top Utilisateurs
-            </h2>
-
-            {loadingUsers ? (
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full rounded-xl" />
-                ))}
-              </div>
-            ) : topFive.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 bg-[#1E1B16] border border-[#3A3530] rounded-xl">
-                <Users
-                  size={36}
-                  strokeWidth={1.2}
-                  className="mb-2 text-[#3A3530]"
-                />
-                <p className="text-sm text-[#6B6050]">
-                  Aucun utilisateur
-                </p>
-              </div>
-            ) : (
-              <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden divide-y divide-[#3A3530]/50">
-                {topFive.map((user, idx) => {
-                  const level = getLevel(user.xp);
-                  return (
-                    <motion.div
-                      key={user.id}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="flex items-center gap-3 px-4 py-3"
-                    >
-                      {/* Rank */}
-                      <span
-                        className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 ${
-                          idx === 0
-                            ? "bg-[#F0C460]/20 text-[#F0C460]"
-                            : idx === 1
-                              ? "bg-[#C0C0C0]/20 text-[#C0C0C0]"
-                              : idx === 2
-                                ? "bg-[#CD7F32]/20 text-[#CD7F32]"
-                                : "bg-[#3A3530] text-[#A89888]"
-                        }`}
-                      >
-                        {idx + 1}
-                      </span>
-
-                      {/* Avatar */}
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#3A3530] shrink-0 overflow-hidden">
-                        {user.avatar_url ? (
-                          <img
-                            src={user.avatar_url}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs text-[#A89888] font-bold">
-                            {(
-                              user.display_name ||
-                              user.username ||
-                              "?"
-                            )
-                              .charAt(0)
-                              .toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Name + level */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#F5E6D3] truncate">
-                          {user.display_name || user.username}
-                        </p>
-                        <p className="text-xs text-[#6B6050]">
-                          {level.icon} Nv.{level.level}
-                        </p>
-                      </div>
-
-                      {/* XP */}
-                      <span className="text-sm font-bold text-[#F0C460] tabular-nums shrink-0">
-                        {user.xp.toLocaleString("fr-FR")} XP
-                      </span>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* ── Recent Activity Feed ── */}
+        {/* ── TOP USERS (XP) ── */}
         <section>
-          <h2 className="flex items-center gap-2 mb-4 text-lg font-bold text-[#F5E6D3] font-display">
-            <Activity size={18} className="text-[#4ECDC4]" />
-            Activité récente
-          </h2>
-
-          {loadingActivities ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-xl" />
-              ))}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Star className="text-[#F0C460]" size={20} />
+              <h2 className="text-xl font-semibold text-[#F7F3EE]">Leaderboard</h2>
             </div>
-          ) : recentActivities.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 bg-[#1E1B16] border border-[#3A3530] rounded-xl">
-              <Activity size={36} strokeWidth={1.2} className="mb-2 text-[#3A3530]" />
-              <p className="text-sm text-[#6B6050]">Aucune activité récente</p>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+            </div>
+          ) : topUsers.length === 0 ? (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-8 text-center">
+              <Trophy className="mx-auto text-[#6B6050] mb-3" size={32} />
+              <p className="text-[#8C8273]">No users found yet.</p>
             </div>
           ) : (
-            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl overflow-hidden divide-y divide-[#3A3530]/50">
-              {recentActivities.map((act) => {
-                const typeConfig: Record<string, { label: string; icon: string; color: string }> = {
-                  glupp: { label: "Glupp", icon: "🍺", color: "#E08840" },
-                  duel: { label: "Duel", icon: "⚔️", color: "#A78BFA" },
-                  photo: { label: "Photo", icon: "📸", color: "#4ECDC4" },
-                  trophy: { label: "Trophée", icon: "🏆", color: "#F0C460" },
-                  level_up: { label: "Niveau", icon: "⬆️", color: "#4CAF50" },
-                  tag: { label: "Tag", icon: "🏷️", color: "#3B82F6" },
-                  crew_glupp: { label: "Crew", icon: "👥", color: "#EC4899" },
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {topUsers.map((user, idx) => {
+                const userLvl = getLevel(user.xp);
+                return (
+                  <motion.div
+                    key={user.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="flex items-center p-4 bg-[#1E1B16] border border-[#3A3530] rounded-xl hover:border-[#6B6050] transition-colors"
+                  >
+                    {/* Rank */}
+                    <span className={`
+                      text-lg font-bold w-8 shrink-0
+                      ${idx === 0 ? 'text-[#F0C460]' : 
+                        idx === 1 ? 'text-[#E8E1D5]' : 
+                        idx === 2 ? 'text-[#E08840]' : 'text-[#6B6050]'}
+                    `}>
+                      #{idx + 1}
+                    </span>
+
+                    {/* Avatar */}
+                    <img
+                      src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                      alt={user.username}
+                      className="w-12 h-12 rounded-full border-2 border-[#3A3530] ml-2 shrink-0 object-cover"
+                    />
+
+                    {/* Info */}
+                    <div className="ml-4 min-w-0 flex-1">
+                      <p className="text-[#F7F3EE] font-semibold truncate">
+                        {user.display_name || user.username}
+                      </p>
+                      <p className="text-xs text-[#8C8273] truncate">
+                        @{user.username}
+                      </p>
+                    </div>
+
+                    {/* XP/Level */}
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-[#E08840]">
+                        {user.xp} XP
+                      </p>
+                      <p className="text-[10px] text-[#8C8273] uppercase tracking-wider">
+                        {userLvl.title}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ── RECENT ACTIVITY ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="text-[#8C8273]" size={20} />
+            <h2 className="text-xl font-semibold text-[#F7F3EE]">Live Activity</h2>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+            </div>
+          ) : recentActivity.length === 0 ? (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-8 text-center">
+              <Activity className="mx-auto text-[#6B6050] mb-3" size={32} />
+              <p className="text-[#8C8273]">It's quiet... too quiet.</p>
+            </div>
+          ) : (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl divide-y divide-[#3A3530] overflow-hidden">
+              {recentActivity.map((act) => {
+                // Helpers for nice display
+                const timeAgo = new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' });
+                const userName = act.user?.display_name || act.user?.username || "Unknown";
+                const userAvatar = act.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`;
+
+                // Config by type
+                const typeConfig: Record<string, { icon: React.ReactNode, label: string, color: string }> = {
+                  tasting: { icon: <Beer size={16} />, label: "Check-in", color: "text-[#E08840]" },
+                  photo: { icon: <Sparkles size={16} />, label: "Photo", color: "text-[#10B981]" },
+                  duel: { icon: <Swords size={16} />, label: "Duel", color: "text-[#EF4444]" },
+                  trophy: { icon: <Trophy size={16} />, label: "Trophy", color: "text-[#F0C460]" },
                 };
-                const cfg = typeConfig[act.type] ?? { label: act.type, icon: "📌", color: "#6B6050" };
-                const timeAgo = (() => {
-                  const diff = Date.now() - new Date(act.created_at).getTime();
-                  const mins = Math.floor(diff / 60000);
-                  if (mins < 60) return `il y a ${mins}min`;
-                  const hrs = Math.floor(mins / 60);
-                  if (hrs < 24) return `il y a ${hrs}h`;
-                  return `il y a ${Math.floor(hrs / 24)}j`;
-                })();
+
+                const cfg = typeConfig[act.type] || { icon: <Activity size={16} />, label: act.type, color: "text-[#8C8273]" };
 
                 return (
-                  <div key={act.id} className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {/* Type badge */}
-                      <div
-                        className="flex items-center justify-center w-8 h-8 rounded-lg text-sm shrink-0"
-                        style={{ background: `${cfg.color}20` }}
-                      >
-                        {cfg.icon}
-                      </div>
+                  <div key={act.id} className="p-4 flex items-center gap-4 hover:bg-[#2A241C] transition-colors">
+                    
+                    {/* Activity Icon */}
+                    <div className={`w-8 h-8 rounded-full bg-[#14120F] border border-[#3A3530] flex items-center justify-center shrink-0 ${cfg.color}`}>
+                      {cfg.icon}
+                    </div>
 
-                      {/* Avatar */}
-                      <div className="w-7 h-7 rounded-full bg-[#3A3530] flex items-center justify-center shrink-0 overflow-hidden">
-                        {act.user?.avatar_url ? (
-                          <img src={act.user.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-[10px] font-bold text-[#A89888]">
-                            {(act.user?.username || "?")[0].toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Info */}
+                    <div className="flex-1 min-w-0 flex items-center gap-3">
+                      {/* User Avatar */}
+                      <img
+                        src={userAvatar}
+                        alt=""
+                        className="w-8 h-8 rounded-full border border-[#3A3530] shrink-0 object-cover"
+                      />
+                      
+                      {/* Text */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[#F5E6D3] truncate">
-                          <span className="font-medium">{act.user?.username ?? "?"}</span>
-                          {" "}
-                          <span className="text-[#A89888]">
-                            {cfg.label === "Glupp" ? "a gluppé" :
+                        <p className="text-sm text-[#E8E1D5] truncate">
+                          <span className="font-semibold">{userName}</span>
+                          <span className="text-[#8C8273] mx-1">
+                            {cfg.label === "Check-in" ? "a gluppé" :
                              cfg.label === "Duel" ? "a joué un duel" :
                              cfg.label === "Photo" ? "a pris une photo" :
                              `a effectué ${cfg.label.toLowerCase()}`}
