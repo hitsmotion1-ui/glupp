@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAdmin } from "@/lib/hooks/useAdmin";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import {
   Camera,
@@ -151,33 +151,9 @@ export default function AdminGluppsPage() {
   const [onlyWithPhoto, setOnlyWithPhoto] = useState(false);
   const [lightbox, setLightbox] = useState<LightboxEntry | null>(null);
 
-const PAGE_SIZE = 20;
-  
-  // 🆕 On appelle DIRECTEMENT nos nouvelles fonctions SQL blindées !
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-glupps", page, onlyWithPhoto],
-    queryFn: async () => {
-      // 1. On récupère les Glupps
-      const { data: gluppsData, error: gluppsErr } = await supabase.rpc("get_admin_glupps", {
-        p_limit: PAGE_SIZE,
-        p_offset: page * PAGE_SIZE,
-        p_only_with_photo: onlyWithPhoto
-      });
-      
-      // 2. On récupère le nombre total pour la pagination
-      const { data: countData, error: countErr } = await supabase.rpc("get_admin_glupps_count", {
-        p_only_with_photo: onlyWithPhoto
-      });
+  const PAGE_SIZE = admin.GLUPPS_PAGE_SIZE;
 
-      if (gluppsErr) console.error("❌ Erreur SQL Glupps :", gluppsErr.message);
-      if (countErr) console.error("❌ Erreur SQL Count :", countErr.message);
-
-      return {
-        glupps: gluppsData || [],
-        total: countData || 0
-      };
-    }
-  });
+  const { data, isLoading } = admin.useAdminGlupps({ page, onlyWithPhoto });
 
   const glupps = data?.glupps ?? [];
   const total = data?.total ?? 0;
@@ -188,18 +164,18 @@ const PAGE_SIZE = 20;
     setPage(0);
   };
 
-  // 🗑️ Mutation pour supprimer un Glupp
+  // 🗑️ Mutation pour supprimer un Glupp (via RPC SECURITY DEFINER)
   const deleteGluppMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("activities").delete().eq("id", id);
+      const { error } = await supabase.rpc("admin_delete_glupp", { p_activity_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
-      // On rafraîchit la liste de l'admin ET le flux social des utilisateurs
-      queryClient.invalidateQueries({ queryKey: ["admin-glupps"] });
-      queryClient.invalidateQueries({ queryKey: ["activities-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "glupps"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "activities"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
       setLightbox(null);
-    }
+    },
   });
 
   const handleDelete = (id: string) => {
