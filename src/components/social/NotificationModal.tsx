@@ -43,8 +43,6 @@ function timeAgo(dateStr: string): string {
   return `il y a ${weeks}sem`;
 }
 
-// ─── Persistent notification card ──────────────────────────────
-
 function PersistentNotifCard({
   notif,
   onMarkRead,
@@ -54,7 +52,7 @@ function PersistentNotifCard({
 }) {
   const p = notif.persistent!;
 
-const configMap: Record<
+  const configMap: Record<
     string,
     {
       icon: typeof Bell;
@@ -99,14 +97,12 @@ const configMap: Record<
       iconColor: "text-green-500",
       accentBorder: "border-l-green-500",
     },
-    // 🆕 AJOUT ICI : Le design pour les likes
     reaction: {
       icon: Heart,
       iconBg: "bg-[#E08840]/15",
       iconColor: "text-[#E08840]",
       accentBorder: "border-l-[#E08840]",
     },
-    // 🆕 AJOUT ICI : Le design pour les commentaires
     comment: {
       icon: MessageCircle,
       iconBg: "bg-[#4ECDC4]/15",
@@ -130,7 +126,6 @@ const configMap: Record<
         !p.is_read ? "bg-glupp-accent/5" : ""
       }`}
     >
-      {/* Icon */}
       <div className="relative shrink-0">
         <div
           className={`w-9 h-9 rounded-full flex items-center justify-center ${config.iconBg}`}
@@ -148,7 +143,6 @@ const configMap: Record<
         )}
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-glupp-cream">{p.title}</p>
         {p.message && (
@@ -171,7 +165,6 @@ const configMap: Record<
         </p>
       </div>
 
-      {/* Mark as read */}
       {!p.is_read && (
         <button
           onClick={() => onMarkRead(p.id)}
@@ -182,15 +175,12 @@ const configMap: Record<
         </button>
       )}
 
-      {/* Unread dot */}
       {!p.is_read && (
         <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-glupp-accent" />
       )}
     </div>
   );
 }
-
-// ─── Main Modal ────────────────────────────────────────────────
 
 export function NotificationModal() {
   const showNotifications = useAppStore((s) => s.showNotifications);
@@ -200,12 +190,21 @@ export function NotificationModal() {
   const { notifications, isLoading, markAsRead, markAllAsRead, celebrateUnreadApprovals } =
     useNotifications();
 
-  // Celebrate unread approved submissions when the modal opens
   useEffect(() => {
     if (showNotifications) {
       celebrateUnreadApprovals();
     }
   }, [showNotifications, celebrateUnreadApprovals]);
+
+  const hasUnread = notifications.some((n) => !n.is_read);
+
+  // 🆕 Marquer comme lu à la fermeture
+  useEffect(() => {
+    if (!showNotifications && hasUnread && !isLoading) {
+      markAllAsRead();
+    }
+  }, [showNotifications, hasUnread, isLoading, markAllAsRead]);
+
   const { acceptRequest, rejectRequest } = useFriends();
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
 
@@ -235,15 +234,12 @@ export function NotificationModal() {
     }
   };
 
-  const hasUnread = notifications.some((n) => !n.is_read);
-
   return (
     <Modal
       isOpen={showNotifications}
       onClose={() => setShowNotifications(false)}
       title="Notifications"
     >
-      {/* Mark all as read button */}
       {hasUnread && !isLoading && (
         <button
           onClick={markAllAsRead}
@@ -286,9 +282,7 @@ export function NotificationModal() {
                     onMarkRead={markAsRead}
                   />
                 ) : (
-                  /* Legacy notification (friend request / activity tag) */
                   <div className="flex items-start gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp">
-                    {/* Icon type indicator */}
                     <div className="relative">
                       <button
                         onClick={() => {
@@ -322,7 +316,6 @@ export function NotificationModal() {
                       </div>
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-glupp-cream">
                         <button
@@ -350,7 +343,6 @@ export function NotificationModal() {
                       </p>
                     </div>
 
-                    {/* Actions for friend requests */}
                     {notif.type === "friend_request" &&
                       notif.legacy!.data.friendship_id && (
                         <div className="flex gap-1.5 shrink-0">

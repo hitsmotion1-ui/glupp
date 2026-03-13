@@ -6,9 +6,6 @@ import { supabase } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/queries/queryKeys";
 import { useAppStore } from "@/lib/store/useAppStore";
 
-// ─── Types ─────────────────────────────────────────────────────
-
-/** Legacy notification from the get_notifications RPC (friend requests, activity tags) */
 export interface LegacyNotification {
   notif_id: string;
   notif_type: "friend_request" | "activity_tag";
@@ -27,7 +24,6 @@ export interface LegacyNotification {
   };
 }
 
-/** Persistent notification from the notifications table */
 export interface PersistentNotification {
   id: string;
   user_id: string;
@@ -40,8 +36,8 @@ export interface PersistentNotification {
     | "trophy"
     | "ban_status"
     | "friend_accepted"
-    | "reaction" // 🆕 Ajouté
-    | "comment"; // 🆕 Ajouté
+    | "reaction" 
+    | "comment"; 
   title: string;
   message: string | null;
   metadata: Record<string, unknown>;
@@ -49,20 +45,15 @@ export interface PersistentNotification {
   created_at: string;
 }
 
-/** Unified notification entry for the UI */
 export interface UnifiedNotification {
   id: string;
   kind: "legacy" | "persistent";
   type: string;
   created_at: string;
   is_read: boolean;
-  // Legacy fields
   legacy?: LegacyNotification;
-  // Persistent fields
   persistent?: PersistentNotification;
 }
-
-// ─── Hook ─────────────────────────────────────────────────────
 
 export function useNotifications() {
   const queryClient = useQueryClient();
@@ -70,10 +61,8 @@ export function useNotifications() {
   const showXPToast = useAppStore((s) => s.showXPToast);
   const triggerCelebration = useAppStore((s) => s.triggerCelebration);
 
-  // Track which notifications we've already celebrated (to avoid double toasts)
   const celebratedIds = useRef<Set<string>>(new Set());
 
-  // ── 1. Legacy notifications (friend requests, activity tags) ──
   const { data: legacyNotifs = [], isLoading: loadingLegacy } = useQuery({
     queryKey: queryKeys.notifications.all,
     queryFn: async () => {
@@ -96,7 +85,6 @@ export function useNotifications() {
     staleTime: 30 * 1000,
   });
 
-  // ── 2. Persistent notifications (submissions, XP, system) ──
   const { data: persistentNotifs = [], isLoading: loadingPersistent } =
     useQuery({
       queryKey: ["notifications", "persistent"],
@@ -122,23 +110,20 @@ export function useNotifications() {
       staleTime: 30 * 1000,
     });
 
-  // ── 3. Merge into unified list ──
   const notifications = useMemo(() => {
     const unified: UnifiedNotification[] = [];
 
-    // Legacy notifications
     for (const n of legacyNotifs) {
       unified.push({
         id: n.notif_id,
         kind: "legacy",
         type: n.notif_type,
         created_at: n.created_at,
-        is_read: false, // Legacy notifs are always unread (pending actions)
+        is_read: false, 
         legacy: n,
       });
     }
 
-    // Persistent notifications
     for (const n of persistentNotifs) {
       unified.push({
         id: n.id,
@@ -150,7 +135,6 @@ export function useNotifications() {
       });
     }
 
-    // Sort by most recent first
     unified.sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -159,13 +143,11 @@ export function useNotifications() {
     return unified;
   }, [legacyNotifs, persistentNotifs]);
 
-  // Unread count
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.is_read).length,
     [notifications]
   );
 
-  // Friend requests only
   const friendRequests = useMemo(
     () =>
       notifications.filter(
@@ -174,7 +156,6 @@ export function useNotifications() {
     [notifications]
   );
 
-  // Activity tags only
   const activityTags = useMemo(
     () =>
       notifications.filter(
@@ -183,12 +164,10 @@ export function useNotifications() {
     [notifications]
   );
 
-  // Sync badge count to store
   useEffect(() => {
     setNotificationCount(unreadCount);
   }, [unreadCount, setNotificationCount]);
 
-  // Mark notification as read
   const markAsRead = useCallback(
     async (notifId: string) => {
       await supabase
@@ -203,7 +182,6 @@ export function useNotifications() {
     [queryClient]
   );
 
-  // Mark all persistent notifications as read
   const markAllAsRead = useCallback(async () => {
     const {
       data: { user },
@@ -225,7 +203,6 @@ export function useNotifications() {
   useEffect(() => {
     const channel = supabase
       .channel("notifications-live")
-      // Listen to friendships changes (legacy)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "friendships" },
@@ -238,12 +215,11 @@ export function useNotifications() {
           });
         }
       )
-      // Listen to new persistent notifications (submissions, XP, etc.)
+      // 🆕 NOUVEAU: Écoute sur tous les événements
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
+        { event: "*", schema: "public", table: "notifications" },
         () => {
-          // Refetch persistent notifications (badge count updates automatically)
           queryClient.invalidateQueries({
             queryKey: ["notifications", "persistent"],
           });
@@ -256,9 +232,7 @@ export function useNotifications() {
     };
   }, [queryClient]);
 
-  // ── 5. Celebrate unread approvals (called when modal opens) ──
   const celebrateUnreadApprovals = useCallback(async () => {
-    // Find unread approved-submission notifications that haven't been celebrated yet
     const unreadApprovals = persistentNotifs.filter(
       (n) =>
         n.type === "submission_approved" &&
@@ -274,15 +248,12 @@ export function useNotifications() {
       const xp = (notif.metadata?.xp_gained as number) || 0;
       const name = (notif.metadata?.name as string) || "";
 
-      // Trigger XP toast
       if (xp > 0) {
         showXPToast(xp, `${name} validé !`);
       }
-      // Trigger celebration confetti
       triggerCelebration();
     }
 
-    // Mark them as read
     const ids = unreadApprovals.map((n) => n.id);
     await supabase
       .from("notifications")
