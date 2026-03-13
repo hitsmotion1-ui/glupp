@@ -190,12 +190,6 @@ export function NotificationModal() {
   const { notifications, isLoading, markAsRead, markAllAsRead, celebrateUnreadApprovals } =
     useNotifications();
 
-  useEffect(() => {
-    if (showNotifications) {
-      celebrateUnreadApprovals();
-    }
-  }, [showNotifications, celebrateUnreadApprovals]);
-
   const hasUnread = notifications.some((n) => !n.is_read);
 
   // 🆕 Marquer comme lu à la fermeture
@@ -237,7 +231,7 @@ export function NotificationModal() {
   return (
     <Modal
       isOpen={showNotifications}
-      onClose={() => setShowNotifications(false)}
+      onClose={() => { if (hasUnread) markAllAsRead(); setShowNotifications(false); }}
       title="Notifications"
     >
       {hasUnread && !isLoading && (
