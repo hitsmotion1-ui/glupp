@@ -170,7 +170,7 @@ export default function AdminGluppsPage() {
       let dataQuery = supabase
         .from("activities")
         .select(
-          "*, user:profiles!inner(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery)"
+          "*, user:profiles!user_id!inner(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery)"
         )
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
@@ -202,7 +202,7 @@ export default function AdminGluppsPage() {
       // Requête pour compter le total (avec les mêmes filtres)
       let countQuery = supabase
         .from("activities")
-        .select("id, user:profiles!inner(username)", { count: "exact", head: true });
+        .select("id, user:profiles!user_id!inner(username)", { count: "exact", head: true });
 
       if (activityType === "all") {
         countQuery = countQuery.in("type", ["glupp", "reglupp"]);
