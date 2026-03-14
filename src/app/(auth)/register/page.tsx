@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { CheckCircle2, XCircle } from "lucide-react"; // 👈 Ajout des icônes de validation
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -13,25 +14,27 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   
-  // 👈 Nouveaux états pour les cases à cocher légales
   const [isAdult, setIsAdult] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // 🛡️ Vérifications en temps réel du mot de passe
+  const hasMinLength = password.length >= 8;
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+  const passwordsMatch = password.length > 0 && password === confirmPassword;
+  
+  const isPasswordValid = hasMinLength && hasNumber && hasSpecialChar;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // 👈 Vérifications légales
-    if (!isAdult) {
-      setError("Tu dois avoir plus de 18 ans pour utiliser Glupp.");
-      return;
-    }
-    
-    if (!acceptTerms) {
-      setError("Tu dois accepter les conditions d'utilisation.");
+    // Vérifications avant envoi
+    if (!isAdult || !acceptTerms) {
+      setError("Tu dois accepter les conditions et certifier ton âge.");
       return;
     }
 
@@ -40,12 +43,12 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Le mot de passe doit faire au moins 6 caractères.");
+    if (!isPasswordValid) {
+      setError("Le mot de passe ne respecte pas tous les critères de sécurité.");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (!passwordsMatch) {
       setError("Les mots de passe ne correspondent pas.");
       return;
     }
@@ -59,7 +62,6 @@ export default function RegisterPage() {
         data: {
           username,
           display_name: username,
-          // 👈 Tu peux même stocker cette validation dans la BDD pour te protéger
           age_verified: true, 
           terms_accepted: true
         },
@@ -75,13 +77,18 @@ export default function RegisterPage() {
     router.push("/duel");
   };
 
+  // Petit composant pour afficher une règle de mot de passe
+  const PasswordRule = ({ isValid, text }: { isValid: boolean, text: string }) => (
+    <div className={`flex items-center gap-1.5 text-xs ${isValid ? "text-glupp-success" : "text-glupp-text-muted"}`}>
+      {isValid ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+      <span>{text}</span>
+    </div>
+  );
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label
-          htmlFor="username"
-          className="block text-sm text-glupp-text-soft mb-1"
-        >
+        <label htmlFor="username" className="block text-sm text-glupp-text-soft mb-1">
           Pseudo
         </label>
         <input
@@ -98,10 +105,7 @@ export default function RegisterPage() {
       </div>
 
       <div>
-        <label
-          htmlFor="email"
-          className="block text-sm text-glupp-text-soft mb-1"
-        >
+        <label htmlFor="email" className="block text-sm text-glupp-text-soft mb-1">
           Email
         </label>
         <input
@@ -116,10 +120,7 @@ export default function RegisterPage() {
       </div>
 
       <div>
-        <label
-          htmlFor="password"
-          className="block text-sm text-glupp-text-soft mb-1"
-        >
+        <label htmlFor="password" className="block text-sm text-glupp-text-soft mb-1">
           Mot de passe
         </label>
         <input
@@ -128,17 +129,20 @@ export default function RegisterPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          minLength={6}
           className="w-full px-4 py-3 bg-glupp-card border border-glupp-border rounded-glupp text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-          placeholder="Min. 6 caractères"
+          placeholder="Créer un mot de passe"
         />
+        
+        {/* 👈 Affichage des règles en temps réel */}
+        <div className="mt-2 p-3 bg-glupp-bg/50 rounded-lg space-y-1.5 border border-glupp-border/50">
+          <PasswordRule isValid={hasMinLength} text="Au moins 8 caractères" />
+          <PasswordRule isValid={hasNumber} text="Au moins 1 chiffre" />
+          <PasswordRule isValid={hasSpecialChar} text="Au moins 1 caractère spécial (!@#...)" />
+        </div>
       </div>
 
       <div>
-        <label
-          htmlFor="confirmPassword"
-          className="block text-sm text-glupp-text-soft mb-1"
-        >
+        <label htmlFor="confirmPassword" className="block text-sm text-glupp-text-soft mb-1">
           Confirmer le mot de passe
         </label>
         <input
@@ -147,12 +151,20 @@ export default function RegisterPage() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
-          className="w-full px-4 py-3 bg-glupp-card border border-glupp-border rounded-glupp text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-          placeholder="Confirmer"
+          className={`w-full px-4 py-3 bg-glupp-card border rounded-glupp text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none transition-colors ${
+            confirmPassword.length > 0 
+              ? (passwordsMatch ? "border-glupp-success focus:border-glupp-success" : "border-glupp-error focus:border-glupp-error")
+              : "border-glupp-border focus:border-glupp-accent"
+          }`}
+          placeholder="Répéter le mot de passe"
         />
+        {/* Petit texte d'erreur sous la confirmation si ça ne match pas */}
+        {confirmPassword.length > 0 && !passwordsMatch && (
+          <p className="text-glupp-error text-xs mt-1">Les mots de passe ne correspondent pas.</p>
+        )}
       </div>
 
-      {/* 👈 Les cases légales (Checkboxes) */}
+      {/* Les cases légales */}
       <div className="pt-2 pb-1 space-y-3">
         <label className="flex items-start gap-3 cursor-pointer group">
           <div className="relative flex items-center mt-0.5">
@@ -184,7 +196,7 @@ export default function RegisterPage() {
             </svg>
           </div>
           <span className="text-sm text-glupp-text-soft group-hover:text-glupp-cream transition-colors leading-tight">
-            J'accepte les <Link href="/legal/terms" className="text-glupp-accent hover:underline">Conditions d'Utilisation</Link> et la <Link href="/legal/privacy" className="text-glupp-accent hover:underline">Politique de Confidentialité</Link>.
+            J'accepte les <Link href="/legal/terms" target="_blank" className="text-glupp-accent hover:underline">Conditions d'Utilisation</Link> et la <Link href="/legal/privacy" target="_blank" className="text-glupp-accent hover:underline">Politique de Confidentialité</Link>.
           </span>
         </label>
       </div>
@@ -195,13 +207,13 @@ export default function RegisterPage() {
         </p>
       )}
 
-      {/* 👈 Le bouton est disabled tant que les deux cases ne sont pas cochées */}
+      {/* Le bouton est disabled si tout n'est pas parfait ! */}
       <Button 
         type="submit" 
         variant="primary" 
         className="w-full mt-2" 
         loading={loading}
-        disabled={!isAdult || !acceptTerms}
+        disabled={!isAdult || !acceptTerms || !isPasswordValid || !passwordsMatch}
       >
         Créer mon compte
       </Button>
