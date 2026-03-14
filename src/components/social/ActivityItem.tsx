@@ -12,6 +12,7 @@ import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2, Flag } from "
 import type { ActivityEntry } from "@/lib/hooks/useActivities";
 import type { Rarity } from "@/types";
 import { ReportModal } from "@/components/global/ReportModal"; // 👈 L'import de la modale
+import { useProfile } from "@/lib/hooks/useProfile";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -101,10 +102,8 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
   const queryClient = useQueryClient();
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
-  }, []);
+const { profile } = useProfile();
+  const currentUserId = profile?.id;
 
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState("");
