@@ -16,11 +16,12 @@ import {
   Trophy,
   Star,
   Sparkles,
+  ShieldAlert, // 👈 Ajout de l'icône ici
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/beers", label: "Bi\u00e8res", icon: Beer, exact: false },
+  { href: "/admin/beers", label: "Bières", icon: Beer, exact: false },
   { href: "/admin/bars", label: "Bars", icon: MapPin, exact: false },
   { href: "/admin/glupps", label: "Glupps", icon: Sparkles, exact: false },
   {
@@ -31,11 +32,12 @@ const navItems = [
     badge: true,
   },
   { href: "/admin/users", label: "Utilisateurs", icon: Users, exact: false },
-  { href: "/admin/trophies", label: "Troph\u00e9es", icon: Trophy, exact: false },
+  { href: "/admin/trophies", label: "Trophées", icon: Trophy, exact: false },
   { href: "/admin/gotw", label: "Glupp of Week", icon: Star, exact: false },
+  { href: "/admin/reports", label: "Signalements", icon: ShieldAlert, exact: false }, // 👈 Ajout du lien ici
   {
     href: "/admin/settings",
-    label: "Param\u00e8tres",
+    label: "Paramètres",
     icon: Settings,
     exact: false,
   },
@@ -145,7 +147,7 @@ export function AdminSidebar() {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#A89888] hover:text-[#F5E6D3] hover:bg-[#1E1B16] transition-all duration-150"
         >
           <ArrowLeft size={18} strokeWidth={1.8} className="shrink-0" />
-          <span>Retour \u00e0 l&apos;app</span>
+          <span>Retour à l&apos;app</span>
         </Link>
       </div>
     </div>
