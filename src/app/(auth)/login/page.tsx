@@ -84,6 +84,12 @@ export default function LoginPage() {
           Inscription
         </Link>
       </p>
+
+      {/* 🆕 Message sanitaire auth */}
+      <p className="text-[10px] text-glupp-text-muted text-center mt-6 leading-relaxed border-t border-glupp-border/50 pt-4">
+        L'abus d'alcool est dangereux pour la santé, à consommer avec modération.<br />
+        Réservé aux personnes majeures.
+      </p>
     </form>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link"; // 👈 Import de Link ajouté
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { useCollection } from "@/lib/hooks/useCollection";
@@ -198,7 +199,7 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      {/* 🆕 Bouton Feedback (CORRIGÉ avec variant="secondary") */}
+      {/* Bouton Feedback */}
       <div>
         <Button 
           variant="secondary" 
@@ -291,6 +292,35 @@ export default function ProfilePage() {
           )}
         </div>
       </CollapsibleSection>
+
+      {/* 🆕 Section Légale & Footer Profil */}
+      <div className="mt-8 pt-6 border-t border-glupp-border flex flex-col items-center space-y-4">
+        <p className="text-xs text-glupp-text-muted text-center px-4 leading-relaxed">
+          L'abus d'alcool est dangereux pour la santé, à consommer avec modération.
+        </p>
+        
+        <div className="flex items-center justify-center gap-2 text-xs text-glupp-text-muted flex-wrap">
+          <Link href="/legal/terms" className="hover:text-glupp-accent underline transition-colors">CGU</Link>
+          <span>·</span>
+          <Link href="/legal/privacy" className="hover:text-glupp-accent underline transition-colors">Confidentialité</Link>
+          <span>·</span>
+          <Link href="/legal" className="hover:text-glupp-accent underline transition-colors">Mentions légales</Link>
+        </div>
+        
+        <p className="text-[10px] text-glupp-text-muted font-mono mt-1">
+          Glupp v1.0 · Réservé aux personnes majeures
+        </p>
+
+        {/* Bouton de déconnexion */}
+        <Button
+          variant="ghost"
+          className="text-glupp-error hover:bg-glupp-error/10 w-full mt-2"
+          onClick={signOut}
+        >
+          <LogOut size={16} className="mr-2" />
+          Se déconnecter
+        </Button>
+      </div>
 
       {/* Friend Search Modal */}
       <FriendSearchModal />

@@ -8,6 +8,7 @@ import { AuthGuard } from "@/components/global/AuthGuard";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { QueryProvider } from "@/lib/providers/QueryProvider";
+import { HealthWarningFooter } from "@/components/global/HealthWarningFooter"; // 👈 Ajoute cet import
 
 export default async function AppLayout({
   children,
@@ -31,6 +32,8 @@ export default async function AppLayout({
           <main className="flex-1 pb-20 overflow-y-auto">
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
+          {/* 👈 Le bandeau sanitaire inséré ici */}
+          <HealthWarningFooter />
           <TabBar />
           <GlobalModals />
           <PWAInstallPrompt />

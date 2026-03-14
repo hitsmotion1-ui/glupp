@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle2, XCircle } from "lucide-react"; // 👈 Ajout des icônes de validation
+import { CheckCircle2, XCircle } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -20,7 +20,6 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 🛡️ Vérifications en temps réel du mot de passe
   const hasMinLength = password.length >= 8;
   const hasNumber = /[0-9]/.test(password);
   const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
@@ -32,7 +31,6 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
 
-    // Vérifications avant envoi
     if (!isAdult || !acceptTerms) {
       setError("Tu dois accepter les conditions et certifier ton âge.");
       return;
@@ -77,7 +75,6 @@ export default function RegisterPage() {
     router.push("/duel");
   };
 
-  // Petit composant pour afficher une règle de mot de passe
   const PasswordRule = ({ isValid, text }: { isValid: boolean, text: string }) => (
     <div className={`flex items-center gap-1.5 text-xs ${isValid ? "text-glupp-success" : "text-glupp-text-muted"}`}>
       {isValid ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
@@ -133,7 +130,6 @@ export default function RegisterPage() {
           placeholder="Créer un mot de passe"
         />
         
-        {/* 👈 Affichage des règles en temps réel */}
         <div className="mt-2 p-3 bg-glupp-bg/50 rounded-lg space-y-1.5 border border-glupp-border/50">
           <PasswordRule isValid={hasMinLength} text="Au moins 8 caractères" />
           <PasswordRule isValid={hasNumber} text="Au moins 1 chiffre" />
@@ -158,13 +154,11 @@ export default function RegisterPage() {
           }`}
           placeholder="Répéter le mot de passe"
         />
-        {/* Petit texte d'erreur sous la confirmation si ça ne match pas */}
         {confirmPassword.length > 0 && !passwordsMatch && (
           <p className="text-glupp-error text-xs mt-1">Les mots de passe ne correspondent pas.</p>
         )}
       </div>
 
-      {/* Les cases légales */}
       <div className="pt-2 pb-1 space-y-3">
         <label className="flex items-start gap-3 cursor-pointer group">
           <div className="relative flex items-center mt-0.5">
@@ -207,7 +201,6 @@ export default function RegisterPage() {
         </p>
       )}
 
-      {/* Le bouton est disabled si tout n'est pas parfait ! */}
       <Button 
         type="submit" 
         variant="primary" 
@@ -223,6 +216,12 @@ export default function RegisterPage() {
         <Link href="/login" className="text-glupp-accent hover:underline font-medium">
           Se connecter
         </Link>
+      </p>
+
+      {/* 🆕 Message sanitaire auth */}
+      <p className="text-[10px] text-glupp-text-muted text-center mt-6 leading-relaxed border-t border-glupp-border/50 pt-4">
+        L'abus d'alcool est dangereux pour la santé, à consommer avec modération.<br />
+        Réservé aux personnes majeures.
       </p>
     </form>
   );
