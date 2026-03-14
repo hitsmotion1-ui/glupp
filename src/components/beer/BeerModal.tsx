@@ -110,7 +110,6 @@ export function BeerModal() {
     setSavingTaste(true);
 
     try {
-      // On met à jour en utilisant l'ID exact de la ligne (très sûr) ET on demande le retour avec .select()
       const { data, error } = await supabase
         .from("user_beers")
         .update({
@@ -120,19 +119,15 @@ export function BeerModal() {
           user_taste_body: tasteDraft.body,
         })
         .eq("id", userBeerData.id) 
-        .select(); // 👈 Très important pour vérifier si Supabase a vraiment écrit la donnée
+        .select();
 
       if (error) throw error;
 
-      // Si Supabase ne renvoie pas de ligne, c'est que la sauvegarde a été bloquée par le RLS
       if (!data || data.length === 0) {
         console.error("Sauvegarde ignorée. Problème RLS ?");
         alert("Attention : Supabase a bloqué la sauvegarde. Vérifie tes règles de sécurité (RLS) pour autoriser l'UPDATE sur la table user_beers !");
       } else {
-        // Succès ! On ferme le mode édition
         setEditingTaste(false);
-        
-        // On force la mise à jour des données locales pour que les jauges s'affichent avec les nouvelles valeurs
         await queryClient.invalidateQueries({ queryKey: ["userBeer", selectedBeerId] });
         await refetchUserBeer();
       }
@@ -357,7 +352,7 @@ export function BeerModal() {
               {!editingTaste ? (
                 <button
                   onClick={() => {
-                    // On initialise les jauges avec les notes précédentes UNIQUEMENT quand on ouvre le mode édition
+                    // On remet le comportement que tu préférais : on copie la communauté s'il n'y a pas de note
                     if (userBeerData?.user_taste_bitter != null) {
                       setTasteDraft({
                         bitter: userBeerData.user_taste_bitter,
@@ -412,14 +407,18 @@ export function BeerModal() {
                         {tasteDraft[dim.key]}
                       </span>
                     </div>
+                    {/* 🛠️ L'ASTUCE ICI : min est à 0 pour que 1 se place à 20%, et on utilise Math.max(1, value) */}
                     <input
                       type="range"
-                      min={1} max={5} step={1}
+                      min={0} max={5} step={1}
                       value={tasteDraft[dim.key]}
-                      onChange={(e) => setTasteDraft((prev) => ({ ...prev, [dim.key]: parseInt(e.target.value) }))}
+                      onChange={(e) => {
+                        const newValue = Math.max(1, parseInt(e.target.value));
+                        setTasteDraft((prev) => ({ ...prev, [dim.key]: newValue }));
+                      }}
                       className="w-full h-2 rounded-full appearance-none cursor-pointer"
                       style={{
-                        background: `linear-gradient(to right, ${dim.color} 0%, ${dim.color} ${((tasteDraft[dim.key] - 1) / 4) * 100}%, rgba(58,53,48,0.6) ${((tasteDraft[dim.key] - 1) / 4) * 100}%, rgba(58,53,48,0.6) 100%)`,
+                        background: `linear-gradient(to right, ${dim.color} 0%, ${dim.color} ${(tasteDraft[dim.key] / 5) * 100}%, rgba(58,53,48,0.6) ${(tasteDraft[dim.key] / 5) * 100}%, rgba(58,53,48,0.6) 100%)`,
                       }}
                     />
                   </div>
