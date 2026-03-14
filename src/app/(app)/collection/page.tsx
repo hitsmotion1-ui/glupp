@@ -19,7 +19,7 @@ import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { LevelBadge } from "@/components/gamification/LevelBadge";
 import { RARITY_CONFIG, type Rarity, formatNumber } from "@/lib/utils/xp";
-import { Search, ChevronDown, Trophy, BookOpen, Globe, Crown, Swords } from "lucide-react";
+import { Search, ChevronDown, Trophy, BookOpen, Globe, Crown, Swords, Clock, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const RARITY_FILTERS: { key: Rarity | "all"; label: string }[] = [
@@ -444,133 +444,60 @@ function BeerdexView() {
   );
 }
 
-/* ─── Mondial View (original Ranking) ─── */
+/* ─── Mondial View (Bientôt disponible) ─── */
 function MondialView() {
-  const {
-    rankings,
-    loading,
-    filterStyle,
-    setFilterStyle,
-    sortBy,
-    setSortBy,
-    availableStyles,
-  } = useRanking();
-  const openBeerModal = useAppStore((s) => s.openBeerModal);
-
-  const regionFilter = useRegionFilter();
-
-  // Fetch user's tasted beer IDs
-  const { data: tastedIds } = useQuery({
-    queryKey: [...queryKeys.collection.all, "tasted-ids"],
-    queryFn: async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return new Set<string>();
-      const { data } = await supabase
-        .from("user_beers")
-        .select("beer_id")
-        .eq("user_id", user.id);
-      return new Set((data || []).map((ub) => ub.beer_id));
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const tastedSet = useMemo(() => tastedIds || new Set<string>(), [tastedIds]);
-
-  // Apply region filter
-  const filteredRankings = useMemo(() => {
-    let beers = rankings;
-    if (regionFilter.selectedCountry) {
-      beers = beers.filter((b) => b.country_code === regionFilter.selectedCountry);
-    }
-    if (regionFilter.selectedRegion) {
-      if (regionFilter.regionMode === "departments") {
-        beers = beers.filter((b) =>
-          matchesNormalizedDepartment(b.region, regionFilter.selectedRegion!, b.country_code)
-        );
-      } else {
-        beers = beers.filter((b) =>
-          matchesNormalizedRegion(b.region, regionFilter.selectedRegion!, b.country_code)
-        );
-      }
-    }
-    return beers;
-  }, [rankings, regionFilter.selectedCountry, regionFilter.selectedRegion, regionFilter.regionMode]);
-
-  if (loading) {
-    return (
-      <div className="px-4 space-y-3">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div>
-      {/* Region Filter */}
-      <div className="mb-3">
-        <RegionFilter {...regionFilter} />
-      </div>
-
-      {/* Sort buttons */}
-      <div className="flex gap-2 px-4 pb-3">
-        {([
-          { key: "elo" as const, label: "ELO" },
-          { key: "name" as const, label: "Nom" },
-          { key: "votes" as const, label: "Votes" },
-        ]).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setSortBy(key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-glupp transition-colors ${
-              sortBy === key
-                ? "bg-glupp-accent text-glupp-bg"
-                : "bg-glupp-card text-glupp-text-soft border border-glupp-border hover:border-glupp-accent"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Style filters */}
-      <div className="flex gap-2 px-4 pb-4 overflow-x-auto scrollbar-hide">
-        <Pill
-          label="Tous"
-          active={!filterStyle}
-          onClick={() => setFilterStyle(null)}
-        />
-        {availableStyles.map((style) => (
-          <Pill
-            key={style}
-            label={style}
-            active={filterStyle === style}
-            onClick={() => setFilterStyle(style)}
-          />
-        ))}
-      </div>
-
-      {/* Ranking list */}
-      <div>
-        {filteredRankings.map((beer, index) => (
-          <BeerRow
-            key={beer.id}
-            beer={beer}
-            rank={index + 1}
-            onClick={() => openBeerModal(beer.id)}
-            tasted={tastedSet.has(beer.id)}
-          />
-        ))}
-      </div>
-
-      {filteredRankings.length === 0 && (
-        <div className="text-center py-12 text-glupp-text-muted">
-          Aucune biere trouvee pour ce filtre.
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* Icône Centrale */}
+      <div className="relative mb-6">
+        <div className="w-20 h-20 bg-glupp-card border-2 border-glupp-accent/30 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(224,136,64,0.15)]">
+          <Globe size={40} className="text-glupp-accent" />
         </div>
-      )}
+        <div className="absolute -top-2 -right-2 bg-glupp-card border-2 border-glupp-border rounded-full p-1.5 animate-bounce shadow-xl">
+          <Clock size={16} className="text-glupp-gold" />
+        </div>
+      </div>
+      
+      {/* Titre et Texte */}
+      <h3 className="font-display text-2xl font-bold text-glupp-cream mb-3">
+        Le Classement Mondial
+      </h3>
+      
+      <p className="text-glupp-text-soft max-w-xs mx-auto mb-8 text-sm leading-relaxed">
+        Prépare-toi à affronter les meilleurs Gluppers ! Le système de compétition mondiale est en cours de création.
+      </p>
+
+      {/* Petite carte "Ce qui arrive" */}
+      <div className="bg-glupp-card border border-glupp-border rounded-xl p-5 max-w-sm w-full mx-auto text-left shadow-lg">
+        <h4 className="font-semibold text-glupp-cream flex items-center gap-2 mb-4 border-b border-glupp-border pb-3 text-sm">
+          <Sparkles size={16} className="text-glupp-accent" />
+          Fonctionnalités à venir
+        </h4>
+        
+        <ul className="text-xs text-glupp-text-soft space-y-4">
+          <li className="flex items-start gap-3">
+            <div className="mt-0.5 bg-glupp-bg border border-glupp-border p-1.5 rounded-md text-glupp-gold">
+              <Trophy size={14} />
+            </div>
+            <div>
+              <span className="block text-glupp-cream font-medium mb-0.5">Classement Global</span>
+              Compare ton XP avec tous les utilisateurs.
+            </div>
+          </li>
+          
+          <li className="flex items-start gap-3">
+            <div className="mt-0.5 bg-glupp-bg border border-glupp-border p-1.5 rounded-md text-[#4ECDC4]">
+              <Crown size={14} />
+            </div>
+            <div>
+              <span className="block text-glupp-cream font-medium mb-0.5">Ligues Mensuelles</span>
+              Gagne ta place de Bronze à Légende à chaque saison.
+            </div>
+          </li>
+        </ul>
+      </div>
+
     </div>
   );
 }

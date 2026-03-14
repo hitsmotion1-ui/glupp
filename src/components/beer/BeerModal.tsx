@@ -61,7 +61,7 @@ export function BeerModal() {
   const { data: beer, isLoading: loadingBeer } = useQuery({
     queryKey: ["beer", selectedBeerId],
     enabled: !!selectedBeerId,
-    staleTime: 5 * 60 * 1000, // En cache pendant 5 minutes
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("beers")
@@ -96,8 +96,10 @@ export function BeerModal() {
   const loading = loadingBeer || loadingUserBeer;
   const tasted = !!userBeerData;
 
-  // Initialiser le "draft" du goût quand on ouvre la bière ou quand on édite
+  // Initialiser le "draft" du goût uniquement à l'ouverture de la modale ou au clic sur "Modifier"
   useEffect(() => {
+    if (!editingTaste) return; // Ne met à jour les jauges que si on est en train d'éditer ou à l'ouverture
+
     if (userBeerData && userBeerData.user_taste_bitter != null) {
       setTasteDraft({
         bitter: userBeerData.user_taste_bitter,
@@ -146,12 +148,15 @@ export function BeerModal() {
       .eq("beer_id", beer.id);
 
     if (!error) {
-      setEditingTaste(false);
-      refetchUserBeer(); // Mets à jour les données affichées instantanément
+      setEditingTaste(false); // On ferme la fenêtre d'édition
+      await refetchUserBeer(); // On télécharge tes nouvelles notes
+      
+      // On force la mise à jour de la collection en arrière-plan
+      queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
     }
 
     setSavingTaste(false);
-  }, [beer, tasteDraft, refetchUserBeer]);
+  }, [beer, tasteDraft, refetchUserBeer, queryClient]);
 
   // Re-Glupp handler
   const handleReglupp = async () => {
@@ -176,12 +181,10 @@ export function BeerModal() {
       }
       setRegluppDone(true);
 
-      // On raffraichit les données de la bière en arrière-plan
       refetchUserBeer(); 
       queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
       
-      // Optionnel : Fermer la modale automatiquement après un Re-Glupp réussi (au bout de 2s)
       setTimeout(() => {
         closeBeerModal();
       }, 2000);
@@ -190,7 +193,6 @@ export function BeerModal() {
     setRegluppLoading(false);
   };
 
-  // XP for next re-glupp
   const regluppXP = (count: number): number => {
     if (count <= 1) return 5;
     if (count <= 3) return 3;
@@ -377,10 +379,7 @@ export function BeerModal() {
               ) : (
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => {
-                      setEditingTaste(false);
-                      // Annuler restaure l'état par défaut (via useEffect)
-                    }}
+                    onClick={() => setEditingTaste(false)}
                     className="px-2 py-1 rounded-md text-[10px] text-glupp-text-muted hover:bg-glupp-border/50 transition-colors"
                   >
                     Annuler
