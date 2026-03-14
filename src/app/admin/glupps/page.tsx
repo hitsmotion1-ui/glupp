@@ -146,7 +146,6 @@ export default function AdminGluppsPage() {
 
   const [page, setPage] = useState(0);
   
-  // Nouveaux états pour les filtres
   const [activityType, setActivityType] = useState<"all" | "glupp" | "reglupp">("all");
   const [onlyWithPhoto, setOnlyWithPhoto] = useState(false);
   const [userSearch, setUserSearch] = useState("");
@@ -158,7 +157,7 @@ export default function AdminGluppsPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(userSearch);
-      setPage(0); // Retour à la page 1 si on change la recherche
+      setPage(0);
     }, 500);
     return () => clearTimeout(timer);
   }, [userSearch]);
@@ -166,7 +165,6 @@ export default function AdminGluppsPage() {
   const { data, isLoading, isError, error: queryError } = useQuery({
     queryKey: ["admin", "glupps", page, onlyWithPhoto, activityType, debouncedSearch],
     queryFn: async () => {
-      // Pour pouvoir filtrer sur le nom d'utilisateur, on force un INNER JOIN sur profiles
       let dataQuery = supabase
         .from("activities")
         .select(
@@ -175,15 +173,18 @@ export default function AdminGluppsPage() {
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      // Filtre Type d'activité
-      if (activityType === "all") {
-        dataQuery = dataQuery.in("type", ["glupp", "reglupp"]);
-      } else {
-        dataQuery = dataQuery.eq("type", activityType);
+      // 🛠️ On filtre pour n'avoir que le type "glupp"
+      dataQuery = dataQuery.eq("type", "glupp");
+
+      // 🛠️ On différencie selon la présence d'une photo
+      if (activityType === "glupp") {
+        dataQuery = dataQuery.not("photo_url", "is", null);
+      } else if (activityType === "reglupp") {
+        dataQuery = dataQuery.is("photo_url", null);
       }
 
-      // Filtre Photo
-      if (onlyWithPhoto) {
+      // Filtre additionnel du bouton "Avec photo"
+      if (onlyWithPhoto && activityType !== "glupp") {
         dataQuery = dataQuery.not("photo_url", "is", null);
       }
 
@@ -199,18 +200,19 @@ export default function AdminGluppsPage() {
         throw new Error(error.message);
       }
 
-      // Requête pour compter le total (avec les mêmes filtres)
+      // 🛠️ Mêmes filtres pour la requête de comptage
       let countQuery = supabase
         .from("activities")
-        .select("id, user:profiles!user_id!inner(username)", { count: "exact", head: true });
+        .select("id, user:profiles!user_id!inner(username)", { count: "exact", head: true })
+        .eq("type", "glupp");
 
-      if (activityType === "all") {
-        countQuery = countQuery.in("type", ["glupp", "reglupp"]);
-      } else {
-        countQuery = countQuery.eq("type", activityType);
+      if (activityType === "glupp") {
+        countQuery = countQuery.not("photo_url", "is", null);
+      } else if (activityType === "reglupp") {
+        countQuery = countQuery.is("photo_url", null);
       }
 
-      if (onlyWithPhoto) {
+      if (onlyWithPhoto && activityType !== "glupp") {
         countQuery = countQuery.not("photo_url", "is", null);
       }
 
@@ -265,11 +267,10 @@ export default function AdminGluppsPage() {
 
       <div className="px-6 py-6 lg:px-8 space-y-4">
         
-        {/* ── BARRE D'OUTILS (Filtres et Recherche) ── */}
+        {/* ── BARRE D'OUTILS ── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#1E1B16] border border-[#3A3530] p-4 rounded-xl">
           
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Onglets Type d'activité */}
             <div className="flex bg-[#141210] border border-[#3A3530] rounded-lg p-1 mr-4">
               <button
                 onClick={() => { setActivityType("all"); setPage(0); }}
@@ -291,7 +292,6 @@ export default function AdminGluppsPage() {
               </button>
             </div>
 
-            {/* Filtre Photo */}
             <button
               onClick={() => { setOnlyWithPhoto(!onlyWithPhoto); setPage(0); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
@@ -305,7 +305,6 @@ export default function AdminGluppsPage() {
             </button>
           </div>
 
-          {/* Recherche Utilisateur */}
           <div className="relative w-full md:w-64">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6050]" />
             <input 
@@ -359,13 +358,16 @@ export default function AdminGluppsPage() {
                   const user = g.user as { id?: string; username?: string; display_name?: string; avatar_url?: string | null } | null;
                   const beer = g.beer as { name?: string; brewery?: string } | null;
                   const safeImageUrl = getValidImageUrl(g.photo_url);
+                  
+                  // 🛠️ Logique visuelle : c'est un reglupp s'il n'y a pas de photo
+                  const isReglupp = !g.photo_url;
 
                   return (
                     <div
                       key={g.id}
                       className="flex items-center gap-3 px-4 py-3 hover:bg-[#3A3530]/20 transition-colors"
                     >
-                      {/* Photo thumbnail / placeholder */}
+                      {/* Photo */}
                       {safeImageUrl ? (
                         <button
                           onClick={() =>
@@ -390,7 +392,8 @@ export default function AdminGluppsPage() {
                         </button>
                       ) : (
                         <div className="w-12 h-12 rounded-lg shrink-0 bg-[#3A3530]/40 flex items-center justify-center relative">
-                          {g.type === "reglupp" && <div className="absolute top-1 left-1 text-[8px] bg-[#E08840] text-black px-1 rounded-sm font-bold">RE</div>}
+                          {/* Badge "RE" sur l'image vide */}
+                          {isReglupp && <div className="absolute top-1 left-1 text-[8px] bg-[#E08840] text-black px-1 rounded-sm font-bold">RE</div>}
                           <Camera size={16} className="text-[#6B6050]" />
                         </div>
                       )}
@@ -409,7 +412,8 @@ export default function AdminGluppsPage() {
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-[#F5E6D3] truncate">
                             {user?.display_name || user?.username || "?"}
-                            {g.type === "reglupp" && <span className="ml-2 text-[10px] text-[#A89888] font-normal border border-[#3A3530] rounded px-1 py-0.5">Reglupp</span>}
+                            {/* Tag Reglupp à côté du nom */}
+                            {isReglupp && <span className="ml-2 text-[10px] text-[#A89888] font-normal border border-[#3A3530] rounded px-1 py-0.5">Reglupp</span>}
                           </p>
                           <p className="text-xs text-[#6B6050] truncate">
                             @{user?.username ?? "?"}
@@ -442,7 +446,7 @@ export default function AdminGluppsPage() {
                         {timeAgo(g.created_at)}
                       </p>
 
-                      {/* Actions Admin */}
+                      {/* Actions */}
                       <div className="flex items-center justify-end gap-1.5 shrink-0 w-20">
                         <button 
                           onClick={() => handleWarn(user?.username || "Inconnu")} 
@@ -455,7 +459,7 @@ export default function AdminGluppsPage() {
                           onClick={() => handleDelete(g.id)} 
                           disabled={deleteGluppMutation.isPending && deleteGluppMutation.variables === g.id}
                           className="p-1.5 text-[#6B6050] hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50" 
-                          title="Supprimer le Glupp"
+                          title="Supprimer"
                         >
                           {deleteGluppMutation.isPending && deleteGluppMutation.variables === g.id ? (
                             <Loader2 size={15} className="animate-spin" />
