@@ -96,27 +96,6 @@ export function BeerModal() {
   const loading = loadingBeer || loadingUserBeer;
   const tasted = !!userBeerData;
 
-  // Initialiser le "draft" du goût uniquement à l'ouverture de la modale ou au clic sur "Modifier"
-  useEffect(() => {
-    if (!editingTaste) return; // Ne met à jour les jauges que si on est en train d'éditer ou à l'ouverture
-
-    if (userBeerData && userBeerData.user_taste_bitter != null) {
-      setTasteDraft({
-        bitter: userBeerData.user_taste_bitter,
-        sweet: userBeerData.user_taste_sweet ?? 3,
-        fruity: userBeerData.user_taste_fruity ?? 3,
-        body: userBeerData.user_taste_body ?? 3,
-      });
-    } else if (beer) {
-      setTasteDraft({
-        bitter: beer.taste_bitter,
-        sweet: beer.taste_sweet,
-        fruity: beer.taste_fruity,
-        body: beer.taste_body,
-      });
-    }
-  }, [userBeerData, beer, editingTaste]);
-
   // Réinitialiser les états éphémères à la fermeture
   useEffect(() => {
     if (!selectedBeerId) {
@@ -127,36 +106,43 @@ export function BeerModal() {
 
   // ── Save user taste rating ──
   const handleSaveTaste = useCallback(async () => {
-    if (!beer) return;
+    if (!beer || !userBeerData) return;
     setSavingTaste(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    try {
+      // On met à jour en utilisant l'ID exact de la ligne (très sûr) ET on demande le retour avec .select()
+      const { data, error } = await supabase
+        .from("user_beers")
+        .update({
+          user_taste_bitter: tasteDraft.bitter,
+          user_taste_sweet: tasteDraft.sweet,
+          user_taste_fruity: tasteDraft.fruity,
+          user_taste_body: tasteDraft.body,
+        })
+        .eq("id", userBeerData.id) 
+        .select(); // 👈 Très important pour vérifier si Supabase a vraiment écrit la donnée
+
+      if (error) throw error;
+
+      // Si Supabase ne renvoie pas de ligne, c'est que la sauvegarde a été bloquée par le RLS
+      if (!data || data.length === 0) {
+        console.error("Sauvegarde ignorée. Problème RLS ?");
+        alert("Attention : Supabase a bloqué la sauvegarde. Vérifie tes règles de sécurité (RLS) pour autoriser l'UPDATE sur la table user_beers !");
+      } else {
+        // Succès ! On ferme le mode édition
+        setEditingTaste(false);
+        
+        // On force la mise à jour des données locales pour que les jauges s'affichent avec les nouvelles valeurs
+        await queryClient.invalidateQueries({ queryKey: ["userBeer", selectedBeerId] });
+        await refetchUserBeer();
+      }
+    } catch (err: any) {
+      console.error("Erreur de sauvegarde :", err);
+      alert("Une erreur est survenue lors de la sauvegarde : " + err.message);
+    } finally {
       setSavingTaste(false);
-      return;
     }
-
-    const { error } = await supabase
-      .from("user_beers")
-      .update({
-        user_taste_bitter: tasteDraft.bitter,
-        user_taste_sweet: tasteDraft.sweet,
-        user_taste_fruity: tasteDraft.fruity,
-        user_taste_body: tasteDraft.body,
-      })
-      .eq("user_id", user.id)
-      .eq("beer_id", beer.id);
-
-    if (!error) {
-      setEditingTaste(false); // On ferme la fenêtre d'édition
-      await refetchUserBeer(); // On télécharge tes nouvelles notes
-      
-      // On force la mise à jour de la collection en arrière-plan
-      queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
-    }
-
-    setSavingTaste(false);
-  }, [beer, tasteDraft, refetchUserBeer, queryClient]);
+  }, [beer, userBeerData, tasteDraft, selectedBeerId, refetchUserBeer, queryClient]);
 
   // Re-Glupp handler
   const handleReglupp = async () => {
@@ -353,7 +339,7 @@ export function BeerModal() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-glupp-cream mb-3">Profil gustatif</h3>
+            <h3 className="text-sm font-semibold text-glupp-cream mb-3">Profil gustatif de la communauté</h3>
             <TasteProfile
               bitter={beer.taste_bitter}
               sweet={beer.taste_sweet}
@@ -370,7 +356,25 @@ export function BeerModal() {
               </h3>
               {!editingTaste ? (
                 <button
-                  onClick={() => setEditingTaste(true)}
+                  onClick={() => {
+                    // On initialise les jauges avec les notes précédentes UNIQUEMENT quand on ouvre le mode édition
+                    if (userBeerData?.user_taste_bitter != null) {
+                      setTasteDraft({
+                        bitter: userBeerData.user_taste_bitter,
+                        sweet: userBeerData.user_taste_sweet ?? 3,
+                        fruity: userBeerData.user_taste_fruity ?? 3,
+                        body: userBeerData.user_taste_body ?? 3,
+                      });
+                    } else {
+                      setTasteDraft({
+                        bitter: beer.taste_bitter,
+                        sweet: beer.taste_sweet,
+                        fruity: beer.taste_fruity,
+                        body: beer.taste_body,
+                      });
+                    }
+                    setEditingTaste(true);
+                  }}
                   className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-glupp-accent hover:bg-glupp-accent/10 transition-colors"
                 >
                   <Pencil size={10} />
@@ -397,7 +401,7 @@ export function BeerModal() {
             </div>
 
             {editingTaste ? (
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 mt-4">
                 {TASTE_DIMS.map((dim) => (
                   <div key={dim.key}>
                     <div className="flex items-center justify-between mb-0.5">
@@ -422,14 +426,16 @@ export function BeerModal() {
                 ))}
               </div>
             ) : userBeerData?.user_taste_bitter != null ? (
-              <TasteProfile
-                bitter={userBeerData.user_taste_bitter}
-                sweet={userBeerData.user_taste_sweet!}
-                fruity={userBeerData.user_taste_fruity!}
-                body={userBeerData.user_taste_body!}
-              />
+              <div className="mt-4">
+                <TasteProfile
+                  bitter={userBeerData.user_taste_bitter}
+                  sweet={userBeerData.user_taste_sweet!}
+                  fruity={userBeerData.user_taste_fruity!}
+                  body={userBeerData.user_taste_body!}
+                />
+              </div>
             ) : (
-              <p className="text-xs text-glupp-text-muted text-center py-2">
+              <p className="text-xs text-glupp-text-muted text-center py-2 mt-2">
                 Partage ton ressenti sur cette bière !
               </p>
             )}
