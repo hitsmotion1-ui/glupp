@@ -7,8 +7,6 @@ import { ErrorBoundary } from "@/components/global/ErrorBoundary";
 import { AuthGuard } from "@/components/global/AuthGuard";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
-
-// 1. 🚀 Ajoute l'import de ton QueryProvider ici :
 import { QueryProvider } from "@/lib/providers/QueryProvider";
 
 export default async function AppLayout({
@@ -26,7 +24,6 @@ export default async function AppLayout({
   }
 
   return (
-    // 2. 🚀 Enveloppe AuthGuard et tout le reste avec QueryProvider :
     <QueryProvider>
       <AuthGuard>
         <div className="min-h-screen bg-glupp-bg flex flex-col">
