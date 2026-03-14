@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { supabase } from "@/lib/supabase/client"; // 👈 On importe Supabase pour lire les signalements
 import {
   LayoutDashboard,
   Beer,
@@ -16,7 +17,7 @@ import {
   Trophy,
   Star,
   Sparkles,
-  ShieldAlert, // 👈 Ajout de l'icône ici
+  ShieldAlert,
 } from "lucide-react";
 
 const navItems = [
@@ -29,12 +30,18 @@ const navItems = [
     label: "Soumissions",
     icon: Inbox,
     exact: false,
-    badge: true,
+    badge: "submissions", // 👈 Identifiant du badge
   },
   { href: "/admin/users", label: "Utilisateurs", icon: Users, exact: false },
   { href: "/admin/trophies", label: "Trophées", icon: Trophy, exact: false },
   { href: "/admin/gotw", label: "Glupp of Week", icon: Star, exact: false },
-  { href: "/admin/reports", label: "Signalements", icon: ShieldAlert, exact: false }, // 👈 Ajout du lien ici
+  { 
+    href: "/admin/reports", 
+    label: "Signalements", 
+    icon: ShieldAlert, 
+    exact: false,
+    badge: "reports" // 👈 Identifiant du badge signalement
+  },
   {
     href: "/admin/settings",
     label: "Paramètres",
@@ -46,27 +53,48 @@ const navItems = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  
+  // 👈 Les états pour nos deux pastilles
+  const [submissionsCount, setSubmissionsCount] = useState(0);
+  const [reportsCount, setReportsCount] = useState(0);
 
   // Close mobile sidebar on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Fetch pending submissions count
+  // Fetch pending counts (Soumissions et Signalements)
   useEffect(() => {
-    async function fetchPendingCount() {
+    async function fetchCounts() {
+      // 1. Compteur des soumissions
       try {
         const res = await fetch("/api/admin/submissions/count");
         if (res.ok) {
           const data = await res.json();
-          setPendingCount(data.count ?? 0);
+          setSubmissionsCount(data.count ?? 0);
         }
       } catch {
-        // Silently fail — badge will just not show
+        // Silently fail
+      }
+
+      // 2. Compteur des signalements 👈
+      try {
+        const { count } = await supabase
+          .from("reports")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending");
+        
+        setReportsCount(count ?? 0);
+      } catch {
+        // Silently fail
       }
     }
-    fetchPendingCount();
+    
+    fetchCounts();
+
+    // Optionnel: Rafraichir les compteurs toutes les 30 secondes pour que la pastille soit en temps réel
+    const interval = setInterval(fetchCounts, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Prevent body scroll when mobile sidebar is open
@@ -108,6 +136,11 @@ export function AdminSidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href, item.exact);
+          
+          // 👈 Déterminer quelle valeur afficher dans la pastille
+          let badgeValue = 0;
+          if (item.badge === "submissions") badgeValue = submissionsCount;
+          if (item.badge === "reports") badgeValue = reportsCount;
 
           return (
             <Link
@@ -129,9 +162,15 @@ export function AdminSidebar() {
                 className="shrink-0"
               />
               <span className="flex-1">{item.label}</span>
-              {item.badge && pendingCount > 0 && (
-                <span className="min-w-[20px] h-5 flex items-center justify-center px-1.5 bg-[#E08840] text-[#141210] text-[10px] font-bold rounded-full">
-                  {pendingCount > 99 ? "99+" : pendingCount}
+              
+              {/* 👈 Affichage de la pastille s'il y a un nombre > 0 */}
+              {item.badge && badgeValue > 0 && (
+                <span className={`min-w-[20px] h-5 flex items-center justify-center px-1.5 text-[10px] font-bold rounded-full ${
+                  item.badge === "reports" 
+                    ? "bg-red-500 text-white" // Rouge pour les alertes urgentes
+                    : "bg-[#E08840] text-[#141210]" // Orange classique
+                }`}>
+                  {badgeValue > 99 ? "99+" : badgeValue}
                 </span>
               )}
             </Link>
