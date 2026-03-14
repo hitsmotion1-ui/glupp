@@ -8,9 +8,10 @@ import { Avatar } from "@/components/ui/Avatar";
 import { RarityBadge } from "@/components/beer/RarityBadge";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { beerEmoji } from "@/lib/utils/xp";
-import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2 } from "lucide-react";
+import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2, Flag } from "lucide-react";
 import type { ActivityEntry } from "@/lib/hooks/useActivities";
 import type { Rarity } from "@/types";
+import { ReportModal } from "@/components/global/ReportModal"; // 👈 L'import de la modale
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -107,6 +108,9 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
 
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState("");
+  
+  // 👈 État pour la modale de signalement
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // ==========================================
   // 🔌 ÉCOUTEUR TEMPS RÉEL (Spécifique à CETTE carte)
@@ -160,7 +164,6 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
       }
     },
     onMutate: () => {
-      // Met à jour l'UI instantanément pour l'utilisateur qui clique (Optimistic Update)
       queryClient.setQueryData(["reactions", activity.id], (old: any) => {
         if (!old) return [];
         if (hasReacted) return old.filter((r: any) => r.user_id !== currentUserId);
@@ -219,90 +222,113 @@ export function ActivityItem({ activity, index = 0 }: { activity: ActivityEntry;
   }, [activity]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.05, 0.3), duration: 0.3 }}
-      className="p-4 bg-glupp-card border border-glupp-border rounded-glupp-xl space-y-3 relative"
-    >
-      <div className="flex gap-3">
-        <button onClick={() => openUserProfileModal(activity.user_id)} className="shrink-0 mt-1">
-          <Avatar url={activity.user_data.avatar_url} name={activity.user_data.display_name || activity.user_data.username} size="sm" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <button onClick={() => openUserProfileModal(activity.user_id)} className="font-semibold text-sm text-glupp-cream hover:text-glupp-accent transition-colors truncate">
-              {activity.user_data.display_name || activity.user_data.username}
-            </button>
-            <span className="text-[10px] text-glupp-text-muted shrink-0">{timeAgo(activity.created_at)}</span>
-          </div>
-          {content}
-        </div>
-      </div>
-
-      <div className="pt-3 mt-2 border-t border-glupp-border/50 flex flex-wrap items-center gap-3">
-        
-        {/* BOUTON 🍻 UNIQUE */}
-        <button 
-          onClick={() => toggleReactionMutation.mutate()}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-            hasReacted ? "bg-glupp-gold/20 text-glupp-gold border border-glupp-gold/30" : "bg-glupp-bg border border-glupp-border text-glupp-text-muted hover:text-glupp-cream"
-          }`}
-        >
-          <motion.div animate={hasReacted ? { y: [0, -12, 0], rotate: [0, -15, 10, 0], scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.5 }} className="origin-bottom-right">
-            🍻
-          </motion.div>
-          {reactionCount > 0 && <span>{reactionCount}</span>}
-        </button>
-
-        {/* BOUTON COMMENTAIRE */}
-        <button 
-          onClick={() => setShowCommentInput(!showCommentInput)}
-          className={`flex items-center gap-1.5 text-xs font-medium transition-colors ml-auto ${
-            showCommentInput || commentsCount > 0 ? "text-glupp-accent" : "text-glupp-text-muted hover:text-glupp-cream"
-          }`}
-        >
-          <MessageCircle size={14} />
-          <span>{commentsCount > 0 ? commentsCount : "Commenter"}</span>
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {showCommentInput && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <div className="pt-3">
-              {commentsLoading ? (
-                <div className="flex justify-center p-4"><Loader2 className="animate-spin text-glupp-accent" size={16} /></div>
-              ) : comments.length > 0 ? (
-                <div className="space-y-2 mb-3">
-                  {comments.map((c: any) => (
-                    <div key={c.id} className="bg-glupp-bg/50 rounded-lg p-2.5 text-xs flex flex-col gap-0.5">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="font-semibold text-glupp-accent">{c.profiles?.display_name || c.profiles?.username || "Glupper"}</span>
-                        <span className="text-[9px] text-glupp-text-muted">{timeAgo(c.created_at)}</span>
-                      </div>
-                      <span className="text-glupp-cream">{c.content}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="text" placeholder="Ajouter un commentaire..." value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCommentMutation.mutate(commentText)}
-                  className="flex-1 bg-glupp-bg border border-glupp-border rounded-full px-4 py-1.5 text-xs text-glupp-cream focus:outline-none focus:border-glupp-accent"
-                />
-                <button 
-                  onClick={() => addCommentMutation.mutate(commentText)} 
-                  disabled={!commentText.trim() || addCommentMutation.isPending} 
-                  className="p-1.5 rounded-full bg-glupp-accent text-white disabled:opacity-50 transition-opacity"
-                >
-                  {addCommentMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
-                </button>
-              </div>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.05, 0.3), duration: 0.3 }}
+        className="p-4 bg-glupp-card border border-glupp-border rounded-glupp-xl space-y-3 relative"
+      >
+        <div className="flex gap-3">
+          <button onClick={() => openUserProfileModal(activity.user_id)} className="shrink-0 mt-1">
+            <Avatar url={activity.user_data.avatar_url} name={activity.user_data.display_name || activity.user_data.username} size="sm" />
+          </button>
+          
+          {/* Contenu et Header */}
+          <div className="flex-1 min-w-0 pr-6"> {/* 👈 Ajout du pr-6 pour laisser la place au bouton */}
+            <div className="flex items-baseline gap-2 mb-1">
+              <button onClick={() => openUserProfileModal(activity.user_id)} className="font-semibold text-sm text-glupp-cream hover:text-glupp-accent transition-colors truncate">
+                {activity.user_data.display_name || activity.user_data.username}
+              </button>
+              <span className="text-[10px] text-glupp-text-muted shrink-0">{timeAgo(activity.created_at)}</span>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            {content}
+          </div>
+
+          {/* 👈 Le bouton Signaler, positionné en haut à droite absolu */}
+          {currentUserId !== activity.user_id && ( // On empêche de se signaler soi-même
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="absolute top-4 right-4 p-1.5 text-glupp-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
+              title="Signaler ce Glupp"
+            >
+              <Flag size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="pt-3 mt-2 border-t border-glupp-border/50 flex flex-wrap items-center gap-3">
+          
+          {/* BOUTON 🍻 UNIQUE */}
+          <button 
+            onClick={() => toggleReactionMutation.mutate()}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              hasReacted ? "bg-glupp-gold/20 text-glupp-gold border border-glupp-gold/30" : "bg-glupp-bg border border-glupp-border text-glupp-text-muted hover:text-glupp-cream"
+            }`}
+          >
+            <motion.div animate={hasReacted ? { y: [0, -12, 0], rotate: [0, -15, 10, 0], scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.5 }} className="origin-bottom-right">
+              🍻
+            </motion.div>
+            {reactionCount > 0 && <span>{reactionCount}</span>}
+          </button>
+
+          {/* BOUTON COMMENTAIRE */}
+          <button 
+            onClick={() => setShowCommentInput(!showCommentInput)}
+            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ml-auto ${
+              showCommentInput || commentsCount > 0 ? "text-glupp-accent" : "text-glupp-text-muted hover:text-glupp-cream"
+            }`}
+          >
+            <MessageCircle size={14} />
+            <span>{commentsCount > 0 ? commentsCount : "Commenter"}</span>
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {showCommentInput && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+              <div className="pt-3">
+                {commentsLoading ? (
+                  <div className="flex justify-center p-4"><Loader2 className="animate-spin text-glupp-accent" size={16} /></div>
+                ) : comments.length > 0 ? (
+                  <div className="space-y-2 mb-3">
+                    {comments.map((c: any) => (
+                      <div key={c.id} className="bg-glupp-bg/50 rounded-lg p-2.5 text-xs flex flex-col gap-0.5">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="font-semibold text-glupp-accent">{c.profiles?.display_name || c.profiles?.username || "Glupper"}</span>
+                          <span className="text-[9px] text-glupp-text-muted">{timeAgo(c.created_at)}</span>
+                        </div>
+                        <span className="text-glupp-cream">{c.content}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text" placeholder="Ajouter un commentaire..." value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCommentMutation.mutate(commentText)}
+                    className="flex-1 bg-glupp-bg border border-glupp-border rounded-full px-4 py-1.5 text-xs text-glupp-cream focus:outline-none focus:border-glupp-accent"
+                  />
+                  <button 
+                    onClick={() => addCommentMutation.mutate(commentText)} 
+                    disabled={!commentText.trim() || addCommentMutation.isPending} 
+                    className="p-1.5 rounded-full bg-glupp-accent text-white disabled:opacity-50 transition-opacity"
+                  >
+                    {addCommentMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* 👈 L'intégration de la modale */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        activityId={activity.id}
+        reportedUserId={activity.user_id}
+      />
+    </>
   );
 }
