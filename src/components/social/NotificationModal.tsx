@@ -98,7 +98,7 @@ function PersistentNotifCard({
       accentBorder: "border-l-green-500",
     },
     reaction: {
-      icon: Heart,
+      icon: Beer, // 👈 On remplace Heart par Beer
       iconBg: "bg-[#E08840]/15",
       iconColor: "text-[#E08840]",
       accentBorder: "border-l-[#E08840]",
@@ -144,7 +144,12 @@ function PersistentNotifCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-glupp-cream">{p.title}</p>
+        <p className="text-sm font-semibold text-glupp-cream">
+          {/* 👈 Remplacement du texte pour les notifications persistantes de type réaction */}
+          {p.type === 'reaction' && p.title.includes('a réagi') 
+            ? p.title.replace('a réagi à', 'a levé sa pinte à')
+            : p.title}
+        </p>
         {p.message && (
           <p className="text-xs text-glupp-text-muted mt-0.5 leading-relaxed">
             {p.message}
@@ -306,11 +311,15 @@ export function NotificationModal() {
                         className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center ${
                           notif.type === "friend_request"
                             ? "bg-glupp-accent"
+                            : notif.type === "reaction" // 👈 Gestion de l'icône pour les réactions legacy
+                            ? "bg-[#E08840]"
                             : "bg-glupp-rarity-rare"
                         }`}
                       >
                         {notif.type === "friend_request" ? (
                           <UserPlus size={9} className="text-glupp-bg" />
+                        ) : notif.type === "reaction" ? ( // 👈 Icône Beer pour les réactions legacy
+                          <Beer size={9} className="text-glupp-bg" />
                         ) : (
                           <AtSign size={9} className="text-glupp-bg" />
                         )}
@@ -331,8 +340,15 @@ export function NotificationModal() {
                           {notif.legacy!.data.from_user.display_name ||
                             notif.legacy!.data.from_user.username}
                         </button>{" "}
+                        {/* 👈 Modification du texte selon le type de notification legacy */}
                         {notif.type === "friend_request"
                           ? "veut etre ton ami"
+                          : notif.type === "reaction"
+                          ? `a levé sa pinte à ton glupp${
+                              notif.legacy!.data.beer
+                                ? ` de ${notif.legacy!.data.beer.name}`
+                                : ""
+                            }`
                           : `t'a mentionne${
                               notif.legacy!.data.beer
                                 ? ` dans un glupp de ${notif.legacy!.data.beer.name}`
