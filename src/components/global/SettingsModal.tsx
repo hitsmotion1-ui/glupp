@@ -9,6 +9,7 @@ import { useAppStore } from "@/lib/store/useAppStore";
 import { LogOut, Camera, Loader2, Save, MapPin, Shield, User as UserIcon, Bell } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import Link from "next/link"; // 👈 Ajout de Link
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -367,6 +368,25 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                 <LogOut size={18} />
                 Se déconnecter de cet appareil
               </Button>
+            </div>
+
+            {/* 🆕 Section Légale intégrée dans les Paramètres de Sécurité */}
+            <div className="mt-6 pt-6 border-t border-glupp-border/50 flex flex-col items-center space-y-3">
+              <p className="text-[10px] text-glupp-text-muted text-center px-2 leading-relaxed uppercase tracking-wide">
+                L'abus d'alcool est dangereux pour la santé, à consommer avec modération.
+              </p>
+              
+              <div className="flex items-center justify-center gap-2 text-xs text-glupp-text-muted flex-wrap">
+                <Link href="/legal/terms" onClick={onClose} className="hover:text-glupp-accent underline transition-colors">CGU</Link>
+                <span>·</span>
+                <Link href="/legal/privacy" onClick={onClose} className="hover:text-glupp-accent underline transition-colors">Confidentialité</Link>
+                <span>·</span>
+                <Link href="/legal/mentions" onClick={onClose} className="hover:text-glupp-accent underline transition-colors">Mentions légales</Link>
+              </div>
+              
+              <p className="text-[10px] text-glupp-text-muted font-mono">
+                Glupp v1.0 · 18+
+              </p>
             </div>
           </div>
         )}
