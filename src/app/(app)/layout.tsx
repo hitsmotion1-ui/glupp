@@ -8,7 +8,7 @@ import { AuthGuard } from "@/components/global/AuthGuard";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { QueryProvider } from "@/lib/providers/QueryProvider";
-import { HealthWarningFooter } from "@/components/global/HealthWarningFooter"; // 👈 Ajoute cet import
+import { HealthWarningFooter } from "@/components/global/HealthWarningFooter";
 
 export default async function AppLayout({
   children,
@@ -29,11 +29,15 @@ export default async function AppLayout({
       <AuthGuard>
         <div className="min-h-screen bg-glupp-bg flex flex-col">
           <Header />
-          <main className="flex-1 pb-20 overflow-y-auto">
+          
+          {/* 👈 On passe pb-20 à pb-24 pour laisser de la place au bandeau ET à la TabBar */}
+          <main className="flex-1 pb-24 overflow-y-auto">
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
-          {/* 👈 Le bandeau sanitaire inséré ici */}
+          
+          {/* Le bandeau sanitaire inséré ici */}
           <HealthWarningFooter />
+          
           <TabBar />
           <GlobalModals />
           <PWAInstallPrompt />

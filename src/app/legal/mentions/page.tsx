@@ -23,10 +23,10 @@ export default function LegalPage() {
           <section>
             <h2 className="text-lg font-bold text-glupp-cream mb-3">1. Éditeur de l'application</h2>
             <ul className="space-y-1">
-              <li><strong className="text-glupp-cream">Nom :</strong> Mikael [NOM] — Entrepreneur individuel</li>
-              <li><strong className="text-glupp-cream">Adresse :</strong> [ADRESSE], Les Herbiers, 85500, France</li>
-              <li><strong className="text-glupp-cream">Email :</strong> contact@glupp.app</li>
-              <li><strong className="text-glupp-cream">Directeur de la publication :</strong> Mikael [NOM]</li>
+              <li><strong className="text-glupp-cream">Nom :</strong> Mikael AUBOUIN — Entrepreneur individuel</li>
+              <li><strong className="text-glupp-cream">Adresse :</strong> 44 avenue de Cholet, Les Herbiers, 85500, France</li>
+              <li><strong className="text-glupp-cream">Email :</strong> mikael_aubouin@hotmail.com</li>
+              <li><strong className="text-glupp-cream">Directeur de la publication :</strong> Mikael AUBOUIN</li>
             </ul>
           </section>
 
