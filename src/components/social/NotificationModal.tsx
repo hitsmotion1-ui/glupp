@@ -98,7 +98,7 @@ function PersistentNotifCard({
       accentBorder: "border-l-green-500",
     },
     reaction: {
-      icon: Beer, // 👈 On remplace Heart par Beer
+      icon: Beer,
       iconBg: "bg-[#E08840]/15",
       iconColor: "text-[#E08840]",
       accentBorder: "border-l-[#E08840]",
@@ -145,7 +145,6 @@ function PersistentNotifCard({
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-glupp-cream">
-          {/* 👈 Remplacement du texte pour les notifications persistantes de type réaction */}
           {p.type === 'reaction' && p.title.includes('a réagi') 
             ? p.title.replace('a réagi à', 'a levé sa pinte à')
             : p.title}
@@ -203,7 +202,6 @@ export function NotificationModal() {
 
   const hasUnread = notifications.some((n) => !n.is_read);
 
-  // Fonction pour marquer comme lu UNIQUEMENT lors de la fermeture intentionnelle
   const handleClose = () => {
     if (hasUnread && !isLoading) {
       markAllAsRead();
@@ -311,14 +309,14 @@ export function NotificationModal() {
                         className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center ${
                           notif.type === "friend_request"
                             ? "bg-glupp-accent"
-                            : notif.type === "reaction" // 👈 Gestion de l'icône pour les réactions legacy
+                            : (notif.type === "reaction" || notif.type === "like") // 👈 Ajout de like
                             ? "bg-[#E08840]"
                             : "bg-glupp-rarity-rare"
                         }`}
                       >
                         {notif.type === "friend_request" ? (
                           <UserPlus size={9} className="text-glupp-bg" />
-                        ) : notif.type === "reaction" ? ( // 👈 Icône Beer pour les réactions legacy
+                        ) : (notif.type === "reaction" || notif.type === "like") ? ( // 👈 Ajout de like
                           <Beer size={9} className="text-glupp-bg" />
                         ) : (
                           <AtSign size={9} className="text-glupp-bg" />
@@ -340,10 +338,10 @@ export function NotificationModal() {
                           {notif.legacy!.data.from_user.display_name ||
                             notif.legacy!.data.from_user.username}
                         </button>{" "}
-                        {/* 👈 Modification du texte selon le type de notification legacy */}
+                        {/* 👈 Modification du texte avec "like" */}
                         {notif.type === "friend_request"
                           ? "veut etre ton ami"
-                          : notif.type === "reaction"
+                          : (notif.type === "reaction" || notif.type === "like")
                           ? `a levé sa pinte à ton glupp${
                               notif.legacy!.data.beer
                                 ? ` de ${notif.legacy!.data.beer.name}`
