@@ -19,6 +19,7 @@ export default function RegisterPage() {
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); // 👈 Nouvel état pour l'écran de succès
 
   const hasMinLength = password.length >= 8;
   const hasNumber = /[0-9]/.test(password);
@@ -53,26 +54,52 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-          display_name: username,
-          age_verified: true, 
-          terms_accepted: true
+    try {
+      // 1. Vérifier si le pseudo existe déjà
+      const { data: existingUser, error: checkError } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("username", username)
+        .maybeSingle();
+
+      if (existingUser) {
+        setError("Ce pseudo est déjà utilisé. Choisis-en un autre !");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Créer le compte
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+            display_name: username,
+            age_verified: true, 
+            terms_accepted: true
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      setError(error.message);
+      if (signUpError) {
+        // Supabase renvoie une erreur spécifique si l'email existe déjà
+        if (signUpError.message.includes("already registered") || signUpError.message.includes("unique")) {
+          setError("Cet email est déjà utilisé. Essaie de te connecter.");
+        } else {
+          setError(signUpError.message);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 3. Afficher l'écran de succès pour demander de vérifier les emails
+      setIsSuccess(true);
+    } catch (err: any) {
+      setError("Une erreur est survenue lors de l'inscription.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push("/duel");
   };
 
   const PasswordRule = ({ isValid, text }: { isValid: boolean, text: string }) => (
@@ -82,6 +109,32 @@ export default function RegisterPage() {
     </div>
   );
 
+  // 👈 Écran de succès affiché après l'inscription
+  if (isSuccess) {
+    return (
+      <div className="text-center space-y-6 py-8 animate-in fade-in zoom-in duration-500">
+        <div className="w-20 h-20 bg-glupp-accent/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-glupp-accent">
+          <span className="text-4xl">🍻</span>
+        </div>
+        <h2 className="text-2xl font-display font-bold text-glupp-cream">Génial !</h2>
+        <div className="p-4 bg-glupp-card border border-glupp-border rounded-xl">
+          <p className="text-glupp-text-soft text-sm leading-relaxed">
+            Ton compte a été créé avec succès.<br/><br/>
+            <strong className="text-glupp-cream">Va vérifier tes emails</strong> et clique sur le lien pour confirmer ton compte et pouvoir te connecter !
+          </p>
+        </div>
+        <Button 
+          variant="primary" 
+          className="w-full mt-4" 
+          onClick={() => router.push("/login")}
+        >
+          Aller se connecter
+        </Button>
+      </div>
+    );
+  }
+
+  // 👇 Le formulaire normal si on n'est pas en succès
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
