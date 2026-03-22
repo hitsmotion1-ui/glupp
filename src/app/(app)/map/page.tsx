@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   List,
   Map as MapIcon,
+  LocateFixed,
 } from "lucide-react";
 import { SubmitBarModal } from "@/components/map/SubmitBarModal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,7 +43,8 @@ const LeafletMap = dynamic(
 type ViewMode = "map" | "list";
 
 export default function MapPage() {
-  const { bars, nearbyBars, loadingBars, mapState } = useMap();
+  // 👉 On va devoir rajouter une fonction "requestLocation" dans useMap plus tard
+  const { bars, nearbyBars, loadingBars, mapState, requestLocation } = useMap();
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [search, setSearch] = useState("");
@@ -127,40 +129,56 @@ export default function MapPage() {
             </div>
 
             <div className="flex items-center gap-2">
-            {/* Proposer un bar */}
-            <button
-              onClick={() => setShowSubmitBar(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-glupp-card border border-glupp-border rounded-glupp text-xs text-glupp-text-soft hover:border-glupp-accent transition-colors"
-            >
-              <MapPin size={12} />
-              + Bar
-            </button>
+              {/* 🆕 Nouveau bouton "Me localiser" */}
+              <button
+                onClick={() => {
+                  if (requestLocation) requestLocation();
+                  else alert("Fonction de localisation à venir !");
+                }}
+                className={`w-8 h-8 flex items-center justify-center rounded-glupp border transition-colors ${
+                  mapState.userLocation 
+                    ? "bg-glupp-accent/20 border-glupp-accent text-glupp-accent" 
+                    : "bg-glupp-card border-glupp-border text-glupp-text-soft hover:border-glupp-accent"
+                }`}
+                title="Me localiser"
+              >
+                <LocateFixed size={14} />
+              </button>
 
-            {/* View toggle */}
-            <div className="flex bg-glupp-card border border-glupp-border rounded-glupp overflow-hidden">
+              {/* Proposer un bar */}
               <button
-                onClick={() => setViewMode("map")}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                  viewMode === "map"
-                    ? "bg-glupp-accent text-white"
-                    : "text-glupp-text-muted hover:text-glupp-cream"
-                }`}
+                onClick={() => setShowSubmitBar(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-glupp-card border border-glupp-border rounded-glupp text-xs text-glupp-text-soft hover:border-glupp-accent transition-colors"
               >
-                <MapIcon size={12} />
-                Carte
+                <MapPin size={12} />
+                + Bar
               </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                  viewMode === "list"
-                    ? "bg-glupp-accent text-white"
-                    : "text-glupp-text-muted hover:text-glupp-cream"
-                }`}
-              >
-                <List size={12} />
-                Liste
-              </button>
-            </div>
+
+              {/* View toggle */}
+              <div className="flex bg-glupp-card border border-glupp-border rounded-glupp overflow-hidden">
+                <button
+                  onClick={() => setViewMode("map")}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === "map"
+                      ? "bg-glupp-accent text-white"
+                      : "text-glupp-text-muted hover:text-glupp-cream"
+                  }`}
+                >
+                  <MapIcon size={12} />
+                  Carte
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === "list"
+                      ? "bg-glupp-accent text-white"
+                      : "text-glupp-text-muted hover:text-glupp-cream"
+                  }`}
+                >
+                  <List size={12} />
+                  Liste
+                </button>
+              </div>
             </div>
           </div>
 

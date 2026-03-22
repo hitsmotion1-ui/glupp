@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/queries/queryKeys";
@@ -18,23 +18,25 @@ export function useMap() {
   const queryClient = useQueryClient();
 
   const [mapState, setMapState] = useState<MapState>({
-    center: { lat: 48.8566, lng: 2.3522 }, // Paris default
+    center: { lat: 46.87, lng: -1.01 }, // Par défaut : Les Herbiers !
     zoom: 13,
     userLocation: null,
     locationError: null,
-    loadingLocation: true,
+    loadingLocation: false, // 👈 Passe à false par défaut puisqu'on ne charge plus au démarrage
   });
 
-  // Get user geolocation
-  useEffect(() => {
+  // 🆕 Fonction pour demander la géolocalisation manuellement (au clic)
+  const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setMapState((s) => ({
         ...s,
-        locationError: "Géolocalisation non supportée",
+        locationError: "Géolocalisation non supportée par ton navigateur",
         loadingLocation: false,
       }));
       return;
     }
+
+    setMapState((s) => ({ ...s, loadingLocation: true, locationError: null }));
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -44,8 +46,8 @@ export function useMap() {
         };
         setMapState((s) => ({
           ...s,
-          center: loc,
-          userLocation: loc,
+          center: loc, // Centre la carte sur l'utilisateur
+          userLocation: loc, // Sauvegarde sa position
           loadingLocation: false,
         }));
       },
@@ -172,5 +174,6 @@ export function useMap() {
     getBarBeers,
     addBar: addBarMutation.mutateAsync,
     addingBar: addBarMutation.isPending,
+    requestLocation, // 👈 On exporte la nouvelle fonction pour le bouton
   };
 }

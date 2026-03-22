@@ -125,13 +125,29 @@ export function GluppModal() {
   };
 
   // Geolocation
-  const requestGeolocation = () => {
+  // Geolocation
+  const requestGeolocation = async () => {
     if (!navigator.geolocation) {
-      setGeoError("Geoloc non supportee");
+      setGeoError("Geoloc non supportée");
       return;
     }
+
+    // 🆕 Vérification de la permission sans déclencher la popup (Très utile sur PWA iOS)
+    if (navigator.permissions) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        if (result.state === 'denied') {
+          setGeoError("Position refusée (à activer dans les réglages)");
+          return;
+        }
+      } catch (e) {
+        // L'API permissions n'est pas supportée partout (ex: vieux Safari), on ignore l'erreur
+      }
+    }
+
     setGeoLoading(true);
     setGeoError(null);
+    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = position.coords.latitude;
@@ -163,8 +179,8 @@ export function GluppModal() {
           // Reverse geocode failed — no biggie
         }
       },
-      () => {
-        setGeoError("Position refusee");
+      (err) => {
+        setGeoError("Impossible de te localiser");
         setGeoLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
