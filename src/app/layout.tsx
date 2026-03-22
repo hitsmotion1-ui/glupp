@@ -46,7 +46,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${bricolage.variable} ${inter.variable}`}>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="/icons/icon-512x512.png" />
         <link
           rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
