@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { useCollection } from "@/lib/hooks/useCollection";
+import { useAvatars } from "@/lib/hooks/useAvatars"; // 🆕 Import du hook avatars
+import { supabase } from "@/lib/supabase/client"; // 🆕 Import de supabase
+import AvatarPicker from "@/components/profile/AvatarPicker"; // 🆕 Import du picker
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -37,13 +40,19 @@ type Section = "progression" | "trophies" | "friends" | "crews" | "passport";
 
 export default function ProfilePage() {
   const { signOut } = useAuth();
-  const { profile, loading, level, nextLevel, progress } = useProfile();
+  // 🆕 On récupère "refetch" pour pouvoir actualiser le profil après un changement d'avatar
+  const { profile, loading: profileLoading, level, nextLevel, progress, refetch } = useProfile();
   const { allBeers, tastedIds } = useCollection();
+  
+  // 🆕 Récupération des avatars
+  const { avatars, loading: avatarsLoading } = useAvatars(profile?.id, profile?.xp);
+
   const [openSections, setOpenSections] = useState<Set<Section>>(new Set());
   
   // États pour les modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false); // 🆕 État du picker
 
   const toggleSection = (section: Section) => {
     setOpenSections((prev) => {
@@ -54,7 +63,27 @@ export default function ProfilePage() {
     });
   };
 
-  if (loading) {
+  // 🆕 Fonction pour mettre à jour l'avatar
+  const handleUpdateAvatar = async (newAvatarId: string) => {
+    if (!profile) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_id: newAvatarId })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      
+      // Actualise les données du profil en arrière-plan pour afficher le nouvel avatar partout
+      refetch(); 
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de l'avatar", error);
+    }
+  };
+
+  const isLoading = profileLoading || avatarsLoading;
+
+  if (isLoading) {
     return (
       <div className="px-4 py-6 space-y-4">
         <div className="flex flex-col items-center gap-3">
@@ -93,6 +122,10 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  // 🆕 Trouver le nom de fichier de l'avatar actuel
+  const currentAvatarData = avatars.find(a => a.id === profile.avatar_id) || avatars.find(a => a.id === 'curieux');
+  const currentFileName = currentAvatarData?.file_name;
 
   // Beer passport data
   const passportData = (() => {
@@ -136,10 +169,13 @@ export default function ProfilePage() {
 
       {/* Avatar + Info */}
       <div className="flex flex-col items-center text-center">
+        {/* 🆕 L'Avatar est maintenant cliquable et utilise le système illustré */}
         <Avatar
           url={profile.avatar_url}
+          fileName={currentFileName}
           name={profile.display_name || profile.username}
           size="lg"
+          onClick={() => setIsAvatarPickerOpen(true)} // Ouvre le tiroir
         />
         <h2 className="font-display text-lg font-bold text-glupp-cream mt-3">
           {profile.display_name || profile.username}
@@ -198,7 +234,7 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      {/* 🆕 Bouton Feedback (CORRIGÉ avec variant="secondary") */}
+      {/* Bouton Feedback */}
       <div>
         <Button 
           variant="secondary" 
@@ -309,6 +345,23 @@ export default function ProfilePage() {
         isOpen={isFeedbackOpen} 
         onClose={() => setIsFeedbackOpen(false)} 
       />
+
+      {/* 🆕 Modale AvatarPicker */}
+      {isAvatarPickerOpen && (
+         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80" onClick={() => setIsAvatarPickerOpen(false)}>
+            <div 
+              className="w-full max-w-md bg-glupp-bg rounded-t-2xl max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <AvatarPicker 
+                avatars={avatars} 
+                currentAvatarId={profile.avatar_id || 'curieux'} 
+                onSelectAvatar={handleUpdateAvatar} 
+                onClose={() => setIsAvatarPickerOpen(false)} 
+              />
+            </div>
+         </div>
+      )}
     </div>
   );
 }

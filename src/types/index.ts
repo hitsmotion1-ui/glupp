@@ -73,6 +73,7 @@ export interface Profile {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  avatar_id: string; // 🆕 AJOUT : Le nouvel ID de l'avatar illustré
   xp: number;
   duels_played: number;
   beers_tasted: number;
