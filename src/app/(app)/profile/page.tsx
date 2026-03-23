@@ -64,9 +64,14 @@ export default function ProfilePage() {
   };
 
   // 🆕 Fonction pour mettre à jour l'avatar
-  const handleUpdateAvatar = async (newAvatarId: string) => {
+const handleUpdateAvatar = async (newAvatarId: string) => {
     if (!profile) return;
     try {
+      // 1. Mettre à jour l'état LOCALEMENT de façon immédiate (Optimistic Update)
+      // Cela force React à redessiner le composant Avatar tout de suite
+      profile.avatar_id = newAvatarId; 
+
+      // 2. Envoyer la mise à jour à la base de données (Supabase)
       const { error } = await supabase
         .from('profiles')
         .update({ avatar_id: newAvatarId })
@@ -74,8 +79,9 @@ export default function ProfilePage() {
 
       if (error) throw error;
       
-      // Actualise les données du profil en arrière-plan pour afficher le nouvel avatar partout
+      // 3. Rafraîchir les données globales en arrière-plan (par sécurité)
       refetch(); 
+      
     } catch (error) {
       console.error("Erreur lors de la mise à jour de l'avatar", error);
     }
