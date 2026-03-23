@@ -22,7 +22,7 @@ export default function AvatarPicker({ avatars, currentAvatarId, onSelectAvatar,
 
   return (
     // 🆕 MODIFICATION ICI : Ajout de pb-12, max-h-[85vh] et overflow-y-auto pour le scroll
-    <div className="p-4 pb-12 bg-glupp-bg rounded-t-2xl flex flex-col h-full max-h-[85vh] overflow-y-auto">
+    <div className="p-4 pb-12 flex flex-col">
       
       {/* 🆕 MODIFICATION ICI : sticky top-0 pour que le titre reste visible quand on scroll */}
       <h2 className="text-xl font-bold mb-4 text-center sticky top-0 bg-glupp-bg py-2 z-10">

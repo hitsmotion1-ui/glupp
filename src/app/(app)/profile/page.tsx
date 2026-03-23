@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // 🆕 useEffect ajouté ici
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { useCollection } from "@/lib/hooks/useCollection";
-import { useAvatars } from "@/lib/hooks/useAvatars"; // 🆕 Import du hook avatars
-import { supabase } from "@/lib/supabase/client"; // 🆕 Import de supabase
-import AvatarPicker from "@/components/profile/AvatarPicker"; // 🆕 Import du picker
+import { useAvatars } from "@/lib/hooks/useAvatars";
+import { supabase } from "@/lib/supabase/client";
+import AvatarPicker from "@/components/profile/AvatarPicker";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -40,11 +40,9 @@ type Section = "progression" | "trophies" | "friends" | "crews" | "passport";
 
 export default function ProfilePage() {
   const { signOut } = useAuth();
-  // 🆕 On récupère "refetch" pour pouvoir actualiser le profil après un changement d'avatar
   const { profile, loading: profileLoading, level, nextLevel, progress, refetch } = useProfile();
   const { allBeers, tastedIds } = useCollection();
   
-  // 🆕 Récupération des avatars
   const { avatars, loading: avatarsLoading } = useAvatars(profile?.id, profile?.xp);
 
   const [openSections, setOpenSections] = useState<Set<Section>>(new Set());
@@ -52,7 +50,23 @@ export default function ProfilePage() {
   // États pour les modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false); // 🆕 État du picker
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+
+  // 🆕 1. Nouvel état pour l'affichage instantané de l'avatar
+  const [localAvatarId, setLocalAvatarId] = useState<string | null>(null);
+
+  // 🆕 2. Bloquer le défilement de la page en arrière-plan quand la modale est ouverte
+  useEffect(() => {
+    if (isAvatarPickerOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    // Nettoyage au démontage
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isAvatarPickerOpen]);
 
   const toggleSection = (section: Section) => {
     setOpenSections((prev) => {
@@ -63,15 +77,12 @@ export default function ProfilePage() {
     });
   };
 
-  // 🆕 Fonction pour mettre à jour l'avatar
-const handleUpdateAvatar = async (newAvatarId: string) => {
+  const handleUpdateAvatar = async (newAvatarId: string) => {
     if (!profile) return;
     try {
-      // 1. Mettre à jour l'état LOCALEMENT de façon immédiate (Optimistic Update)
-      // Cela force React à redessiner le composant Avatar tout de suite
-      profile.avatar_id = newAvatarId; 
+      // 🆕 On met à jour l'état local -> L'image change instantanément pour l'utilisateur
+      setLocalAvatarId(newAvatarId); 
 
-      // 2. Envoyer la mise à jour à la base de données (Supabase)
       const { error } = await supabase
         .from('profiles')
         .update({ avatar_id: newAvatarId })
@@ -79,7 +90,6 @@ const handleUpdateAvatar = async (newAvatarId: string) => {
 
       if (error) throw error;
       
-      // 3. Rafraîchir les données globales en arrière-plan (par sécurité)
       refetch(); 
       
     } catch (error) {
@@ -129,8 +139,9 @@ const handleUpdateAvatar = async (newAvatarId: string) => {
     );
   }
 
-  // 🆕 Trouver le nom de fichier de l'avatar actuel
-  const currentAvatarData = avatars.find(a => a.id === profile.avatar_id) || avatars.find(a => a.id === 'curieux');
+  // 🆕 On utilise l'avatar cliqué (localAvatarId) en priorité, sinon celui de la base de données
+  const activeAvatarId = localAvatarId || profile.avatar_id || 'curieux';
+  const currentAvatarData = avatars.find(a => a.id === activeAvatarId) || avatars.find(a => a.id === 'curieux');
   const currentFileName = currentAvatarData?.file_name;
 
   // Beer passport data
@@ -175,13 +186,12 @@ const handleUpdateAvatar = async (newAvatarId: string) => {
 
       {/* Avatar + Info */}
       <div className="flex flex-col items-center text-center">
-        {/* 🆕 L'Avatar est maintenant cliquable et utilise le système illustré */}
         <Avatar
           url={profile.avatar_url}
           fileName={currentFileName}
           name={profile.display_name || profile.username}
           size="lg"
-          onClick={() => setIsAvatarPickerOpen(true)} // Ouvre le tiroir
+          onClick={() => setIsAvatarPickerOpen(true)}
         />
         <h2 className="font-display text-lg font-bold text-glupp-cream mt-3">
           {profile.display_name || profile.username}
@@ -352,16 +362,16 @@ const handleUpdateAvatar = async (newAvatarId: string) => {
         onClose={() => setIsFeedbackOpen(false)} 
       />
 
-      {/* 🆕 Modale AvatarPicker */}
+      {/* 🆕 Modale AvatarPicker avec overscroll-contain */}
       {isAvatarPickerOpen && (
          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80" onClick={() => setIsAvatarPickerOpen(false)}>
             <div 
-              className="w-full max-w-md bg-glupp-bg rounded-t-2xl max-h-[80vh] overflow-y-auto"
+              className="w-full max-w-md bg-glupp-bg rounded-t-2xl max-h-[85vh] overflow-y-auto overscroll-contain"
               onClick={(e) => e.stopPropagation()}
             >
               <AvatarPicker 
                 avatars={avatars} 
-                currentAvatarId={profile.avatar_id || 'curieux'} 
+                currentAvatarId={activeAvatarId} 
                 onSelectAvatar={handleUpdateAvatar} 
                 onClose={() => setIsAvatarPickerOpen(false)} 
               />
