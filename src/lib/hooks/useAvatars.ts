@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from "@/lib/supabase/client"; // 🆕 Import corrigé
 
 export interface AvatarData {
   id: string;
@@ -34,7 +34,6 @@ export function getLevel(xp: number): number {
 export function useAvatars(userId: string | undefined, userXp: number = 0) {
   const [avatars, setAvatars] = useState<AvatarData[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
 
   useEffect(() => {
     async function fetchAvatarsAndStatus() {
@@ -52,7 +51,7 @@ export function useAvatars(userId: string | undefined, userXp: number = 0) {
 
         // 2. Récupérer les trophées débloqués de l'utilisateur
         const { data: userTrophies, error: trophiesError } = await supabase
-          .from('user_trophies') // Assurez-vous que c'est le bon nom de table
+          .from('user_trophies')
           .select('trophy_id')
           .eq('user_id', userId)
           .eq('completed', true);
@@ -91,7 +90,7 @@ export function useAvatars(userId: string | undefined, userXp: number = 0) {
     }
 
     fetchAvatarsAndStatus();
-  }, [userId, userXp, supabase]);
+  }, [userId, userXp]); // 🆕 Retrait de supabase des dépendances (il est importé statiquement)
 
   return { avatars, loading };
 }
