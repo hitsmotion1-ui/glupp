@@ -208,14 +208,13 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     try {
       const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
 
+      // OPTIMISATION 1 : Cibler spécifiquement les codes-barres de produits (EAN/UPC)
+      // Éviter de mettre QR_CODE ou CODE_128 si on cherche des bières, ça accélère le scan
       const formats = [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.EAN_8,
         Html5QrcodeSupportedFormats.UPC_A,
         Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.QR_CODE,
       ];
 
       const scanner = new Html5Qrcode("barcode-fallback", {
@@ -227,9 +226,15 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
 
       let frameCount = 0;
 
+      // OPTIMISATION 2 : Réglages agressifs pour la détection EAN
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 10, disableFlip: false },
+        { 
+          fps: 15, // Plus de frames par seconde (10 c'est un peu juste si on bouge)
+          disableFlip: true, // Pas besoin de miroir pour la caméra arrière
+          // qrbox (zone de scan) n'est pas définie ici pour qu'il scanne l'image complète
+          // ce qui marche mieux sur mobile avec du EAN-13 quand le CSS crop la vidéo
+        },
         (decodedText, result) => {
           const format = result?.result?.format?.formatName || "inconnu";
           handleDetected(decodedText, format);
@@ -243,9 +248,27 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         }
       );
 
+      // OPTIMISATION 3 : Tenter d'appliquer les contraintes de focus (macro) si disponibles
+// OPTIMISATION 3 : Tenter d'appliquer les contraintes de focus (macro) si disponibles
+      setTimeout(() => {
+          try {
+              // Contournement TypeScript avec 'as any' et '?.' au cas où la méthode n'existe pas dans votre version
+              const videoTrack = (scanner as any).getRunningTrack?.();
+              
+              if (videoTrack && typeof videoTrack.applyConstraints === 'function') {
+                  const capabilities = videoTrack.getCapabilities() as any;
+                  if (capabilities?.focusMode?.includes('continuous') || capabilities?.focusMode?.includes('macro')) {
+                      videoTrack.applyConstraints({
+                          advanced: [{ focusMode: 'continuous' }] as any
+                      }).catch(() => addLog("info", "Impossible d'appliquer l'autofocus"));
+                  }
+              }
+          } catch(e) { /* ignore */ }
+      }, 1000);
+
       setCameraReady(true);
       setStarting(false);
-      addLog("success", "Camera ZXing active (10fps)");
+      addLog("success", "Camera ZXing active (15fps optimisé EAN)");
     } catch (err) {
       const errStr = String(err);
       addLog("error", `ZXing fallback echoue: ${errStr}`);
