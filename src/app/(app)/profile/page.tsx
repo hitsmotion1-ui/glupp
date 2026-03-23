@@ -362,12 +362,17 @@ export default function ProfilePage() {
         onClose={() => setIsFeedbackOpen(false)} 
       />
 
-      {/* 🆕 Modale AvatarPicker avec overscroll-contain */}
+{/* 🆕 Modale AvatarPicker avec blocage tactile du fond */}
       {isAvatarPickerOpen && (
-         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80" onClick={() => setIsAvatarPickerOpen(false)}>
+         <div 
+           className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80" 
+           onClick={() => setIsAvatarPickerOpen(false)}
+           style={{ touchAction: 'none' }} // Empêche le fond noir d'absorber le défilement tactile
+         >
             <div 
-              className="w-full max-w-md bg-glupp-bg rounded-t-2xl max-h-[85vh] overflow-y-auto overscroll-contain"
+              className="w-full max-w-md bg-glupp-bg rounded-t-3xl overflow-hidden shadow-2xl" 
               onClick={(e) => e.stopPropagation()}
+              style={{ touchAction: 'auto' }} // Autorise la modale à gérer son propre défilement
             >
               <AvatarPicker 
                 avatars={avatars} 
