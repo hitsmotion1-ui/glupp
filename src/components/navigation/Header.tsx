@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image"; // 👈 Nouvel import obligatoire pour les images
 import { useAppStore } from "@/lib/store/useAppStore";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 import { ScanLine, Search, Bell } from "lucide-react";
@@ -16,9 +17,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-glupp-bg/95 backdrop-blur-lg border-b border-glupp-border pt-[env(safe-area-inset-top,0px)]">
       <div className="flex items-center justify-between px-4 h-14">
-        <h1 className="font-display text-xl font-bold text-glupp-accent">
-          Glupp
-        </h1>
+        
+        {/* 🆕 Remplacement du texte <h1> par le logo */}
+        <Image 
+          src="/logo.svg" 
+          alt="Logo Glupp" 
+          width={90}    // Largeur adaptée pour le header (à ajuster si besoin)
+          height={28}   // Hauteur adaptée pour le header (à ajuster si besoin)
+          priority      // Important pour qu'il s'affiche instantanément
+          className="object-contain" 
+        />
+
         <div className="flex items-center gap-2">
           {/* Scan button */}
           <button
