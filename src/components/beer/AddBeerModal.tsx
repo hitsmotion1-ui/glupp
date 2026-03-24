@@ -61,13 +61,14 @@ interface AddBeerModalProps {
   isOpen: boolean;
   onClose: () => void;
   prefillName?: string;
+  prefillBarcode?: string | null; // 🆕 AJOUT : Le code barre pré-rempli
 }
 
 // ═══════════════════════════════════════════
 // Component
 // ═══════════════════════════════════════════
 
-export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps) {
+export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: AddBeerModalProps) {
   const { addBeer, adding, checkDuplicates } = useAddBeer();
   const openGluppModal = useAppStore((s) => s.openGluppModal);
 
@@ -78,6 +79,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
   const [countryCode, setCountryCode] = useState("FR");
   const [region, setRegion] = useState("");
   const [abv, setAbv] = useState("");
+  const [barcode, setBarcode] = useState(prefillBarcode || ""); // 🆕 AJOUT : État pour le code-barres
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,10 +98,11 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState("");
 
-  // Reset form when prefillName changes
+  // Reset form when prefillName or prefillBarcode changes
   useEffect(() => {
     if (isOpen) {
       setName(prefillName || "");
+      setBarcode(prefillBarcode || ""); // 🆕 AJOUT : Reset avec la prop
       setBrewery("");
       setStyle("Blonde Ale");
       setCountryCode("FR");
@@ -113,7 +116,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
       setCheckedDuplicates(false);
       setSubmitted(false);
     }
-  }, [isOpen, prefillName]);
+  }, [isOpen, prefillName, prefillBarcode]);
 
   // ── Derived ──
   const selectedCountry = COUNTRIES.find((c) => c.code === countryCode) || COUNTRIES[0];
@@ -180,6 +183,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
         country_code: countryCode,
         region: region.trim() || undefined,
         abv: abv ? parseFloat(abv) : null,
+        barcode: barcode.trim() || undefined, // 🆕 AJOUT : Ajout du barcode
         imageFile: photoFile,
       };
 
@@ -204,6 +208,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
 
   const handleClose = () => {
     setName(prefillName || "");
+    setBarcode(prefillBarcode || ""); // 🆕 AJOUT : Reset sur la fermeture
     setBrewery("");
     setStyle("Blonde Ale");
     setCountryCode("FR");
@@ -525,6 +530,20 @@ export function AddBeerModal({ isOpen, onClose, prefillName }: AddBeerModalProps
               % vol
             </span>
           </div>
+        </div>
+
+        {/* ── Code Barres ── */}
+        <div>
+          <label className="text-xs text-glupp-text-muted block mb-1">
+            Code-barres (optionnel)
+          </label>
+          <input
+            type="text"
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            placeholder="Ex: 5411551080222"
+            className={inputClass}
+          />
         </div>
 
         {/* ── Photo ── */}

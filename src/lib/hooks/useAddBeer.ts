@@ -21,6 +21,7 @@ export interface AddBeerInput {
   country_code: string;  // ISO code
   region?: string;
   abv?: number | null;
+  barcode?: string;      // 🆕 AJOUT : Le code-barres pour l'insertion
   imageFile?: File | null;
 }
 
@@ -147,6 +148,7 @@ export function useAddBeer() {
             country_code: input.country_code,
             region: input.region?.trim() || null,
             abv: input.abv ?? null,
+            barcode: input.barcode, // 🆕 AJOUT : Mise à jour du code-barres
             color,
             taste_bitter: taste.bitter,
             taste_sweet: taste.sweet,
@@ -175,6 +177,7 @@ export function useAddBeer() {
             country_code: input.country_code,
             region: input.region?.trim() || null,
             abv: input.abv ?? null,
+            barcode: input.barcode, // 🆕 AJOUT : Insertion du code-barres
             ibu: null,
             elo: 1500,
             total_votes: 0,
