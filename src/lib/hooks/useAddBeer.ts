@@ -21,7 +21,8 @@ export interface AddBeerInput {
   country_code: string;  // ISO code
   region?: string;
   abv?: number | null;
-  barcode?: string;      // 🆕 AJOUT : Le code-barres pour l'insertion
+  barcode?: string;      // 🆕 AJOUT CODE BARRES
+  description?: string;  // 🆕 AJOUT COMMENTAIRE
   imageFile?: File | null;
 }
 
@@ -44,7 +45,6 @@ export function useAddBeer() {
   const [showDuplicates, setShowDuplicates] = useState(false);
 
   // ── Anti-duplicate check ──
-  // Only match approved or pending beers (rejected beers can be re-submitted)
   const checkDuplicates = async (name: string, brewery: string): Promise<DuplicateCandidate[]> => {
     if (!name.trim()) return [];
 
@@ -56,9 +56,7 @@ export function useAddBeer() {
       .ilike("name", `%${name.trim()}%`)
       .limit(5);
 
-    // Also match on brewery if provided
     if (brewery.trim()) {
-      // Do a second query to catch brewery matches
       const { data: byName } = await query;
 
       const { data: byBrewery } = await supabase
@@ -70,7 +68,6 @@ export function useAddBeer() {
         .ilike("name", `%${name.trim().split(" ")[0]}%`)
         .limit(5);
 
-      // Merge and deduplicate
       const all = [...(byName || []), ...(byBrewery || [])];
       const seen = new Set<string>();
       const unique: DuplicateCandidate[] = [];
@@ -96,7 +93,7 @@ export function useAddBeer() {
       const taste = getDefaultTaste(input.style);
       const color = getDefaultColor(input.style);
 
-      // 0. Upload photo if provided
+      // 0. Upload photo
       let imageUrl: string | null = null;
       if (input.imageFile) {
         const timestamp = Date.now();
@@ -115,13 +112,10 @@ export function useAddBeer() {
             .from("beer-photos")
             .getPublicUrl(filePath);
           imageUrl = publicUrl;
-        } else {
-          console.warn("Photo upload failed:", uploadError.message);
         }
       }
 
-      // 1. Check if a previously rejected beer exists for this user (same name)
-      //    If so, re-edit it instead of creating a duplicate
+      // 1. Check existing rejected
       const { data: rejectedList } = await supabase
         .from("beers")
         .select("id")
@@ -133,11 +127,10 @@ export function useAddBeer() {
         .limit(1);
 
       const existingRejected = rejectedList?.[0] ?? null;
-
       let beer: Beer;
 
       if (existingRejected) {
-        // Re-submit: update the rejected beer with new info and reset to pending
+        // Update
         const { data: updatedList, error: updateError } = await supabase
           .from("beers")
           .update({
@@ -148,25 +141,23 @@ export function useAddBeer() {
             country_code: input.country_code,
             region: input.region?.trim() || null,
             abv: input.abv ?? null,
-            barcode: input.barcode, // 🆕 AJOUT : Mise à jour du code-barres
+            barcode: input.barcode || null, // 🆕 Envoi Barcode
+            description: input.description || null, // 🆕 Envoi Commentaire
             color,
             taste_bitter: taste.bitter,
             taste_sweet: taste.sweet,
             taste_fruity: taste.fruity,
             taste_body: taste.body,
-            ...(imageUrl ? { image_url: imageUrl } : {}), // Keep old photo if no new one
+            ...(imageUrl ? { image_url: imageUrl } : {}),
             status: "pending",
           })
           .eq("id", existingRejected.id)
           .select();
 
         if (updateError) throw new Error(updateError.message);
-        if (!updatedList || updatedList.length === 0) {
-          throw new Error("Impossible de re-soumettre cette biere. Veuillez reessayer.");
-        }
         beer = updatedList[0] as Beer;
       } else {
-        // New submission: insert a fresh beer
+        // Insert
         const { data: inserted, error: beerError } = await supabase
           .from("beers")
           .insert({
@@ -177,7 +168,8 @@ export function useAddBeer() {
             country_code: input.country_code,
             region: input.region?.trim() || null,
             abv: input.abv ?? null,
-            barcode: input.barcode, // 🆕 AJOUT : Insertion du code-barres
+            barcode: input.barcode || null, // 🆕 Envoi Barcode
+            description: input.description || null, // 🆕 Envoi Commentaire
             ibu: null,
             elo: 1500,
             total_votes: 0,
@@ -201,46 +193,16 @@ export function useAddBeer() {
         beer = inserted as Beer;
       }
 
-      // 2. Auto-glupp is deferred until admin approves the beer
-      // (handled in useAdmin.ts → approveBeerMutation)
-
-      // 3. Give +10 XP for the proposal
+      // XP & Notifications
       try {
-        const { error: xpError } = await supabase.rpc("add_xp", {
-          p_user_id: user.id,
-          p_amount: XP_GAINS.propose_beer,
-          p_reason: "propose_beer",
-        });
-
-        // Fallback: increment XP directly if RPC doesn't exist
+        const { error: xpError } = await supabase.rpc("add_xp", { p_user_id: user.id, p_amount: XP_GAINS.propose_beer, p_reason: "propose_beer" });
         if (xpError) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("xp")
-            .eq("id", user.id)
-            .single();
-
-          if (profile) {
-            await supabase
-              .from("profiles")
-              .update({ xp: (profile.xp || 0) + XP_GAINS.propose_beer })
-              .eq("id", user.id);
-          }
+          const { data: profile } = await supabase.from("profiles").select("xp").eq("id", user.id).single();
+          if (profile) await supabase.from("profiles").update({ xp: (profile.xp || 0) + XP_GAINS.propose_beer }).eq("id", user.id);
         }
-      } catch {
-        // XP award is non-critical, don't block the add flow
-        console.error("Failed to award XP for beer proposal");
-      }
+      } catch {}
 
-      // 4. beers_tasted count is updated when admin approves the beer
-      // (handled in useAdmin.ts → approveBeerMutation)
-
-      // 5. Notify admins
-      const { data: admins } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("is_admin", true);
-
+      const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
       if (admins && admins.length > 0) {
         const notifications = admins.map((admin) => ({
           user_id: admin.id,
@@ -249,7 +211,6 @@ export function useAddBeer() {
           message: `${input.name.trim()} (${input.brewery.trim()}) proposee par un utilisateur`,
           metadata: { beer_id: beer.id, beer_name: input.name.trim() },
         }));
-
         await supabase.from("notifications").insert(notifications);
       }
 
@@ -257,7 +218,6 @@ export function useAddBeer() {
     },
     onSuccess: () => {
       showXPToast(XP_GAINS.propose_beer, "Biere proposee !");
-      // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
       queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
@@ -275,14 +235,5 @@ export function useAddBeer() {
     setShowDuplicates(false);
   };
 
-  return {
-    addBeer,
-    adding: addBeerMutation.isPending,
-    checkDuplicates,
-    duplicates,
-    setDuplicates,
-    showDuplicates,
-    setShowDuplicates,
-    dismissDuplicates,
-  };
+  return { addBeer, adding: addBeerMutation.isPending, checkDuplicates, duplicates, setDuplicates, showDuplicates, setShowDuplicates, dismissDuplicates };
 }

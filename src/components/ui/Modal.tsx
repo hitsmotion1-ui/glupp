@@ -27,31 +27,32 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop avec touch-none pour bloquer le scroll du fond */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/60"
+            className="fixed inset-0 z-[60] bg-black/60 touch-none"
             onClick={onClose}
           />
 
-          {/* Sheet */}
+          {/* Sheet avec overscroll-contain pour garder le scroll à l'intérieur */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[60] bg-glupp-card rounded-t-glupp-xl max-h-[92vh] overflow-y-auto"
+            className="fixed bottom-0 left-0 right-0 z-[60] bg-glupp-card rounded-t-glupp-xl max-h-[92vh] overflow-y-auto overscroll-contain"
+            style={{ touchAction: "auto" }}
           >
             {/* Handle */}
-            <div className="flex justify-center pt-3 pb-2">
+            <div className="flex justify-center pt-3 pb-2 sticky top-0 bg-glupp-card z-10 shrink-0">
               <div className="w-10 h-1 bg-glupp-border rounded-full" />
             </div>
 
             {/* Header */}
             {title && (
-              <div className="flex items-center justify-between px-5 pb-3">
+              <div className="flex items-center justify-between px-5 pb-3 sticky top-5 bg-glupp-card z-10 shrink-0 border-b border-glupp-border/50">
                 <h2 className="font-display text-lg font-semibold text-glupp-cream">
                   {title}
                 </h2>
@@ -65,7 +66,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             )}
 
             {/* Content */}
-            <div className="px-5 pb-[calc(5rem+env(safe-area-inset-bottom,0px))]">
+            <div className="px-5 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-2">
               {children}
             </div>
           </motion.div>
