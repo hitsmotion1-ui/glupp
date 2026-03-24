@@ -31,19 +31,6 @@ export interface AdminSubmission {
   user?: Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
 }
 
-// 🆕 Le Hook pour le graphique des 30 derniers jours (Corrigé)
-export function useAdminDailyStats() {
-  return useQuery({
-    queryKey: ["admin", "daily_stats"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_admin_daily_stats");
-      if (error) throw error;
-      return data;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-} // <-- Il manquait cette accolade !
-
 interface BeerInput {
   name: string;
   brewery: string;
@@ -76,7 +63,23 @@ interface BarInput {
 }
 
 // ═══════════════════════════════════════════
-// Hook Principal
+// NOUVEAU HOOK : Daily Stats (Graphique)
+// ═══════════════════════════════════════════
+
+export function useAdminDailyStats() {
+  return useQuery({
+    queryKey: ["admin", "daily_stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_admin_daily_stats");
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ═══════════════════════════════════════════
+// HOOK PRINCIPAL : useAdmin
 // ═══════════════════════════════════════════
 
 export function useAdmin() {
@@ -214,7 +217,6 @@ export function useAdmin() {
         if (error) throw new Error(error.message);
         if (!data || data.length === 0) return [];
 
-        // Fetch profiles for proposers
         const addedByIds = [...new Set(data.map((b) => b.added_by).filter(Boolean))];
         let profileMap = new Map<string, Pick<Profile, "id" | "username" | "display_name">>();
 
@@ -240,11 +242,7 @@ export function useAdmin() {
 
   const approveBeerMutation = useMutation({
     mutationFn: async (beerId: string) => {
-      // Use RPC with SECURITY DEFINER to bypass RLS for cross-user operations
-      const { data, error } = await supabase.rpc("approve_beer", {
-        p_beer_id: beerId,
-      });
-
+      const { data, error } = await supabase.rpc("approve_beer", { p_beer_id: beerId });
       if (error) throw new Error(error.message);
       return data;
     },
@@ -260,12 +258,10 @@ export function useAdmin() {
 
   const rejectBeerMutation = useMutation({
     mutationFn: async ({ beerId, reason }: { beerId: string; reason?: string }) => {
-      // Use RPC with SECURITY DEFINER to bypass RLS for cross-user operations
       const { data, error } = await supabase.rpc("reject_beer", {
         p_beer_id: beerId,
         p_reason: reason?.trim() || null,
       });
-
       if (error) throw new Error(error.message);
       return data;
     },
@@ -353,7 +349,6 @@ export function useAdmin() {
         .from("bars")
         .delete()
         .eq("id", id);
-
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -365,7 +360,6 @@ export function useAdmin() {
 
   const toggleVerifiedMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Fetch current state
       const { data: bar, error: fetchError } = await supabase
         .from("bars")
         .select("is_verified")
@@ -393,11 +387,9 @@ export function useAdmin() {
   // ─── Submissions ─────────────────────────
 
   function useAdminSubmissions(status?: string) {
-    // Always fetch ALL submissions (single cache), then filter client-side
     return useQuery({
       queryKey: ["admin", "submissions", "all"],
       queryFn: async () => {
-        // 1. Fetch from legacy submissions table
         const legacyQuery = supabase
           .from("submissions")
           .select("*")
@@ -407,8 +399,6 @@ export function useAdmin() {
         const { data: legacyData } = await legacyQuery;
         const legacySubmissions = legacyData || [];
 
-        // 2. Fetch user-submitted beers from beers table (new flow)
-        // Only show beers that were proposed by users (added_by IS NOT NULL)
         const beersQuery = supabase
           .from("beers")
           .select("*")
@@ -420,7 +410,6 @@ export function useAdmin() {
         const { data: beerSubmissions } = await beersQuery;
         const pendingBeers = (beerSubmissions || []).filter((b) => b.added_by);
 
-        // 3. Collect all user IDs
         const userIds = [
           ...new Set([
             ...legacySubmissions.map((s) => s.user_id),
@@ -440,7 +429,6 @@ export function useAdmin() {
           );
         }
 
-        // 4. Convert pending beers to AdminSubmission format
         const beerAsSubmissions: AdminSubmission[] = pendingBeers.map((beer) => ({
           id: `beer-${beer.id}`,
           user_id: beer.added_by!,
@@ -462,13 +450,11 @@ export function useAdmin() {
           user: beer.added_by ? profileMap.get(beer.added_by) || undefined : undefined,
         }));
 
-        // 5. Format legacy submissions
         const legacyFormatted = legacySubmissions.map((s) => ({
           ...s,
           user: profileMap.get(s.user_id) || null,
         })) as AdminSubmission[];
 
-        // 6. Merge and sort by date (newest first)
         const allSubmissions = [...beerAsSubmissions, ...legacyFormatted].sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
@@ -485,9 +471,7 @@ export function useAdmin() {
 
   const approveSubmissionMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.rpc("approve_submission", {
-        p_submission_id: id,
-      });
+      const { data, error } = await supabase.rpc("approve_submission", { p_submission_id: id });
       if (error) throw new Error(error.message);
       return data;
     },
@@ -515,13 +499,7 @@ export function useAdmin() {
   });
 
   const updateSubmissionDataMutation = useMutation({
-    mutationFn: async ({
-      id,
-      data: newData,
-    }: {
-      id: string;
-      data: Record<string, unknown>;
-    }) => {
+    mutationFn: async ({ id, data: newData }: { id: string; data: Record<string, unknown> }) => {
       const { data, error } = await supabase
         .from("submissions")
         .update({ data: newData })
@@ -549,9 +527,7 @@ export function useAdmin() {
           .limit(50);
 
         if (search && search.trim().length > 0) {
-          query = query.or(
-            `username.ilike.%${search}%,display_name.ilike.%${search}%`
-          );
+          query = query.or(`username.ilike.%${search}%,display_name.ilike.%${search}%`);
         }
 
         const { data, error } = await query;
@@ -562,13 +538,9 @@ export function useAdmin() {
     });
   }
 
-  // ─── Toggle Ban ──────────────────────────
-
   const toggleBanMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { data, error } = await supabase.rpc("admin_toggle_ban", {
-        p_user_id: userId,
-      });
+      const { data, error } = await supabase.rpc("admin_toggle_ban", { p_user_id: userId });
       if (error) throw new Error(error.message);
       return data as { success: boolean; is_banned: boolean; username: string };
     },
@@ -576,8 +548,6 @@ export function useAdmin() {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     },
   });
-
-  // ─── Award Trophy ─────────────────────────
 
   const awardTrophyMutation = useMutation({
     mutationFn: async ({ userId, trophyId }: { userId: string; trophyId: string }) => {
@@ -594,20 +564,8 @@ export function useAdmin() {
     },
   });
 
-  // ─── Set GOTW ────────────────────────────
-
   const setGOTWMutation = useMutation({
-    mutationFn: async ({
-      beerId,
-      weekStart,
-      weekEnd,
-      bonusXp,
-    }: {
-      beerId: string;
-      weekStart: string;
-      weekEnd: string;
-      bonusXp: number;
-    }) => {
+    mutationFn: async ({ beerId, weekStart, weekEnd, bonusXp }: { beerId: string; weekStart: string; weekEnd: string; bonusXp: number }) => {
       const { data, error } = await supabase.rpc("admin_set_gotw", {
         p_beer_id: beerId,
         p_week_start: weekStart,
@@ -622,8 +580,6 @@ export function useAdmin() {
     },
   });
 
-  // ─── Trophies list ───────────────────────
-
   function useAdminTrophies() {
     return useQuery({
       queryKey: ["admin", "trophies"],
@@ -636,11 +592,9 @@ export function useAdmin() {
         if (error) throw new Error(error.message);
         return (data as Trophy[]) || [];
       },
-      staleTime: 5 * 60 * 1000, // 5 min
+      staleTime: 5 * 60 * 1000,
     });
   }
-
-  // ─── GOTW list ───────────────────────────
 
   function useAdminGOTW() {
     return useQuery({
@@ -658,15 +612,11 @@ export function useAdmin() {
     });
   }
 
-  // ─── User admin detail ───────────────────
-
   function useUserAdminDetail(userId?: string | null) {
     return useQuery({
       queryKey: ["admin", "user-detail", userId],
       queryFn: async () => {
-        const { data, error } = await supabase.rpc("get_user_admin_detail", {
-          p_user_id: userId!,
-        });
+        const { data, error } = await supabase.rpc("get_user_admin_detail", { p_user_id: userId! });
         if (error) throw new Error(error.message);
         return data as UserAdminDetail;
       },
@@ -674,8 +624,6 @@ export function useAdmin() {
       staleTime: 30 * 1000,
     });
   }
-
-  // ─── Recent activities ───────────────────
 
   function useAdminActivities() {
     return useQuery({
@@ -695,14 +643,9 @@ export function useAdmin() {
     });
   }
 
-  // ─── All glupps (modération photos) ─────
-
   const GLUPPS_PAGE_SIZE = 25;
 
-  function useAdminGlupps({
-    page = 0,
-    onlyWithPhoto = false,
-  }: { page?: number; onlyWithPhoto?: boolean } = {}) {
+  function useAdminGlupps({ page = 0, onlyWithPhoto = false }: { page?: number; onlyWithPhoto?: boolean } = {}) {
     return useQuery({
       queryKey: ["admin", "glupps", page, onlyWithPhoto],
       queryFn: async () => {
@@ -729,18 +672,8 @@ export function useAdmin() {
     });
   }
 
-  // ─── XP ──────────────────────────────────
-
   const awardXPMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      amount,
-      reason,
-    }: {
-      userId: string;
-      amount: number;
-      reason: string;
-    }) => {
+    mutationFn: async ({ userId, amount, reason }: { userId: string; amount: number; reason: string }) => {
       const { data, error } = await supabase.rpc("admin_award_xp", {
         p_user_id: userId,
         p_amount: amount,
@@ -755,81 +688,50 @@ export function useAdmin() {
     },
   });
 
-  // ─── Public API ──────────────────────────
-
   return {
-    // Stats
     stats,
     loadingStats,
-
-    // Beers
     useAdminBeers,
     createBeer: createBeerMutation.mutateAsync,
     creatingBeer: createBeerMutation.isPending,
-    updateBeer: (id: string, data: Partial<BeerInput>) =>
-      updateBeerMutation.mutateAsync({ id, data }),
+    updateBeer: (id: string, data: Partial<BeerInput>) => updateBeerMutation.mutateAsync({ id, data }),
     updatingBeer: updateBeerMutation.isPending,
     deleteBeer: deleteBeerMutation.mutateAsync,
     deletingBeer: deleteBeerMutation.isPending,
-
-    // Beer moderation
     useAdminPendingBeers,
     approveBeer: approveBeerMutation.mutateAsync,
     approvingBeer: approveBeerMutation.isPending,
-    rejectBeer: (beerId: string, reason?: string) =>
-      rejectBeerMutation.mutateAsync({ beerId, reason }),
+    rejectBeer: (beerId: string, reason?: string) => rejectBeerMutation.mutateAsync({ beerId, reason }),
     rejectingBeer: rejectBeerMutation.isPending,
-
-    // Bars
     useAdminBars,
     createBar: createBarMutation.mutateAsync,
     creatingBar: createBarMutation.isPending,
-    updateBar: (id: string, data: Partial<BarInput>) =>
-      updateBarMutation.mutateAsync({ id, data }),
+    updateBar: (id: string, data: Partial<BarInput>) => updateBarMutation.mutateAsync({ id, data }),
     updatingBar: updateBarMutation.isPending,
     deleteBar: deleteBarMutation.mutateAsync,
     deletingBar: deleteBarMutation.isPending,
     toggleVerified: toggleVerifiedMutation.mutateAsync,
     togglingVerified: toggleVerifiedMutation.isPending,
-
-    // Submissions
     useAdminSubmissions,
     approveSubmission: approveSubmissionMutation.mutateAsync,
     approvingSubmission: approveSubmissionMutation.isPending,
-    rejectSubmission: (id: string, reason: string) =>
-      rejectSubmissionMutation.mutateAsync({ id, reason }),
+    rejectSubmission: (id: string, reason: string) => rejectSubmissionMutation.mutateAsync({ id, reason }),
     rejectingSubmission: rejectSubmissionMutation.isPending,
-    updateSubmissionData: (id: string, data: Record<string, unknown>) =>
-      updateSubmissionDataMutation.mutateAsync({ id, data }),
+    updateSubmissionData: (id: string, data: Record<string, unknown>) => updateSubmissionDataMutation.mutateAsync({ id, data }),
     updatingSubmissionData: updateSubmissionDataMutation.isPending,
-
-    // Users
     useAdminUsers,
-    awardXP: (userId: string, amount: number, reason: string) =>
-      awardXPMutation.mutateAsync({ userId, amount, reason }),
+    awardXP: (userId: string, amount: number, reason: string) => awardXPMutation.mutateAsync({ userId, amount, reason }),
     awardingXP: awardXPMutation.isPending,
     toggleBan: toggleBanMutation.mutateAsync,
     togglingBan: toggleBanMutation.isPending,
-
-    // Trophies
     useAdminTrophies,
-    awardTrophy: (userId: string, trophyId: string) =>
-      awardTrophyMutation.mutateAsync({ userId, trophyId }),
+    awardTrophy: (userId: string, trophyId: string) => awardTrophyMutation.mutateAsync({ userId, trophyId }),
     awardingTrophy: awardTrophyMutation.isPending,
-
-    // GOTW
     useAdminGOTW,
-    setGOTW: (beerId: string, weekStart: string, weekEnd: string, bonusXp: number) =>
-      setGOTWMutation.mutateAsync({ beerId, weekStart, weekEnd, bonusXp }),
+    setGOTW: (beerId: string, weekStart: string, weekEnd: string, bonusXp: number) => setGOTWMutation.mutateAsync({ beerId, weekStart, weekEnd, bonusXp }),
     settingGOTW: setGOTWMutation.isPending,
-
-    // User detail
     useUserAdminDetail,
-
-    // Activities
     useAdminActivities,
-
-    // Glupps (modération photos)
     useAdminGlupps,
     GLUPPS_PAGE_SIZE,
   };

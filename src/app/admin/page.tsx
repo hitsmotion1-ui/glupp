@@ -1,835 +1,356 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAdmin } from "@/lib/hooks/useAdmin";
+import { AdminHeader } from "@/components/admin/AdminHeader";
+import { AdminActivityChart } from "@/components/admin/AdminActivityChart";
+import { MissingBarcodesList } from "@/components/admin/MissingBarcodesList"; 
 import { supabase } from "@/lib/supabase/client";
-import { queryKeys } from "@/lib/queries/queryKeys";
-import type { Beer, Bar, Profile, Rarity, Trophy, GluppOfWeek, Activity, UserAdminDetail } from "@/types";
+import {
+  Users,
+  Beer,
+  MapPin,
+  Sparkles,
+  Swords,
+  Inbox,
+  Star,
+  Clock,
+  Trophy,
+  Activity,
+  MessageSquarePlus,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import { getLevel } from "@/lib/utils/xp";
+import Link from "next/link";
+import React, { useEffect, useState } from "react";
 
 // ═══════════════════════════════════════════
-// Types
+// Skeleton placeholders
 // ═══════════════════════════════════════════
 
-export interface AdminStats {
-  total_users: number;
-  total_beers: number;
-  total_bars: number;
-  total_duels: number;
-  total_glupps: number;
-  pending_submissions: number;
-  active_today: number;
+function Skeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={`animate-pulse rounded-lg bg-[#3A3530]/40 ${className}`} />
+  );
 }
 
-export interface AdminSubmission {
-  id: string;
-  user_id: string;
-  type: "beer" | "bar" | "correction";
-  status: "pending" | "approved" | "rejected";
-  data: Record<string, unknown>;
-  admin_note: string | null;
-  created_at: string;
-  // Joined
-  user?: Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
-}
-
-interface BeerInput {
-  name: string;
-  brewery: string;
-  country: string;
-  country_code: string;
-  style: string;
-  abv?: number | null;
-  ibu?: number | null;
-  color?: string;
-  taste_bitter?: number;
-  taste_sweet?: number;
-  taste_fruity?: number;
-  taste_body?: number;
-  rarity?: Rarity;
-  description?: string | null;
-  image_url?: string | null;
-  barcode?: string | null;
-  fun_fact?: string | null;
-  fun_fact_icon?: string;
-  region?: string | null;
-}
-
-interface BarInput {
-  name?: string;
-  address?: string | null;
-  city?: string | null;
-  geo_lat?: number | null;
-  geo_lng?: number | null;
-  is_verified?: boolean;
+function StatCardSkeleton() {
+  return (
+    <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-5">
+      <div className="flex items-start justify-between">
+        <Skeleton className="w-10 h-10 rounded-lg" />
+      </div>
+      <Skeleton className="mt-4 h-8 w-20" />
+      <Skeleton className="mt-2 h-4 w-28" />
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════
-// Hook Principal
+// Dashboard Page
 // ═══════════════════════════════════════════
 
-export function useAdmin() {
-  const queryClient = useQueryClient();
-
-  // ─── Stats ───────────────────────────────
-
-  const {
-    data: stats = null,
-    isLoading: loadingStats,
-  } = useQuery({
-    queryKey: queryKeys.admin.stats,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_admin_stats");
-      if (error) throw new Error(error.message);
-      return data as AdminStats;
-    },
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
-
-  // ─── Beers CRUD ──────────────────────────
-
-  function useAdminBeers(search?: string, rarity?: string) {
-    return useQuery({
-      queryKey: queryKeys.admin.beers({ search, rarity }),
-      queryFn: async () => {
-        let query = supabase
-          .from("beers")
-          .select("*", { count: "exact" })
-          .eq("is_active", true)
-          .eq("status", "approved")
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (search && search.trim().length > 0) {
-          query = query.or(
-            `name.ilike.%${search}%,brewery.ilike.%${search}%`
-          );
-        }
-
-        if (rarity) {
-          query = query.eq("rarity", rarity);
-        }
-
-        const { data, error, count } = await query;
-        if (error) throw new Error(error.message);
-        return { beers: (data as Beer[]) || [], total: count ?? 0 };
-      },
-      staleTime: 30 * 1000,
-    });
-  }
-
-  const createBeerMutation = useMutation({
-    mutationFn: async (input: BeerInput) => {
-      const { data, error } = await supabase
-        .from("beers")
-        .insert({
-          ...input,
-          elo: 1000,
-          total_votes: 0,
-          is_active: true,
-          color: input.color ?? "#F59E0B",
-          taste_bitter: input.taste_bitter ?? 3,
-          taste_sweet: input.taste_sweet ?? 3,
-          taste_fruity: input.taste_fruity ?? 3,
-          taste_body: input.taste_body ?? 3,
-          rarity: input.rarity ?? "common",
-          fun_fact_icon: input.fun_fact_icon ?? "🍺",
-        })
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Beer;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-    },
-  });
-
-  const updateBeerMutation = useMutation({
-    mutationFn: async ({ id, data: input }: { id: string; data: Partial<BeerInput> }) => {
-      const { data, error } = await supabase
-        .from("beers")
-        .update(input)
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Beer;
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.beers.detail(variables.id),
-      });
-    },
-  });
-
-  const deleteBeerMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("beers")
-        .update({ is_active: false })
-        .eq("id", id);
-
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-    },
-  });
-
-  // ─── Pending Beers (moderation) ──────────
-
-  function useAdminPendingBeers() {
-    return useQuery({
-      queryKey: ["admin", "beers", "pending"],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from("beers")
-          .select("*")
-          .eq("status", "pending")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (error) throw new Error(error.message);
-        if (!data || data.length === 0) return [];
-
-        // Fetch profiles for proposers
-        const addedByIds = [...new Set(data.map((b) => b.added_by).filter(Boolean))];
-        let profileMap = new Map<string, Pick<Profile, "id" | "username" | "display_name">>();
-
-        if (addedByIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("id, username, display_name")
-            .in("id", addedByIds);
-
-          if (profiles) {
-            profileMap = new Map(profiles.map((p) => [p.id, p]));
-          }
-        }
-
-        return (data as Beer[]).map((beer) => ({
-          ...beer,
-          proposer: beer.added_by ? profileMap.get(beer.added_by) || null : null,
-        }));
-      },
-      staleTime: 15 * 1000,
-    });
-  }
-
-  const approveBeerMutation = useMutation({
-    mutationFn: async (beerId: string) => {
-      // Use RPC with SECURITY DEFINER to bypass RLS for cross-user operations
-      const { data, error } = await supabase.rpc("approve_beer", {
-        p_beer_id: beerId,
-      });
-
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
-    },
-  });
-
-  const rejectBeerMutation = useMutation({
-    mutationFn: async ({ beerId, reason }: { beerId: string; reason?: string }) => {
-      // Use RPC with SECURITY DEFINER to bypass RLS for cross-user operations
-      const { data, error } = await supabase.rpc("reject_beer", {
-        p_beer_id: beerId,
-        p_reason: reason?.trim() || null,
-      });
-
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-    },
-  });
-
-  // ─── Bars CRUD ───────────────────────────
-
-  function useAdminBars(search?: string) {
-    return useQuery({
-      queryKey: queryKeys.admin.bars({ search }),
-      queryFn: async () => {
-        let query = supabase
-          .from("bars")
-          .select("*", { count: "exact" })
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (search && search.trim().length > 0) {
-          query = query.or(
-            `name.ilike.%${search}%,city.ilike.%${search}%`
-          );
-        }
-
-        const { data, error, count } = await query;
-        if (error) throw new Error(error.message);
-        return { bars: (data as Bar[]) || [], total: count ?? 0 };
-      },
-      staleTime: 30 * 1000,
-    });
-  }
-
-  const createBarMutation = useMutation({
-    mutationFn: async (input: BarInput) => {
-      const { data, error } = await supabase
-        .from("bars")
-        .insert({
-          name: input.name,
-          address: input.address ?? null,
-          city: input.city ?? null,
-          geo_lat: input.geo_lat ?? null,
-          geo_lng: input.geo_lng ?? null,
-          is_verified: false,
-          rating: 0,
-          total_votes: 0,
-        })
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Bar;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "bars"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.bars.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-    },
-  });
-
-  const updateBarMutation = useMutation({
-    mutationFn: async ({ id, data: input }: { id: string; data: Partial<BarInput> }) => {
-      const { data, error } = await supabase
-        .from("bars")
-        .update(input)
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Bar;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "bars"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.bars.all });
-    },
-  });
-
-  const deleteBarMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("bars")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "bars"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.bars.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-    },
-  });
-
-  const toggleVerifiedMutation = useMutation({
-    mutationFn: async (id: string) => {
-      // Fetch current state
-      const { data: bar, error: fetchError } = await supabase
-        .from("bars")
-        .select("is_verified")
-        .eq("id", id)
-        .single();
-
-      if (fetchError) throw new Error(fetchError.message);
-
-      const { data, error } = await supabase
-        .from("bars")
-        .update({ is_verified: !bar.is_verified })
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Bar;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "bars"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.bars.all });
-    },
-  });
-
-  // ─── Submissions ─────────────────────────
-
-  function useAdminSubmissions(status?: string) {
-    // Always fetch ALL submissions (single cache), then filter client-side
-    return useQuery({
-      queryKey: ["admin", "submissions", "all"],
-      queryFn: async () => {
-        // 1. Fetch from legacy submissions table
-        const legacyQuery = supabase
-          .from("submissions")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        const { data: legacyData } = await legacyQuery;
-        const legacySubmissions = legacyData || [];
-
-        // 2. Fetch user-submitted beers from beers table (new flow)
-        // Only show beers that were proposed by users (added_by IS NOT NULL)
-        const beersQuery = supabase
-          .from("beers")
-          .select("*")
-          .eq("is_active", true)
-          .not("added_by", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        const { data: beerSubmissions } = await beersQuery;
-        const pendingBeers = (beerSubmissions || []).filter((b) => b.added_by);
-
-        // 3. Collect all user IDs
-        const userIds = [
-          ...new Set([
-            ...legacySubmissions.map((s) => s.user_id),
-            ...pendingBeers.map((b) => b.added_by).filter(Boolean),
-          ]),
-        ];
-
-        let profileMap = new Map<string, Pick<Profile, "id" | "username" | "display_name" | "avatar_url">>();
-        if (userIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("id, username, display_name, avatar_url")
-            .in("id", userIds);
-
-          profileMap = new Map(
-            (profiles || []).map((p) => [p.id, p])
-          );
-        }
-
-        // 4. Convert pending beers to AdminSubmission format
-        const beerAsSubmissions: AdminSubmission[] = pendingBeers.map((beer) => ({
-          id: `beer-${beer.id}`,
-          user_id: beer.added_by!,
-          type: "beer" as const,
-          status: beer.status as "pending" | "approved" | "rejected",
-          data: {
-            name: beer.name,
-            brewery: beer.brewery,
-            style: beer.style,
-            abv: beer.abv,
-            country: beer.country,
-            country_code: beer.country_code,
-            region: beer.region,
-            image_url: beer.image_url,
-            beer_id: beer.id,
-          },
-          admin_note: null,
-          created_at: beer.created_at,
-          user: beer.added_by ? profileMap.get(beer.added_by) || undefined : undefined,
-        }));
-
-        // 5. Format legacy submissions
-        const legacyFormatted = legacySubmissions.map((s) => ({
-          ...s,
-          user: profileMap.get(s.user_id) || null,
-        })) as AdminSubmission[];
-
-        // 6. Merge and sort by date (newest first)
-        const allSubmissions = [...beerAsSubmissions, ...legacyFormatted].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-
-        return allSubmissions;
-      },
-      staleTime: 15 * 1000,
-      select: (data) => {
-        if (!status) return data;
-        return data.filter((s) => s.status === status);
-      },
-    });
-  }
-
-  const approveSubmissionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { data, error } = await supabase.rpc("approve_submission", {
-        p_submission_id: id,
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "beers"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "bars"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-    },
-  });
-
-  const rejectSubmissionMutation = useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const { data, error } = await supabase.rpc("reject_submission", {
-        p_submission_id: id,
-        p_reason: reason,
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
-    },
-  });
-
-  const updateSubmissionDataMutation = useMutation({
-    mutationFn: async ({
-      id,
-      data: newData,
-    }: {
-      id: string;
-      data: Record<string, unknown>;
-    }) => {
-      const { data, error } = await supabase
-        .from("submissions")
-        .update({ data: newData })
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "submissions"] });
-    },
-  });
-
-  // ─── Users ───────────────────────────────
-
-  function useAdminUsers(search?: string) {
-    return useQuery({
-      queryKey: queryKeys.admin.users(search),
-      queryFn: async () => {
-        let query = supabase
-          .from("profiles")
-          .select("*")
-          .order("xp", { ascending: false })
-          .limit(50);
-
-        if (search && search.trim().length > 0) {
-          query = query.or(
-            `username.ilike.%${search}%,display_name.ilike.%${search}%`
-          );
-        }
-
-        const { data, error } = await query;
-        if (error) throw new Error(error.message);
-        return (data as Profile[]) || [];
-      },
-      staleTime: 30 * 1000,
-    });
-  }
-
-  // ─── Toggle Ban ──────────────────────────
-
-  const toggleBanMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const { data, error } = await supabase.rpc("admin_toggle_ban", {
-        p_user_id: userId,
-      });
-      if (error) throw new Error(error.message);
-      return data as { success: boolean; is_banned: boolean; username: string };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-    },
-  });
-
-  // ─── Award Trophy ─────────────────────────
-
-  const awardTrophyMutation = useMutation({
-    mutationFn: async ({ userId, trophyId }: { userId: string; trophyId: string }) => {
-      const { data, error } = await supabase.rpc("admin_award_trophy", {
-        p_user_id: userId,
-        p_trophy_id: trophyId,
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
-    },
-  });
-
-  // ─── Set GOTW ────────────────────────────
-
-  const setGOTWMutation = useMutation({
-    mutationFn: async ({
-      beerId,
-      weekStart,
-      weekEnd,
-      bonusXp,
-    }: {
-      beerId: string;
-      weekStart: string;
-      weekEnd: string;
-      bonusXp: number;
-    }) => {
-      const { data, error } = await supabase.rpc("admin_set_gotw", {
-        p_beer_id: beerId,
-        p_week_start: weekStart,
-        p_week_end: weekEnd,
-        p_bonus_xp: bonusXp,
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "gotw"] });
-    },
-  });
-
-  // ─── Trophies list ───────────────────────
-
-  function useAdminTrophies() {
-    return useQuery({
-      queryKey: ["admin", "trophies"],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from("trophies")
-          .select("*")
-          .order("category", { ascending: true })
-          .order("name", { ascending: true });
-        if (error) throw new Error(error.message);
-        return (data as Trophy[]) || [];
-      },
-      staleTime: 5 * 60 * 1000, // 5 min
-    });
-  }
-
-  // ─── GOTW list ───────────────────────────
-
-  function useAdminGOTW() {
-    return useQuery({
-      queryKey: ["admin", "gotw"],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from("glupp_of_week")
-          .select("*, beer:beers(*)")
-          .order("week_start", { ascending: false })
-          .limit(10);
-        if (error) throw new Error(error.message);
-        return (data as (GluppOfWeek & { beer?: Beer })[]) || [];
-      },
-      staleTime: 30 * 1000,
-    });
-  }
-
-  // ─── User admin detail ───────────────────
-
-  function useUserAdminDetail(userId?: string | null) {
-    return useQuery({
-      queryKey: ["admin", "user-detail", userId],
-      queryFn: async () => {
-        const { data, error } = await supabase.rpc("get_user_admin_detail", {
-          p_user_id: userId!,
-        });
-        if (error) throw new Error(error.message);
-        return data as UserAdminDetail;
-      },
-      enabled: !!userId,
-      staleTime: 30 * 1000,
-    });
-  }
-
-  // ─── Recent activities ───────────────────
-
-  function useAdminActivities() {
-    return useQuery({
-      queryKey: ["admin", "activities"],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from("activities")
-          .select("*, user:profiles!user_id(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery)")
-          .in("type", ["glupp", "duel", "photo"])
-          .order("created_at", { ascending: false })
-          .limit(15);
-        if (error) throw new Error(error.message);
-        return (data as Activity[]) || [];
-      },
-      staleTime: 0,
-      refetchOnWindowFocus: true,
-    });
-  }
-
-  // ─── All glupps (modération photos) ─────
-
-  const GLUPPS_PAGE_SIZE = 25;
-
-  function useAdminGlupps({
-    page = 0,
-    onlyWithPhoto = false,
-  }: { page?: number; onlyWithPhoto?: boolean } = {}) {
-    return useQuery({
-      queryKey: ["admin", "glupps", page, onlyWithPhoto],
-      queryFn: async () => {
-        let query = supabase
-          .from("activities")
-          .select(
-            "id, user_id, beer_id, photo_url, created_at, metadata, user:profiles!user_id(id, username, display_name, avatar_url), beer:beers!beer_id(id, name, brewery, rarity)",
-            { count: "exact" }
-          )
-          .eq("type", "glupp")
-          .order("created_at", { ascending: false })
-          .range(page * GLUPPS_PAGE_SIZE, (page + 1) * GLUPPS_PAGE_SIZE - 1);
-
-        if (onlyWithPhoto) {
-          query = query.not("photo_url", "is", null);
-        }
-
-        const { data, error, count } = await query;
-        if (error) throw new Error(error.message);
-        return { glupps: data || [], total: count ?? 0 };
-      },
-      staleTime: 0,
-      refetchOnWindowFocus: true,
-    });
-  }
-
-  // ─── XP ──────────────────────────────────
-
-  const awardXPMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      amount,
-      reason,
-    }: {
-      userId: string;
-      amount: number;
-      reason: string;
-    }) => {
-      const { data, error } = await supabase.rpc("admin_award_xp", {
-        p_user_id: userId,
-        p_amount: amount,
-        p_reason: reason,
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
-    },
-  });
-
-  // ─── Public API ──────────────────────────
-
-  return {
-    // Stats
-    stats,
-    loadingStats,
-
-    // Beers
-    useAdminBeers,
-    createBeer: createBeerMutation.mutateAsync,
-    creatingBeer: createBeerMutation.isPending,
-    updateBeer: (id: string, data: Partial<BeerInput>) =>
-      updateBeerMutation.mutateAsync({ id, data }),
-    updatingBeer: updateBeerMutation.isPending,
-    deleteBeer: deleteBeerMutation.mutateAsync,
-    deletingBeer: deleteBeerMutation.isPending,
-
-    // Beer moderation
-    useAdminPendingBeers,
-    approveBeer: approveBeerMutation.mutateAsync,
-    approvingBeer: approveBeerMutation.isPending,
-    rejectBeer: (beerId: string, reason?: string) =>
-      rejectBeerMutation.mutateAsync({ beerId, reason }),
-    rejectingBeer: rejectBeerMutation.isPending,
-
-    // Bars
-    useAdminBars,
-    createBar: createBarMutation.mutateAsync,
-    creatingBar: createBarMutation.isPending,
-    updateBar: (id: string, data: Partial<BarInput>) =>
-      updateBarMutation.mutateAsync({ id, data }),
-    updatingBar: updateBarMutation.isPending,
-    deleteBar: deleteBarMutation.mutateAsync,
-    deletingBar: deleteBarMutation.isPending,
-    toggleVerified: toggleVerifiedMutation.mutateAsync,
-    togglingVerified: toggleVerifiedMutation.isPending,
-
-    // Submissions
-    useAdminSubmissions,
-    approveSubmission: approveSubmissionMutation.mutateAsync,
-    approvingSubmission: approveSubmissionMutation.isPending,
-    rejectSubmission: (id: string, reason: string) =>
-      rejectSubmissionMutation.mutateAsync({ id, reason }),
-    rejectingSubmission: rejectSubmissionMutation.isPending,
-    updateSubmissionData: (id: string, data: Record<string, unknown>) =>
-      updateSubmissionDataMutation.mutateAsync({ id, data }),
-    updatingSubmissionData: updateSubmissionDataMutation.isPending,
-
-    // Users
-    useAdminUsers,
-    awardXP: (userId: string, amount: number, reason: string) =>
-      awardXPMutation.mutateAsync({ userId, amount, reason }),
-    awardingXP: awardXPMutation.isPending,
-    toggleBan: toggleBanMutation.mutateAsync,
-    togglingBan: toggleBanMutation.isPending,
-
-    // Trophies
-    useAdminTrophies,
-    awardTrophy: (userId: string, trophyId: string) =>
-      awardTrophyMutation.mutateAsync({ userId, trophyId }),
-    awardingTrophy: awardTrophyMutation.isPending,
-
-    // GOTW
-    useAdminGOTW,
-    setGOTW: (beerId: string, weekStart: string, weekEnd: string, bonusXp: number) =>
-      setGOTWMutation.mutateAsync({ beerId, weekStart, weekEnd, bonusXp }),
-    settingGOTW: setGOTWMutation.isPending,
-
-    // User detail
-    useUserAdminDetail,
-
-    // Activities
-    useAdminActivities,
-
-    // Glupps (modération photos)
-    useAdminGlupps,
-    GLUPPS_PAGE_SIZE,
-  };
+export default function AdminDashboardPage() {
+  const { 
+    loadingStats, 
+    stats, 
+    useAdminUsers, 
+    useAdminActivities 
+  } = useAdmin();
+
+  const { data: topUsers = [], isLoading: loadingUsers } = useAdminUsers();
+  const { data: recentActivity = [], isLoading: loadingActivity } = useAdminActivities();
+
+  const [pendingFeedbacksCount, setPendingFeedbacksCount] = useState(0);
+
+  useEffect(() => {
+    const fetchPendingFeedbacksCount = async () => {
+      const { data } = await supabase
+        .from("feedbacks")
+        .select("id")
+        .eq("status", "pending");
+      
+      if (data) {
+        setPendingFeedbacksCount(data.length);
+      }
+    };
+    
+    fetchPendingFeedbacksCount();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-[#14120F] text-[#E8E1D5] pb-24">
+      {/* ── HEADER NAVIGATION ── */}
+      <AdminHeader title="Dashboard" subtitle="Overview of the Glupp platform" />
+
+      {/* ── MAIN CONTENT ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        {/* ── BOUTON FEEDBACKS AVEC NOTIFICATION ── */}
+        <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-[#F7F3EE] flex items-center gap-2">
+              <MessageSquarePlus size={20} className="text-[#E08840]" />
+              Retours utilisateurs
+            </h2>
+            <p className="text-sm text-[#8C8273] mt-1">
+              Consulte les bugs, suggestions et problèmes signalés par la communauté.
+            </p>
+          </div>
+          <Link
+            href="/admin/feedbacks"
+            className="relative shrink-0 inline-flex items-center gap-2 px-6 py-2.5 bg-[#E08840] text-[#1E1B16] font-bold rounded-lg hover:bg-opacity-90 transition-colors"
+          >
+            Voir les messages
+            {pendingFeedbacksCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-[#1E1B16] shadow-md animate-pulse">
+                {pendingFeedbacksCount}
+              </span>
+            )}
+          </Link>
+        </div>
+
+        {/* ── OVERVIEW STATS ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="text-[#8C8273]" size={20} />
+            <h2 className="text-xl font-semibold text-[#F7F3EE]">Statistiques Globales</h2>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {loadingStats ? (
+              <>
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+              </>
+            ) : (
+              <>
+                <DashboardStatCard
+                  title="Utilisateurs"
+                  value={stats?.total_users || 0}
+                  icon={<Users size={20} className="text-[#4ECDC4]" />}
+                />
+                <DashboardStatCard
+                  title="Bières"
+                  value={stats?.total_beers || 0}
+                  icon={<Beer size={20} className="text-[#E08840]" />}
+                />
+                <DashboardStatCard
+                  title="En attente"
+                  value={stats?.pending_submissions || 0}
+                  icon={<Inbox size={20} className="text-[#F0C460]" />}
+                />
+                <DashboardStatCard
+                  title="Bars"
+                  value={stats?.total_bars || 0}
+                  icon={<MapPin size={20} className="text-[#8B5CF6]" />}
+                />
+                <DashboardStatCard
+                  title="Duels Joués"
+                  value={stats?.total_duels || 0}
+                  icon={<Swords size={20} className="text-[#EF4444]" />}
+                />
+                <DashboardStatCard
+                  title="Glupps"
+                  value={stats?.total_glupps || 0}
+                  icon={<Sparkles size={20} className="text-[#10B981]" />}
+                />
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* ── GRAPHIQUE D'ÉVOLUTION ── */}
+        <section>
+          <AdminActivityChart />
+        </section>
+
+        {/* ── SCANS ORPHELINS ── */}
+        <section>
+          <MissingBarcodesList />
+        </section>
+
+        {/* ── TOP USERS (LEADERBOARD) ── */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Star className="text-[#F0C460]" size={20} />
+              <h2 className="text-xl font-semibold text-[#F7F3EE]">Leaderboard</h2>
+            </div>
+          </div>
+
+          {loadingUsers ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+            </div>
+          ) : topUsers.length === 0 ? (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-8 text-center">
+              <Trophy className="mx-auto text-[#6B6050] mb-3" size={32} />
+              <p className="text-[#8C8273]">Aucun utilisateur trouvé.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {topUsers.slice(0, 3).map((user, idx) => {
+                const userLvl = getLevel(user.xp);
+                return (
+                  <motion.div
+                    key={user.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="flex items-center p-4 bg-[#1E1B16] border border-[#3A3530] rounded-xl hover:border-[#6B6050] transition-colors"
+                  >
+                    <span className={`
+                      text-lg font-bold w-8 shrink-0
+                      ${idx === 0 ? 'text-[#F0C460]' : 
+                        idx === 1 ? 'text-[#E8E1D5]' : 
+                        idx === 2 ? 'text-[#E08840]' : 'text-[#6B6050]'}
+                    `}>
+                      #{idx + 1}
+                    </span>
+                    <img
+                      src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                      alt={user.username}
+                      className="w-12 h-12 rounded-full border-2 border-[#3A3530] ml-2 shrink-0 object-cover"
+                    />
+                    <div className="ml-4 min-w-0 flex-1">
+                      <p className="text-[#F7F3EE] font-semibold truncate">
+                        {user.display_name || user.username}
+                      </p>
+                      <p className="text-xs text-[#8C8273] truncate">
+                        @{user.username}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-[#E08840]">
+                        {user.xp} XP
+                      </p>
+                      <p className="text-[10px] text-[#8C8273] uppercase tracking-wider">
+                        {userLvl.title}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ── RECENT ACTIVITY ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="text-[#8C8273]" size={20} />
+            <h2 className="text-xl font-semibold text-[#F7F3EE]">Activité Récente</h2>
+          </div>
+
+          {loadingActivity ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+            </div>
+          ) : recentActivity.length === 0 ? (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-8 text-center">
+              <Activity className="mx-auto text-[#6B6050] mb-3" size={32} />
+              <p className="text-[#8C8273]">C'est bien calme ici...</p>
+            </div>
+          ) : (
+            <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl divide-y divide-[#3A3530] overflow-hidden">
+              {recentActivity.slice(0, 5).map((act) => {
+                const timeAgo = new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' });
+                const userName = act.user?.display_name || act.user?.username || "Inconnu";
+                const userAvatar = act.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`;
+
+                const typeConfig: Record<string, { icon: React.ReactNode, label: string, color: string }> = {
+                  tasting: { icon: <Beer size={16} />, label: "Check-in", color: "text-[#E08840]" },
+                  photo: { icon: <Sparkles size={16} />, label: "Photo", color: "text-[#10B981]" },
+                  duel: { icon: <Swords size={16} />, label: "Duel", color: "text-[#EF4444]" },
+                  trophy: { icon: <Trophy size={16} />, label: "Trophy", color: "text-[#F0C460]" },
+                  glupp: { icon: <Activity size={16} />, label: "Glupp", color: "text-[#4ECDC4]" },
+                };
+
+                const cfg = typeConfig[act.type] || { icon: <Activity size={16} />, label: act.type, color: "text-[#8C8273]" };
+
+                return (
+                  <div key={act.id} className="p-4 flex items-center gap-4 hover:bg-[#2A241C] transition-colors">
+                    <div className={`w-8 h-8 rounded-full bg-[#14120F] border border-[#3A3530] flex items-center justify-center shrink-0 ${cfg.color}`}>
+                      {cfg.icon}
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center gap-3">
+                      <img
+                        src={userAvatar}
+                        alt=""
+                        className="w-8 h-8 rounded-full border border-[#3A3530] shrink-0 object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[#E8E1D5] truncate">
+                          <span className="font-semibold">{userName}</span>
+                          <span className="text-[#8C8273] mx-1">
+                            {cfg.label === "Check-in" ? "a gluppé" :
+                             cfg.label === "Duel" ? "a joué un duel" :
+                             cfg.label === "Photo" ? "a pris une photo" :
+                             `a effectué l'action ${cfg.label.toLowerCase()}`}
+                          </span>
+                          {act.beer && (
+                            <span className="text-[#E08840]"> · {act.beer.name}</span>
+                          )}
+                        </p>
+                      </div>
+                      {act.photo_url && (
+                        <a
+                          href={act.photo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Voir la photo"
+                          className="shrink-0"
+                        >
+                          <img
+                            src={act.photo_url}
+                            alt=""
+                            className="w-10 h-10 rounded-lg object-cover border border-[#3A3530] hover:opacity-80 transition-opacity"
+                          />
+                        </a>
+                      )}
+                      <span className="text-xs text-[#6B6050] shrink-0">{timeAgo}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+      </div>
+    </div>
+  );
 }
 
-export function useAdminDailyStats() {
-  return useQuery({
-    queryKey: ["admin", "daily_stats"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_admin_daily_stats");
-      if (error) throw error;
-      return data;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+// ═══════════════════════════════════════════
+// Composant Local de Carte de Statistique
+// ═══════════════════════════════════════════
+interface DashboardStatCardProps {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+}
+
+function DashboardStatCard({ title, value, icon }: DashboardStatCardProps) {
+  return (
+    <div className="bg-[#1E1B16] border border-[#3A3530] rounded-xl p-5 flex flex-col justify-between">
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-10 h-10 rounded-lg bg-[#14120F] border border-[#3A3530] flex items-center justify-center">
+          {icon}
+        </div>
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-[#F7F3EE]">{value}</p>
+        <p className="text-xs text-[#8C8273] mt-1 uppercase tracking-wider">{title}</p>
+      </div>
+    </div>
+  );
 }
