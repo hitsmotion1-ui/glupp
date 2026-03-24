@@ -69,7 +69,7 @@ export function AdminActivityChart() {
               fontSize={11} 
               tickLine={false} 
               axisLine={false} 
-              tickFormatter={(val) => Math.round(val).toString()}
+              tickFormatter={(val: number) => Math.round(val).toString()}
             />
             
             <Tooltip content={<CustomTooltip />} />

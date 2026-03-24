@@ -31,19 +31,6 @@ export interface AdminSubmission {
   user?: Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
 }
 
-// 🆕 Le Hook pour le graphique des 30 derniers jours (Corrigé)
-export function useAdminDailyStats() {
-  return useQuery({
-    queryKey: ["admin", "daily_stats"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_admin_daily_stats");
-      if (error) throw error;
-      return data;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-} // <-- Il manquait cette accolade !
-
 interface BeerInput {
   name: string;
   brewery: string;
@@ -833,4 +820,16 @@ export function useAdmin() {
     useAdminGlupps,
     GLUPPS_PAGE_SIZE,
   };
+}
+
+export function useAdminDailyStats() {
+  return useQuery({
+    queryKey: ["admin", "daily_stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_admin_daily_stats");
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 }
