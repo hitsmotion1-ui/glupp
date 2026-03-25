@@ -55,6 +55,36 @@ const STEPS: OnboardingStep[] = [
   },
   {
     icon: (
+      <div className="relative">
+        <motion.div
+          animate={{ rotate: [0, -8, 0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="text-6xl"
+        >
+          📖
+        </motion.div>
+        <motion.div
+          animate={{ scale: [1, 1.4, 1], opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="absolute -top-1 -right-3 text-xl"
+        >
+          💡
+        </motion.div>
+      </div>
+    ),
+    title: "Parle comme un Gluppeur",
+    description: "Ici, on a notre propre vocabulaire. Petit lexique express :",
+    color: "#F0C460",
+    features: [
+      { icon: <span className="text-xs font-bold">G</span>, text: "Glupp — Une biere goutee et enregistree" },
+      { icon: <Zap size={14} />, text: "Glupper — Ajouter une biere a ta collection" },
+      { icon: <Users size={14} />, text: "Gluppeur — Toi ! Un membre de la communaute" },
+      { icon: <Star size={14} />, text: "Beerdex — Ta collection complete de bieres" },
+      { icon: <Trophy size={14} />, text: "Crew — Ton groupe de potes Gluppeurs" },
+    ],
+  },
+  {
+    icon: (
       <div className="relative flex items-center gap-3">
         <motion.div
           animate={{ x: [0, 8, 0], rotate: [0, -5, 0] }}
