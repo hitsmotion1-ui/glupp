@@ -6,7 +6,7 @@ import { RarityBadge } from "./RarityBadge";
 import { Check } from "lucide-react";
 
 interface BeerRowProps {
-  beer: Beer;
+  beer: Beer & { score?: number; wins?: number; glupps?: number };
   rank: number;
   onClick: () => void;
   tasted?: boolean;
@@ -20,6 +20,7 @@ const MEDALS: Record<number, string> = {
 
 export function BeerRow({ beer, rank, onClick, tasted }: BeerRowProps) {
   const isTop3 = rank <= 3;
+  const hasPersonalScore = typeof beer.score === "number" && beer.score > 0;
 
   return (
     <button
@@ -71,10 +72,23 @@ export function BeerRow({ beer, rank, onClick, tasted }: BeerRowProps) {
       {/* Country */}
       <span className="text-sm">{beer.country}</span>
 
-      {/* ELO */}
-      <span className="text-sm font-mono font-semibold text-glupp-gold w-12 text-right">
-        {formatNumber(beer.elo)}
-      </span>
+      {/* Personal score (replaces ELO) — only show if the beer has been in duels */}
+      {hasPersonalScore ? (
+        <div className="text-right shrink-0 w-14">
+          <p className="text-sm font-mono font-semibold text-glupp-gold">
+            {Math.round(beer.score!)} pts
+          </p>
+          {typeof beer.wins === "number" && (
+            <p className="text-[9px] text-glupp-text-muted">
+              {beer.wins}W
+            </p>
+          )}
+        </div>
+      ) : (
+        <span className="text-[10px] text-glupp-text-muted w-14 text-right">
+          —
+        </span>
+      )}
     </button>
   );
 }
