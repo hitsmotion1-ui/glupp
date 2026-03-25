@@ -151,7 +151,7 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
             </span>
           </div>
           <p className="text-[10px] text-glupp-text-muted">
-            Avis Glupp ({stats.total_reviews})
+            Avis Glupper ({stats.total_reviews})
           </p>
           <StarRating value={Math.round(stats.avg_overall)} readonly size={12} />
         </Card>
@@ -307,7 +307,7 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
             className="flex items-center gap-1.5 text-xs text-glupp-text-muted hover:text-glupp-cream transition-colors mb-2"
           >
             <MessageSquare size={12} />
-            {reviews.length} avis Glupp
+            {reviews.length} avis Glupper
             {showAllReviews ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
 
