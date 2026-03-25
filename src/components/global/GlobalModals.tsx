@@ -33,7 +33,7 @@ export function GlobalModals() {
   // FAB menu
   const [fabOpen, setFabOpen] = useState(false);
 
-  // Add beer modal (replaces SubmitBeerModal)
+  // Add beer modal
   const [showAddBeer, setShowAddBeer] = useState(false);
   const [showSubmitBar, setShowSubmitBar] = useState(false);
   const [addBeerPrefill, setAddBeerPrefill] = useState("");
@@ -98,7 +98,6 @@ export function GlobalModals() {
         openGluppModal(beer.id);
       }
     } else {
-      // Show dialog with options instead of just a toast
       setNotFoundBarcode(barcode);
     }
   };
@@ -197,7 +196,7 @@ export function GlobalModals() {
                 Scanner une etiquette
               </motion.button>
 
-              {/* Glupper option — slightly bigger, primary action */}
+              {/* Glupper option */}
               <motion.button
                 initial={{ opacity: 0, y: 15, scale: 0.8 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -216,7 +215,7 @@ export function GlobalModals() {
           )}
         </AnimatePresence>
 
-        {/* FAB button with rotation animation */}
+        {/* FAB button */}
         <motion.button
           onClick={() => setFabOpen(!fabOpen)}
           animate={{ rotate: fabOpen ? 45 : 0 }}
@@ -254,7 +253,6 @@ export function GlobalModals() {
         title="Glupper une biere"
       >
         <div className="space-y-3">
-          {/* Search input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-glupp-text-muted" />
             <input
@@ -267,7 +265,6 @@ export function GlobalModals() {
             />
           </div>
 
-          {/* Results */}
           <div className="max-h-[50vh] overflow-y-auto space-y-1">
             {searching && (
               <p className="text-center py-4 text-glupp-text-muted text-sm">
@@ -328,6 +325,7 @@ export function GlobalModals() {
         </div>
       </Modal>
 
+      {/* Add Beer modal */}
       <AddBeerModal
         isOpen={showAddBeer}
         onClose={() => {
@@ -358,17 +356,18 @@ export function GlobalModals() {
             Le code <span className="font-mono text-glupp-cream">{notFoundBarcode}</span> n&apos;est pas dans notre base.
           </p>
           <div className="flex flex-col gap-2">
+            {/* Rescanner → relance la caméra */}
             <button
               onClick={() => {
-                setAddBeerPrefillBarcode(notFoundBarcode);
                 setNotFoundBarcode(null);
-                setShowAddBeer(true);
+                setShowScanner(true);
               }}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-glupp-accent text-glupp-bg font-medium text-sm rounded-glupp hover:bg-glupp-accent/90 transition-colors"
             >
               <ScanLine size={16} />
               Rescanner
             </button>
+            {/* Rechercher par nom */}
             <button
               onClick={() => {
                 setNotFoundBarcode(null);
@@ -379,8 +378,10 @@ export function GlobalModals() {
               <Search size={16} />
               Rechercher par nom
             </button>
+            {/* Proposer → passe le barcode scanné au formulaire */}
             <button
               onClick={() => {
+                setAddBeerPrefillBarcode(notFoundBarcode);
                 setNotFoundBarcode(null);
                 setShowAddBeer(true);
               }}
