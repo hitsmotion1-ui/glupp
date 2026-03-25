@@ -323,8 +323,8 @@ export function BeerModal() {
             {[
               { label: "Alcool", value: beer.abv ? `${beer.abv}%` : "N/A" },
               { label: "IBU", value: beer.ibu?.toString() || "N/A" },
-              { label: "ELO", value: formatNumber(beer.elo) },
-              { label: "Votes", value: formatNumber(beer.total_votes) },
+              { label: "Duels", value: beer.total_votes > 0 ? formatNumber(beer.total_votes) : "\u2014" },
+              { label: "Score", value: beer.total_votes >= 10 ? formatNumber(beer.elo) : "En cours..." },
             ].map((stat) => (
               <div key={stat.label} className="bg-glupp-card-alt rounded-glupp p-2 text-center">
                 <p className="text-xs text-glupp-text-muted">{stat.label}</p>
