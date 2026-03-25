@@ -3,7 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/queries/queryKeys";
-import { useAppStore } from "@/lib/store/useAppStore";
 import type { Crew } from "@/types";
 
 // ═══════════════════════════════════════════
@@ -25,7 +24,9 @@ interface CrewMember {
 
 interface CrewWithMembers extends Omit<Crew, "members"> {
   members: CrewMember[];
+  pending_members: CrewMember[];
   member_count: number;
+  is_admin: boolean;
 }
 
 interface CrewInvite {
@@ -43,7 +44,6 @@ interface CrewInvite {
 
 export function useCrews() {
   const queryClient = useQueryClient();
-  const showXPToast = useAppStore((s) => s.showXPToast);
 
   // ─── Fetch user's crews (only accepted) ───
   const { data: crews = [], isLoading } = useQuery({
@@ -57,13 +57,14 @@ export function useCrews() {
       // Get crew IDs where user is accepted member
       const { data: memberships } = await supabase
         .from("crew_members")
-        .select("crew_id")
+        .select("crew_id, role")
         .eq("user_id", user.id)
         .eq("status", "accepted");
 
       if (!memberships || memberships.length === 0) return [];
 
       const crewIds = memberships.map((m) => m.crew_id);
+      const roleMap = new Map(memberships.map((m) => [m.crew_id, m.role]));
 
       // Get crew details
       const { data: crewsData, error } = await supabase
@@ -73,27 +74,34 @@ export function useCrews() {
 
       if (error || !crewsData) return [];
 
-      // Get accepted members for each crew
+      // Get ALL members for each crew (accepted + pending for admin view)
       const result: CrewWithMembers[] = [];
       for (const crew of crewsData) {
-        const { data: members } = await supabase
+        const { data: allMembers } = await supabase
           .from("crew_members")
           .select(
             "user_id, role, status, joined_at, profiles(username, display_name, avatar_url, xp)"
           )
           .eq("crew_id", crew.id)
-          .eq("status", "accepted");
+          .in("status", ["accepted", "pending"]);
+
+        const mapped = (allMembers || []).map((m: Record<string, unknown>) => ({
+          user_id: m.user_id as string,
+          role: m.role as string,
+          status: m.status as string,
+          joined_at: m.joined_at as string,
+          profile: m.profiles as CrewMember["profile"],
+        }));
+
+        const accepted = mapped.filter((m) => m.status === "accepted");
+        const pending = mapped.filter((m) => m.status === "pending");
 
         result.push({
           ...crew,
-          members: (members || []).map((m: Record<string, unknown>) => ({
-            user_id: m.user_id as string,
-            role: m.role as string,
-            status: m.status as string,
-            joined_at: m.joined_at as string,
-            profile: m.profiles as CrewMember["profile"],
-          })),
-          member_count: members?.length || 0,
+          members: accepted,
+          pending_members: pending,
+          member_count: accepted.length,
+          is_admin: roleMap.get(crew.id) === "admin",
         });
       }
 
@@ -111,7 +119,6 @@ export function useCrews() {
       } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Get pending memberships
       const { data: pending } = await supabase
         .from("crew_members")
         .select("crew_id, joined_at")
@@ -122,7 +129,6 @@ export function useCrews() {
 
       const crewIds = pending.map((p) => p.crew_id);
 
-      // Get crew details + creator info
       const { data: crewsData } = await supabase
         .from("crews")
         .select("id, name, created_by, profiles!created_by(username)")
@@ -130,7 +136,6 @@ export function useCrews() {
 
       if (!crewsData) return [];
 
-      // Get member count for each crew
       const result: CrewInvite[] = [];
       for (const crew of crewsData) {
         const { count } = await supabase
@@ -170,13 +175,11 @@ export function useCrews() {
         p_name: name,
         p_member_ids: memberIds,
       });
-
       if (error) throw new Error(error.message);
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
-      showXPToast(0, "Crew cree !");
     },
   });
 
@@ -211,7 +214,6 @@ export function useCrews() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
       queryClient.invalidateQueries({ queryKey: ["crews", "invites"] });
-      showXPToast(0, "Tu as rejoint le crew !");
     },
   });
 
@@ -241,17 +243,34 @@ export function useCrews() {
     },
   });
 
+  // ─── Kick from crew (admin only) ───
+  const kickMutation = useMutation({
+    mutationFn: async ({
+      crewId,
+      userId,
+    }: {
+      crewId: string;
+      userId: string;
+    }) => {
+      const { error } = await supabase.rpc("kick_from_crew", {
+        p_crew_id: crewId,
+        p_user_id: userId,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
+    },
+  });
+
   // ─── Public API ───
   return {
-    // Crews
     crews,
     isLoading,
 
-    // Invites
     invites,
     loadingInvites,
 
-    // Actions
     createCrew: (name: string, memberIds: string[] = []) =>
       createCrewMutation.mutateAsync({ name, memberIds }),
     creatingCrew: createCrewMutation.isPending,
@@ -271,5 +290,9 @@ export function useCrews() {
     leaveCrew: (crewId: string) =>
       leaveCrewMutation.mutateAsync(crewId),
     leavingCrew: leaveCrewMutation.isPending,
+
+    kickFromCrew: (crewId: string, userId: string) =>
+      kickMutation.mutateAsync({ crewId, userId }),
+    kicking: kickMutation.isPending,
   };
 }

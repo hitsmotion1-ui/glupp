@@ -20,7 +20,10 @@ import {
   X,
   LogOut,
   Loader2,
-  UserPlus,
+  UserMinus,
+  Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -64,24 +67,24 @@ export function CrewSection() {
     crews,
     isLoading,
     invites,
-    loadingInvites,
     acceptInvite,
     acceptingInvite,
     declineInvite,
-    decliningInvite,
     leaveCrew,
-    leavingCrew,
+    kickFromCrew,
+    kicking,
   } = useCrews();
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [leavingCrewId, setLeavingCrewId] = useState<string | null>(null);
   const [processingInviteId, setProcessingInviteId] = useState<string | null>(null);
+  const [kickingUserId, setKickingUserId] = useState<string | null>(null);
+  const [expandedCrewId, setExpandedCrewId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
       <div className="px-4 space-y-3">
         <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-36" />
         <Skeleton className="h-36" />
       </div>
     );
@@ -118,6 +121,19 @@ export function CrewSection() {
       console.error("Leave crew error:", err);
     } finally {
       setLeavingCrewId(null);
+    }
+  };
+
+  const handleKick = async (crewId: string, userId: string, username: string, isPending: boolean) => {
+    const action = isPending ? "Annuler l'invitation de" : "Retirer";
+    if (!window.confirm(`${action} @${username} du crew ?`)) return;
+    setKickingUserId(userId);
+    try {
+      await kickFromCrew(crewId, userId);
+    } catch (err) {
+      console.error("Kick error:", err);
+    } finally {
+      setKickingUserId(null);
     }
   };
 
@@ -220,6 +236,8 @@ export function CrewSection() {
               const crewNext = getCrewNextLevel(crew.xp);
               const crewProgress = getCrewProgress(crew.xp);
               const isLeaving = leavingCrewId === crew.id;
+              const isExpanded = expandedCrewId === crew.id;
+              const hasPending = crew.pending_members && crew.pending_members.length > 0;
 
               return (
                 <motion.div
@@ -232,9 +250,17 @@ export function CrewSection() {
                   {/* Crew header */}
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 min-w-0 flex-1">
-                      <h4 className="font-display font-bold text-glupp-cream truncate">
-                        {crew.name}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-display font-bold text-glupp-cream truncate">
+                          {crew.name}
+                        </h4>
+                        {crew.is_admin && (
+                          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 bg-glupp-gold/10 rounded text-[9px] font-semibold text-glupp-gold">
+                            <Crown size={9} />
+                            Chef
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-glupp-accent font-medium">
                           {crewLevel.name}
@@ -244,13 +270,11 @@ export function CrewSection() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1 px-2 py-1 bg-glupp-accent/10 rounded-full">
-                        <Zap size={12} className="text-glupp-accent" />
-                        <span className="text-xs font-bold text-glupp-accent">
-                          {formatNumber(crew.xp)} XP
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-1 px-2 py-1 bg-glupp-accent/10 rounded-full shrink-0">
+                      <Zap size={12} className="text-glupp-accent" />
+                      <span className="text-xs font-bold text-glupp-accent">
+                        {formatNumber(crew.xp)} XP
+                      </span>
                     </div>
                   </div>
 
@@ -275,39 +299,35 @@ export function CrewSection() {
                     <div className="flex items-center gap-1">
                       <Users size={12} className="text-glupp-text-muted" />
                       <span className="text-xs text-glupp-text-muted">
-                        {crew.member_count || crew.members?.length || 0}{" "}
-                        membres
+                        {crew.member_count} membre{crew.member_count > 1 ? "s" : ""}
                       </span>
                     </div>
+                    {hasPending && crew.is_admin && (
+                      <div className="flex items-center gap-1">
+                        <Clock size={12} className="text-glupp-accent" />
+                        <span className="text-xs text-glupp-accent">
+                          {crew.pending_members.length} en attente
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Members */}
+                  {/* Members preview (collapsed) */}
                   <div className="flex items-center gap-1.5 pt-1">
                     {(crew.members || []).slice(0, 6).map((member) => (
                       <button
                         key={member.user_id}
-                        onClick={() =>
-                          openUserProfileModal(member.user_id)
-                        }
+                        onClick={() => openUserProfileModal(member.user_id)}
                         className="relative"
-                        title={
-                          member.profile.display_name ||
-                          member.profile.username
-                        }
+                        title={member.profile.display_name || member.profile.username}
                       >
                         <Avatar
                           url={member.profile.avatar_url}
-                          name={
-                            member.profile.display_name ||
-                            member.profile.username
-                          }
+                          name={member.profile.display_name || member.profile.username}
                           size="sm"
                         />
                         {member.role === "admin" && (
-                          <Crown
-                            size={8}
-                            className="absolute -top-0.5 -right-0.5 text-glupp-gold"
-                          />
+                          <Crown size={8} className="absolute -top-0.5 -right-0.5 text-glupp-gold" />
                         )}
                       </button>
                     ))}
@@ -320,8 +340,131 @@ export function CrewSection() {
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-1 border-t border-glupp-border/50">
+                  {/* ═══ Admin panel (expandable) ═══ */}
+                  {crew.is_admin && (
+                    <div className="pt-1 border-t border-glupp-border/50">
+                      <button
+                        onClick={() => setExpandedCrewId(isExpanded ? null : crew.id)}
+                        className="flex items-center gap-1.5 text-xs text-glupp-text-muted hover:text-glupp-cream transition-colors w-full py-1"
+                      >
+                        <Crown size={12} className="text-glupp-gold" />
+                        <span>Gerer le crew</span>
+                        {isExpanded ? <ChevronUp size={12} className="ml-auto" /> : <ChevronDown size={12} className="ml-auto" />}
+                      </button>
+
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          transition={{ duration: 0.2 }}
+                          className="mt-2 space-y-2"
+                        >
+                          {/* Accepted members */}
+                          <p className="text-[10px] text-glupp-text-muted uppercase tracking-wider font-semibold">
+                            Membres ({crew.members.length})
+                          </p>
+                          {crew.members.map((member) => (
+                            <div
+                              key={member.user_id}
+                              className="flex items-center gap-2.5 py-1.5"
+                            >
+                              <Avatar
+                                url={member.profile.avatar_url}
+                                name={member.profile.display_name || member.profile.username}
+                                size="sm"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-glupp-cream truncate">
+                                  {member.profile.display_name || member.profile.username}
+                                </p>
+                                <p className="text-[10px] text-glupp-text-muted">
+                                  {member.role === "admin" ? "Chef" : "Membre"}
+                                </p>
+                              </div>
+                              {member.role !== "admin" && (
+                                <button
+                                  onClick={() =>
+                                    handleKick(
+                                      crew.id,
+                                      member.user_id,
+                                      member.profile.username,
+                                      false
+                                    )
+                                  }
+                                  disabled={kickingUserId === member.user_id}
+                                  className="shrink-0 flex items-center gap-1 px-2 py-1 text-[10px] text-glupp-text-muted hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-50"
+                                >
+                                  {kickingUserId === member.user_id ? (
+                                    <Loader2 size={10} className="animate-spin" />
+                                  ) : (
+                                    <UserMinus size={10} />
+                                  )}
+                                  Retirer
+                                </button>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Pending invitations */}
+                          {hasPending && (
+                            <>
+                              <p className="text-[10px] text-glupp-accent uppercase tracking-wider font-semibold mt-3">
+                                Invitations en attente ({crew.pending_members.length})
+                              </p>
+                              {crew.pending_members.map((member) => (
+                                <div
+                                  key={member.user_id}
+                                  className="flex items-center gap-2.5 py-1.5"
+                                >
+                                  <div className="relative">
+                                    <Avatar
+                                      url={member.profile.avatar_url}
+                                      name={member.profile.display_name || member.profile.username}
+                                      size="sm"
+                                    />
+                                    <Clock
+                                      size={8}
+                                      className="absolute -bottom-0.5 -right-0.5 text-glupp-accent bg-glupp-card rounded-full"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-glupp-cream truncate">
+                                      {member.profile.display_name || member.profile.username}
+                                    </p>
+                                    <p className="text-[10px] text-glupp-accent">
+                                      En attente de reponse
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      handleKick(
+                                        crew.id,
+                                        member.user_id,
+                                        member.profile.username,
+                                        true
+                                      )
+                                    }
+                                    disabled={kickingUserId === member.user_id}
+                                    className="shrink-0 flex items-center gap-1 px-2 py-1 text-[10px] text-glupp-text-muted hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-50"
+                                  >
+                                    {kickingUserId === member.user_id ? (
+                                      <Loader2 size={10} className="animate-spin" />
+                                    ) : (
+                                      <X size={10} />
+                                    )}
+                                    Annuler
+                                  </button>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </motion.div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Leave button (for everyone) */}
+                  <div className="pt-1 border-t border-glupp-border/50">
                     <button
                       onClick={() => handleLeaveCrew(crew.id, crew.name)}
                       disabled={isLeaving}
@@ -332,7 +475,7 @@ export function CrewSection() {
                       ) : (
                         <LogOut size={12} />
                       )}
-                      Quitter
+                      Quitter le crew
                     </button>
                   </div>
                 </motion.div>
