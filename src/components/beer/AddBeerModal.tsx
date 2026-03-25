@@ -43,7 +43,7 @@ interface AddBeerModalProps {
   isOpen: boolean;
   onClose: () => void;
   prefillName?: string;
-  prefillBarcode?: string | null; // 🆕 AJOUT PROPS
+  prefillBarcode?: string | null;
 }
 
 export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: AddBeerModalProps) {
@@ -57,17 +57,19 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
   const [countryCode, setCountryCode] = useState("FR");
   const [region, setRegion] = useState("");
   const [abv, setAbv] = useState("");
-  const [barcode, setBarcode] = useState(prefillBarcode || ""); // 🆕 ÉTAT BARCODE
-  const [description, setDescription] = useState(""); // 🆕 ÉTAT COMMENTAIRE
+  const [barcode, setBarcode] = useState(prefillBarcode || "");
+  const [description, setDescription] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [wantsToGlupp, setWantsToGlupp] = useState(false);
 
   // ── Duplicate state ──
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
   const [showDuplicateCheck, setShowDuplicateCheck] = useState(false);
   const [checkedDuplicates, setCheckedDuplicates] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedBeerId, setSubmittedBeerId] = useState<string | null>(null);
 
   // ── Dropdown states ──
   const [showStylePicker, setShowStylePicker] = useState(false);
@@ -79,8 +81,8 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
   useEffect(() => {
     if (isOpen) {
       setName(prefillName || "");
-      setBarcode(prefillBarcode || ""); // 🆕 Autofill
-      setDescription(""); // 🆕 Reset commentaire
+      setBarcode(prefillBarcode || "");
+      setDescription("");
       setBrewery("");
       setStyle("Blonde Ale");
       setCountryCode("FR");
@@ -93,6 +95,8 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
       setShowDuplicateCheck(false);
       setCheckedDuplicates(false);
       setSubmitted(false);
+      setSubmittedBeerId(null);
+      setWantsToGlupp(false);
     }
   }, [isOpen, prefillName, prefillBarcode]);
 
@@ -130,6 +134,11 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
       return;
     }
 
+    if (wantsToGlupp && !photoFile) {
+      setError("La photo est obligatoire pour glupper la biere");
+      return;
+    }
+
     if (!checkedDuplicates) {
       const found = await checkDuplicates(name, brewery);
       if (found.length > 0) {
@@ -151,12 +160,22 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
         country_code: countryCode,
         region: region.trim() || undefined,
         abv: abv ? parseFloat(abv) : null,
-        barcode: barcode.trim() || undefined, // 🆕 Envoi
-        description: description.trim() || undefined, // 🆕 Envoi
+        barcode: barcode.trim() || undefined,
+        description: description.trim() || undefined,
         imageFile: photoFile,
       };
 
-      await addBeer(input);
+      const beer = await addBeer(input);
+
+      if (wantsToGlupp && beer) {
+        handleClose();
+        setTimeout(() => {
+          openGluppModal(beer.id);
+        }, 300);
+        return;
+      }
+
+      setSubmittedBeerId(beer?.id || null);
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
@@ -190,6 +209,8 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
     setShowDuplicateCheck(false);
     setCheckedDuplicates(false);
     setSubmitted(false);
+    setSubmittedBeerId(null);
+    setWantsToGlupp(false);
     setShowStylePicker(false);
     setShowCountryPicker(false);
     onClose();
@@ -197,6 +218,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
 
   const inputClass = "w-full px-3 py-2.5 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors";
 
+  // ═══ SUCCESS SCREEN ═══
   if (submitted) {
     return (
       <Modal isOpen={isOpen} onClose={handleClose} title="Biere proposee !">
@@ -206,7 +228,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
           </div>
           <div>
             <h3 className="font-display font-bold text-glupp-cream text-lg">Merci !</h3>
-            <p className="text-sm text-glupp-text-muted mt-1">Ta proposition "{name}" est en cours de validation.</p>
+            <p className="text-sm text-glupp-text-muted mt-1">Ta proposition &quot;{name}&quot; est en cours de validation.</p>
             <p className="text-xs text-glupp-accent mt-2">+10 XP</p>
           </div>
           <Button variant="primary" onClick={handleClose}>Compris</Button>
@@ -215,6 +237,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
     );
   }
 
+  // ═══ DUPLICATE CHECK SCREEN ═══
   if (showDuplicateCheck && duplicates.length > 0) {
     return (
       <Modal isOpen={isOpen} onClose={handleClose} title="Biere similaire trouvee">
@@ -245,24 +268,28 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
     );
   }
 
+  // ═══ MAIN FORM ═══
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Proposer une biere">
       <div className="space-y-4">
         <div className="flex items-center gap-3 p-3 bg-glupp-accent/10 border border-glupp-accent/20 rounded-glupp">
           <Beer className="w-5 h-5 text-glupp-accent shrink-0" />
-          <p className="text-xs text-glupp-text-soft">Propose une biere a Glupp ! L'equipe la validera et tu gagneras +10 XP immediatement.</p>
+          <p className="text-xs text-glupp-text-soft">Propose une biere a Glupp ! L&apos;equipe la validera et tu gagneras +10 XP immediatement.</p>
         </div>
 
+        {/* ── Nom ── */}
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">Nom de la biere *</label>
           <input type="text" value={name} onChange={(e) => { setName(e.target.value); setCheckedDuplicates(false); }} placeholder="Ex: Chouffe Houblon" className={inputClass} />
         </div>
 
+        {/* ── Brasserie ── */}
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">Brasserie *</label>
           <input type="text" value={brewery} onChange={(e) => { setBrewery(e.target.value); setCheckedDuplicates(false); }} placeholder="Ex: Brasserie d'Achouffe" className={inputClass} />
         </div>
 
+        {/* ── Style ── */}
         <div className="relative">
           <label className="text-xs text-glupp-text-muted block mb-1">Style *</label>
           <button type="button" onClick={() => { setShowStylePicker(!showStylePicker); setShowCountryPicker(false); }} className={`${inputClass} flex items-center justify-between`}>
@@ -289,6 +316,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
           )}
         </div>
 
+        {/* ── Pays ── */}
         <div className="relative">
           <label className="text-xs text-glupp-text-muted block mb-1">Pays *</label>
           <button type="button" onClick={() => { setShowCountryPicker(!showCountryPicker); setShowStylePicker(false); }} className={`${inputClass} flex items-center justify-between`}>
@@ -315,6 +343,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
           )}
         </div>
 
+        {/* ── Région ── */}
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">Region (optionnel)</label>
           <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Ex: Vendee, Baviere..." className={inputClass} />
@@ -327,28 +356,64 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
           )}
         </div>
 
+        {/* ── ABV ── */}
         <div>
-          <label className="text-xs text-glupp-text-muted block mb-1">Taux d'alcool (optionnel)</label>
+          <label className="text-xs text-glupp-text-muted block mb-1">Taux d&apos;alcool (optionnel)</label>
           <div className="relative w-32">
             <input type="number" value={abv} onChange={(e) => setAbv(e.target.value)} placeholder="8.0" step="0.1" min="0" max="30" className={`${inputClass} pr-12`} />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-glupp-text-muted">% vol</span>
           </div>
         </div>
 
-        {/* ── 🆕 Code Barres ── */}
+        {/* ── Code-barres ── */}
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">Code-barres (optionnel)</label>
           <input type="text" value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Ex: 5411551080222" className={inputClass} />
         </div>
 
-        {/* ── 🆕 Commentaire ── */}
+        {/* ── Commentaire ── */}
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">Commentaire / Notes (optionnel)</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Un détail à nous préciser sur cette bière ?" rows={2} className={`${inputClass} resize-none`} />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Un detail a nous preciser sur cette biere ?" rows={2} className={`${inputClass} resize-none`} />
         </div>
 
+        {/* ── Toggle Glupper ── */}
+        <div className="p-3 bg-glupp-accent/10 border border-glupp-accent/20 rounded-glupp">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🍺</span>
+              <div>
+                <p className="text-sm font-medium text-glupp-cream">Glupper cette biere maintenant</p>
+                <p className="text-[10px] text-glupp-text-muted">
+                  {wantsToGlupp 
+                    ? "La photo sera obligatoire pour valider le glupp" 
+                    : "Tu pourras la glupper plus tard depuis ta collection"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWantsToGlupp(!wantsToGlupp)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${
+                wantsToGlupp ? "bg-glupp-accent" : "bg-glupp-border"
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  wantsToGlupp ? "translate-x-[22px]" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </label>
+        </div>
+
+        {/* ── Photo ── */}
         <div>
-          <label className="text-xs text-glupp-text-muted block mb-1">Photo (optionnel)</label>
+          <label className="text-xs text-glupp-text-muted block mb-1">
+            Photo {wantsToGlupp ? (
+              <span className="text-glupp-error font-medium">(obligatoire pour glupper)</span>
+            ) : "(optionnel)"}
+          </label>
           {photoPreview ? (
             <div className="relative inline-block">
               <img src={photoPreview} alt="Preview" className="w-24 h-24 rounded-glupp object-cover border border-glupp-border" />
@@ -365,15 +430,33 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
           )}
         </div>
 
+        {/* ── Error ── */}
         {error && <p className="text-xs text-red-400 bg-red-400/10 px-3 py-2 rounded-glupp">{error}</p>}
 
+        {/* ── Buttons ── */}
         <div className="flex gap-2 pt-1">
           <Button variant="ghost" className="flex-1" onClick={handleClose}>Annuler</Button>
-          <Button variant="primary" className="flex-1" onClick={handleSubmit} disabled={adding || !name.trim() || !brewery.trim()}>
-            {adding ? <Loader2 size={14} className="animate-spin" /> : <><Send size={14} className="mr-1.5" /> Proposer a Glupp</>}
+          <Button 
+            variant="primary" 
+            className="flex-1" 
+            onClick={handleSubmit} 
+            disabled={adding || !name.trim() || !brewery.trim() || (wantsToGlupp && !photoFile)}
+          >
+            {adding ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <>
+                <Send size={14} className="mr-1.5" />
+                {wantsToGlupp ? "Proposer et Glupper !" : "Proposer a Glupp"}
+              </>
+            )}
           </Button>
         </div>
-        <p className="text-center text-xs text-glupp-text-muted pb-2">+10 XP immediatement · +25 XP quand validee</p>
+        <p className="text-center text-xs text-glupp-text-muted pb-2">
+          {wantsToGlupp 
+            ? "+10 XP proposition · +25 XP validation · +15 XP photo · +20 XP position" 
+            : "+10 XP immediatement · +25 XP quand validee"}
+        </p>
       </div>
     </Modal>
   );

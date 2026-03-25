@@ -37,6 +37,7 @@ export function GlobalModals() {
   const [showAddBeer, setShowAddBeer] = useState(false);
   const [showSubmitBar, setShowSubmitBar] = useState(false);
   const [addBeerPrefill, setAddBeerPrefill] = useState("");
+  const [addBeerPrefillBarcode, setAddBeerPrefillBarcode] = useState<string | null>(null);
 
   // Barcode not found state
   const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
@@ -327,14 +328,15 @@ export function GlobalModals() {
         </div>
       </Modal>
 
-      {/* Add Beer modal (replaces SubmitBeerModal) */}
       <AddBeerModal
         isOpen={showAddBeer}
         onClose={() => {
           setShowAddBeer(false);
           setAddBeerPrefill("");
+          setAddBeerPrefillBarcode(null);
         }}
         prefillName={addBeerPrefill}
+        prefillBarcode={addBeerPrefillBarcode}
       />
 
       <SubmitBarModal
@@ -358,8 +360,9 @@ export function GlobalModals() {
           <div className="flex flex-col gap-2">
             <button
               onClick={() => {
+                setAddBeerPrefillBarcode(notFoundBarcode);
                 setNotFoundBarcode(null);
-                setShowScanner(true);
+                setShowAddBeer(true);
               }}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-glupp-accent text-glupp-bg font-medium text-sm rounded-glupp hover:bg-glupp-accent/90 transition-colors"
             >
