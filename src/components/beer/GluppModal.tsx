@@ -510,17 +510,25 @@ export function GluppModal() {
           />
         </div>
 
-        {/* ── Geolocation — masqué si un bar est sélectionné (la position est déjà connue) ── */}
+        {/* ── Position section ── */}
         {barIsSelected ? (
-          /* Bar sélectionné → position validée automatiquement */
+          /* Bar sélectionné → position validée automatiquement, afficher le nom du bar */
           <div className="flex items-center gap-2 px-4 py-2.5 bg-glupp-success/10 border border-glupp-success/30 rounded-glupp">
             <CheckCircle size={14} className="text-glupp-success shrink-0" />
-            <span className="text-sm text-glupp-success flex-1">
-              Position validée via le bar
-            </span>
+            <div className="flex-1 min-w-0">
+              <span className="text-sm text-glupp-success block truncate">
+                {selectedBarId
+                  ? `📍 ${bars.find((b) => b.id === selectedBarId)?.name || "Bar selectionne"}`
+                  : showNewBar && newBarName.trim()
+                  ? `📍 ${newBarName.trim()}`
+                  : "Position validee via le bar"}
+              </span>
+              <span className="text-[9px] text-glupp-text-muted">Position enregistree automatiquement</span>
+            </div>
             <span className="text-[10px] text-glupp-accent font-medium shrink-0">+20 XP</span>
           </div>
-        ) : (
+        ) : locationType === "home" || locationType === null ? (
+          /* Chez moi ou pas encore choisi → afficher le bouton GPS */
           <div>
             <label className="flex items-center justify-between text-sm text-glupp-text-soft mb-2">
               <span>
@@ -567,7 +575,7 @@ export function GluppModal() {
               </button>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* ── XP Summary bar ── */}
         <motion.div
