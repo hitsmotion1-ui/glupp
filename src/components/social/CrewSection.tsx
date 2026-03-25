@@ -7,23 +7,32 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useCrews } from "@/lib/hooks/useCrews";
 import { useAppStore } from "@/lib/store/useAppStore";
-import { getLevel, formatNumber } from "@/lib/utils/xp";
+import { formatNumber } from "@/lib/utils/xp";
 import { CreateCrewModal } from "./CreateCrewModal";
 import {
   Users,
   Plus,
-  Flame,
   Trophy,
   Crown,
   Zap,
+  Mail,
+  Check,
+  X,
+  LogOut,
+  Loader2,
+  UserPlus,
 } from "lucide-react";
+
+// ═══════════════════════════════════════════
+// Crew Levels
+// ═══════════════════════════════════════════
 
 const CREW_LEVELS = [
   { level: 1, name: "Bande de potes", min: 0 },
-  { level: 2, name: "Confrérie", min: 500 },
+  { level: 2, name: "Confrerie", min: 500 },
   { level: 3, name: "Guilde", min: 2000 },
-  { level: 4, name: "Ordre Sacré", min: 5000 },
-  { level: 5, name: "Légende", min: 10000 },
+  { level: 4, name: "Ordre Sacre", min: 5000 },
+  { level: 5, name: "Legende", min: 10000 },
 ];
 
 function getCrewLevel(xp: number) {
@@ -46,10 +55,27 @@ function getCrewProgress(xp: number) {
   return Math.round(((xp - current.min) / (next.min - current.min)) * 100);
 }
 
+// ═══════════════════════════════════════════
+// Component
+// ═══════════════════════════════════════════
+
 export function CrewSection() {
-  const { crews, isLoading } = useCrews();
+  const {
+    crews,
+    isLoading,
+    invites,
+    loadingInvites,
+    acceptInvite,
+    acceptingInvite,
+    declineInvite,
+    decliningInvite,
+    leaveCrew,
+    leavingCrew,
+  } = useCrews();
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [leavingCrewId, setLeavingCrewId] = useState<string | null>(null);
+  const [processingInviteId, setProcessingInviteId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -60,6 +86,40 @@ export function CrewSection() {
       </div>
     );
   }
+
+  const handleAcceptInvite = async (crewId: string) => {
+    setProcessingInviteId(crewId);
+    try {
+      await acceptInvite(crewId);
+    } catch (err) {
+      console.error("Accept invite error:", err);
+    } finally {
+      setProcessingInviteId(null);
+    }
+  };
+
+  const handleDeclineInvite = async (crewId: string) => {
+    setProcessingInviteId(crewId);
+    try {
+      await declineInvite(crewId);
+    } catch (err) {
+      console.error("Decline invite error:", err);
+    } finally {
+      setProcessingInviteId(null);
+    }
+  };
+
+  const handleLeaveCrew = async (crewId: string, crewName: string) => {
+    if (!window.confirm(`Quitter "${crewName}" ? Tu pourras etre reinvite plus tard.`)) return;
+    setLeavingCrewId(crewId);
+    try {
+      await leaveCrew(crewId);
+    } catch (err) {
+      console.error("Leave crew error:", err);
+    } finally {
+      setLeavingCrewId(null);
+    }
+  };
 
   return (
     <>
@@ -74,26 +134,83 @@ export function CrewSection() {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-glupp-accent text-glupp-bg rounded-full text-xs font-medium hover:bg-glupp-accent/90 transition-colors"
           >
             <Plus size={14} />
-            Créer
+            Creer
           </button>
         </div>
 
-        {/* Crews list */}
-        {crews.length === 0 ? (
+        {/* ═══ Pending invites ═══ */}
+        {invites.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-glupp-accent">
+              <Mail size={14} />
+              <span>
+                {invites.length} invitation{invites.length > 1 ? "s" : ""} en attente
+              </span>
+            </div>
+
+            {invites.map((invite) => {
+              const isProcessing = processingInviteId === invite.crew_id;
+              return (
+                <motion.div
+                  key={invite.crew_id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3 bg-glupp-accent/5 border border-glupp-accent/20 rounded-glupp-lg"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display font-bold text-glupp-cream text-sm truncate">
+                        {invite.crew_name}
+                      </p>
+                      <p className="text-[10px] text-glupp-text-muted mt-0.5">
+                        Invite par @{invite.invited_by_username} · {invite.member_count} membre{invite.member_count > 1 ? "s" : ""}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => handleAcceptInvite(invite.crew_id)}
+                        disabled={isProcessing}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-glupp-accent text-glupp-bg rounded-glupp text-xs font-semibold hover:bg-glupp-accent/90 disabled:opacity-50 transition-colors"
+                      >
+                        {isProcessing && acceptingInvite ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Check size={12} />
+                        )}
+                        Rejoindre
+                      </button>
+                      <button
+                        onClick={() => handleDeclineInvite(invite.crew_id)}
+                        disabled={isProcessing}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-glupp-card border border-glupp-border rounded-glupp text-xs text-glupp-text-muted hover:text-glupp-cream hover:border-glupp-text-muted disabled:opacity-50 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ═══ Crews list ═══ */}
+        {crews.length === 0 && invites.length === 0 ? (
           <div className="text-center py-10">
             <Users className="w-10 h-10 text-glupp-text-muted mx-auto mb-3" />
             <p className="text-sm text-glupp-text-muted">
               Pas encore de crew
             </p>
             <p className="text-xs text-glupp-text-muted mt-1">
-              Crée un crew avec tes amis pour gagner de l'XP ensemble !
+              Cree un crew avec tes amis pour gagner de l&apos;XP ensemble !
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-glupp-accent text-glupp-bg rounded-full text-sm font-semibold hover:bg-glupp-accent/90 transition-colors"
             >
               <Plus size={16} />
-              Créer mon premier crew
+              Creer mon premier crew
             </button>
           </div>
         ) : (
@@ -102,6 +219,7 @@ export function CrewSection() {
               const crewLevel = getCrewLevel(crew.xp);
               const crewNext = getCrewNextLevel(crew.xp);
               const crewProgress = getCrewProgress(crew.xp);
+              const isLeaving = leavingCrewId === crew.id;
 
               return (
                 <motion.div
@@ -113,8 +231,8 @@ export function CrewSection() {
                 >
                   {/* Crew header */}
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <h4 className="font-display font-bold text-glupp-cream">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <h4 className="font-display font-bold text-glupp-cream truncate">
                         {crew.name}
                       </h4>
                       <div className="flex items-center gap-2">
@@ -126,11 +244,13 @@ export function CrewSection() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 px-2 py-1 bg-glupp-accent/10 rounded-full">
-                      <Zap size={12} className="text-glupp-accent" />
-                      <span className="text-xs font-bold text-glupp-accent">
-                        {formatNumber(crew.xp)} XP
-                      </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 px-2 py-1 bg-glupp-accent/10 rounded-full">
+                        <Zap size={12} className="text-glupp-accent" />
+                        <span className="text-xs font-bold text-glupp-accent">
+                          {formatNumber(crew.xp)} XP
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -146,14 +266,6 @@ export function CrewSection() {
 
                   {/* Stats row */}
                   <div className="flex items-center gap-4">
-                    {crew.streak > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Flame size={12} className="text-glupp-error" />
-                        <span className="text-xs font-medium text-glupp-cream">
-                          {crew.streak}j streak
-                        </span>
-                      </div>
-                    )}
                     <div className="flex items-center gap-1">
                       <Trophy size={12} className="text-glupp-gold" />
                       <span className="text-xs text-glupp-text-muted">
@@ -206,6 +318,22 @@ export function CrewSection() {
                         </span>
                       </div>
                     )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-glupp-border/50">
+                    <button
+                      onClick={() => handleLeaveCrew(crew.id, crew.name)}
+                      disabled={isLeaving}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-glupp-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-glupp transition-colors disabled:opacity-50"
+                    >
+                      {isLeaving ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <LogOut size={12} />
+                      )}
+                      Quitter
+                    </button>
                   </div>
                 </motion.div>
               );

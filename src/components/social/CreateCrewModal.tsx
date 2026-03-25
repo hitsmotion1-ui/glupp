@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Avatar } from "@/components/ui/Avatar";
 import { useFriends } from "@/lib/hooks/useFriends";
 import { useCrews } from "@/lib/hooks/useCrews";
-import { Users, Check, Loader2, Plus } from "lucide-react";
+import { Users, Check, Loader2, Plus, AlertTriangle } from "lucide-react";
 
 interface CreateCrewModalProps {
   isOpen: boolean;
@@ -18,6 +18,7 @@ export function CreateCrewModal({ isOpen, onClose }: CreateCrewModalProps) {
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
     new Set()
   );
+  const [error, setError] = useState<string | null>(null);
 
   const { friends } = useFriends();
   const { createCrew, creatingCrew } = useCrews();
@@ -36,6 +37,7 @@ export function CreateCrewModal({ isOpen, onClose }: CreateCrewModalProps) {
 
   const handleCreate = async () => {
     if (!name.trim() || name.trim().length < 2) return;
+    setError(null);
     try {
       await createCrew(name.trim(), Array.from(selectedMembers));
       setName("");
@@ -43,13 +45,21 @@ export function CreateCrewModal({ isOpen, onClose }: CreateCrewModalProps) {
       onClose();
     } catch (err) {
       console.error("create crew error:", err);
+      setError(err instanceof Error ? err.message : "Erreur lors de la creation");
     }
+  };
+
+  const handleClose = () => {
+    setName("");
+    setSelectedMembers(new Set());
+    setError(null);
+    onClose();
   };
 
   const canCreate = name.trim().length >= 2 && !creatingCrew;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Créer un Crew">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Creer un Crew">
       <div className="space-y-5 pb-4">
         {/* Crew name input */}
         <div className="space-y-2">
@@ -60,7 +70,7 @@ export function CreateCrewModal({ isOpen, onClose }: CreateCrewModalProps) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ex: Les Brasseurs du Sud"
+            placeholder="Ex: Les Gluppeurs du Sud"
             maxLength={30}
             className="w-full px-4 py-3 bg-glupp-card-alt border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
           />
@@ -72,14 +82,17 @@ export function CreateCrewModal({ isOpen, onClose }: CreateCrewModalProps) {
         {/* Select friends */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-glupp-text-soft uppercase tracking-wider">
-            Inviter des amis ({selectedMembers.size} sélectionnés)
+            Inviter des amis ({selectedMembers.size} selectionnes)
           </label>
+          <p className="text-[10px] text-glupp-text-muted">
+            Ils recevront une invitation qu&apos;ils pourront accepter ou decliner.
+          </p>
 
           {friends.length === 0 ? (
             <div className="text-center py-6">
               <Users className="w-8 h-8 text-glupp-text-muted mx-auto mb-2" />
               <p className="text-xs text-glupp-text-muted">
-                Ajoute des amis d'abord !
+                Ajoute des amis d&apos;abord !
               </p>
             </div>
           ) : (
@@ -125,6 +138,14 @@ export function CreateCrewModal({ isOpen, onClose }: CreateCrewModalProps) {
           )}
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-glupp">
+            <AlertTriangle size={14} className="text-red-400 shrink-0" />
+            <p className="text-xs text-red-400">{error}</p>
+          </div>
+        )}
+
         {/* Create button */}
         <button
           onClick={handleCreate}
@@ -140,7 +161,7 @@ export function CreateCrewModal({ isOpen, onClose }: CreateCrewModalProps) {
           ) : (
             <Plus size={18} />
           )}
-          {creatingCrew ? "Création..." : "Créer le crew"}
+          {creatingCrew ? "Creation..." : "Creer le crew"}
         </button>
       </div>
     </Modal>

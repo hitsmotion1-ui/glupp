@@ -1,32 +1,51 @@
 "use client";
 
-import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/queries/queryKeys";
 import { useAppStore } from "@/lib/store/useAppStore";
 import type { Crew } from "@/types";
 
+// ═══════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════
+
+interface CrewMember {
+  user_id: string;
+  role: string;
+  status: string;
+  joined_at: string;
+  profile: {
+    username: string;
+    display_name: string;
+    avatar_url: string | null;
+    xp: number;
+  };
+}
+
 interface CrewWithMembers extends Omit<Crew, "members"> {
-  members: Array<{
-    user_id: string;
-    role: string;
-    joined_at: string;
-    profile: {
-      username: string;
-      display_name: string;
-      avatar_url: string | null;
-      xp: number;
-    };
-  }>;
+  members: CrewMember[];
   member_count: number;
 }
+
+interface CrewInvite {
+  crew_id: string;
+  crew_name: string;
+  invited_by: string;
+  invited_by_username: string;
+  member_count: number;
+  created_at: string;
+}
+
+// ═══════════════════════════════════════════
+// Hook
+// ═══════════════════════════════════════════
 
 export function useCrews() {
   const queryClient = useQueryClient();
   const showXPToast = useAppStore((s) => s.showXPToast);
 
-  // Fetch user's crews
+  // ─── Fetch user's crews (only accepted) ───
   const { data: crews = [], isLoading } = useQuery({
     queryKey: queryKeys.crews.all,
     queryFn: async () => {
@@ -35,17 +54,18 @@ export function useCrews() {
       } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Get crew IDs where user is member
+      // Get crew IDs where user is accepted member
       const { data: memberships } = await supabase
         .from("crew_members")
         .select("crew_id")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("status", "accepted");
 
       if (!memberships || memberships.length === 0) return [];
 
       const crewIds = memberships.map((m) => m.crew_id);
 
-      // Get crew details with members
+      // Get crew details
       const { data: crewsData, error } = await supabase
         .from("crews")
         .select("*")
@@ -53,21 +73,25 @@ export function useCrews() {
 
       if (error || !crewsData) return [];
 
-      // Get members for each crew
+      // Get accepted members for each crew
       const result: CrewWithMembers[] = [];
       for (const crew of crewsData) {
         const { data: members } = await supabase
           .from("crew_members")
-          .select("user_id, role, joined_at, profiles(username, display_name, avatar_url, xp)")
-          .eq("crew_id", crew.id);
+          .select(
+            "user_id, role, status, joined_at, profiles(username, display_name, avatar_url, xp)"
+          )
+          .eq("crew_id", crew.id)
+          .eq("status", "accepted");
 
         result.push({
           ...crew,
           members: (members || []).map((m: Record<string, unknown>) => ({
             user_id: m.user_id as string,
             role: m.role as string,
+            status: m.status as string,
             joined_at: m.joined_at as string,
-            profile: m.profiles as { username: string; display_name: string; avatar_url: string | null; xp: number },
+            profile: m.profiles as CrewMember["profile"],
           })),
           member_count: members?.length || 0,
         });
@@ -78,7 +102,62 @@ export function useCrews() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Create crew
+  // ─── Fetch pending invites for current user ───
+  const { data: invites = [], isLoading: loadingInvites } = useQuery({
+    queryKey: ["crews", "invites"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      // Get pending memberships
+      const { data: pending } = await supabase
+        .from("crew_members")
+        .select("crew_id, joined_at")
+        .eq("user_id", user.id)
+        .eq("status", "pending");
+
+      if (!pending || pending.length === 0) return [];
+
+      const crewIds = pending.map((p) => p.crew_id);
+
+      // Get crew details + creator info
+      const { data: crewsData } = await supabase
+        .from("crews")
+        .select("id, name, created_by, profiles!created_by(username)")
+        .in("id", crewIds);
+
+      if (!crewsData) return [];
+
+      // Get member count for each crew
+      const result: CrewInvite[] = [];
+      for (const crew of crewsData) {
+        const { count } = await supabase
+          .from("crew_members")
+          .select("*", { count: "exact", head: true })
+          .eq("crew_id", crew.id)
+          .eq("status", "accepted");
+
+        const profile = crew.profiles as unknown as { username: string } | null;
+
+        result.push({
+          crew_id: crew.id,
+          crew_name: crew.name,
+          invited_by: crew.created_by,
+          invited_by_username: profile?.username || "Inconnu",
+          member_count: count || 0,
+          created_at:
+            pending.find((p) => p.crew_id === crew.id)?.joined_at || "",
+        });
+      }
+
+      return result;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  // ─── Create crew (via RPC) ───
   const createCrewMutation = useMutation({
     mutationFn: async ({
       name,
@@ -87,51 +166,110 @@ export function useCrews() {
       name: string;
       memberIds: string[];
     }) => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Non connecté");
+      const { data, error } = await supabase.rpc("create_crew", {
+        p_name: name,
+        p_member_ids: memberIds,
+      });
 
-      // Create crew
-      const { data: crew, error: crewError } = await supabase
-        .from("crews")
-        .insert({ name, created_by: user.id })
-        .select()
-        .single();
-
-      if (crewError) throw new Error(crewError.message);
-
-      // Add creator as admin
-      await supabase
-        .from("crew_members")
-        .insert({ crew_id: crew.id, user_id: user.id, role: "admin" });
-
-      // Add invited members
-      if (memberIds.length > 0) {
-        const memberInserts = memberIds.map((uid) => ({
-          crew_id: crew.id,
-          user_id: uid,
-          role: "member",
-        }));
-        await supabase.from("crew_members").insert(memberInserts);
-      }
-
-      return crew;
+      if (error) throw new Error(error.message);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
-      showXPToast(0, "Crew créé !");
+      showXPToast(0, "Crew cree !");
     },
   });
 
-  const createCrew = async (name: string, memberIds: string[] = []) => {
-    return createCrewMutation.mutateAsync({ name, memberIds });
-  };
+  // ─── Invite to crew ───
+  const inviteMutation = useMutation({
+    mutationFn: async ({
+      crewId,
+      userId,
+    }: {
+      crewId: string;
+      userId: string;
+    }) => {
+      const { error } = await supabase.rpc("invite_to_crew", {
+        p_crew_id: crewId,
+        p_user_id: userId,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
+    },
+  });
 
+  // ─── Accept invite ───
+  const acceptInviteMutation = useMutation({
+    mutationFn: async (crewId: string) => {
+      const { error } = await supabase.rpc("accept_crew_invite", {
+        p_crew_id: crewId,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
+      queryClient.invalidateQueries({ queryKey: ["crews", "invites"] });
+      showXPToast(0, "Tu as rejoint le crew !");
+    },
+  });
+
+  // ─── Decline invite ───
+  const declineInviteMutation = useMutation({
+    mutationFn: async (crewId: string) => {
+      const { error } = await supabase.rpc("decline_crew_invite", {
+        p_crew_id: crewId,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crews", "invites"] });
+    },
+  });
+
+  // ─── Leave crew ───
+  const leaveCrewMutation = useMutation({
+    mutationFn: async (crewId: string) => {
+      const { error } = await supabase.rpc("leave_crew", {
+        p_crew_id: crewId,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
+    },
+  });
+
+  // ─── Public API ───
   return {
+    // Crews
     crews,
     isLoading,
-    createCrew,
+
+    // Invites
+    invites,
+    loadingInvites,
+
+    // Actions
+    createCrew: (name: string, memberIds: string[] = []) =>
+      createCrewMutation.mutateAsync({ name, memberIds }),
     creatingCrew: createCrewMutation.isPending,
+
+    inviteToCrew: (crewId: string, userId: string) =>
+      inviteMutation.mutateAsync({ crewId, userId }),
+    inviting: inviteMutation.isPending,
+
+    acceptInvite: (crewId: string) =>
+      acceptInviteMutation.mutateAsync(crewId),
+    acceptingInvite: acceptInviteMutation.isPending,
+
+    declineInvite: (crewId: string) =>
+      declineInviteMutation.mutateAsync(crewId),
+    decliningInvite: declineInviteMutation.isPending,
+
+    leaveCrew: (crewId: string) =>
+      leaveCrewMutation.mutateAsync(crewId),
+    leavingCrew: leaveCrewMutation.isPending,
   };
 }
