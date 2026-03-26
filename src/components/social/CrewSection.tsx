@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useCrews } from "@/lib/hooks/useCrews";
+import { useFriends } from "@/lib/hooks/useFriends";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { formatNumber } from "@/lib/utils/xp";
 import { CreateCrewModal } from "./CreateCrewModal";
@@ -21,6 +22,7 @@ import {
   LogOut,
   Loader2,
   UserMinus,
+  UserPlus,
   Clock,
   ChevronDown,
   ChevronUp,
@@ -73,13 +75,18 @@ export function CrewSection() {
     leaveCrew,
     kickFromCrew,
     kicking,
+    inviteToCrew,
+    inviting,
   } = useCrews();
+  const { friends } = useFriends();
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [leavingCrewId, setLeavingCrewId] = useState<string | null>(null);
   const [processingInviteId, setProcessingInviteId] = useState<string | null>(null);
   const [kickingUserId, setKickingUserId] = useState<string | null>(null);
   const [expandedCrewId, setExpandedCrewId] = useState<string | null>(null);
+  const [invitingToCrewId, setInvitingToCrewId] = useState<string | null>(null);
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -458,6 +465,85 @@ export function CrewSection() {
                               ))}
                             </>
                           )}
+
+                          {/* ═══ Invite a friend ═══ */}
+                          <div className="mt-3 pt-2 border-t border-glupp-border/30">
+                            <button
+                              onClick={() => setInvitingToCrewId(invitingToCrewId === crew.id ? null : crew.id)}
+                              className="flex items-center gap-1.5 text-xs font-semibold text-glupp-accent hover:text-glupp-accent/80 transition-colors"
+                            >
+                              <UserPlus size={12} />
+                              Inviter un ami
+                            </button>
+
+                            {invitingToCrewId === crew.id && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                transition={{ duration: 0.15 }}
+                                className="mt-2 space-y-1.5 max-h-40 overflow-y-auto"
+                              >
+                                {(() => {
+                                  const allCrewUserIds = new Set([
+                                    ...crew.members.map((m) => m.user_id),
+                                    ...(crew.pending_members || []).map((m) => m.user_id),
+                                  ]);
+                                  const availableFriends = friends.filter(
+                                    (f) => !allCrewUserIds.has(f.friend_id)
+                                  );
+
+                                  if (availableFriends.length === 0) {
+                                    return (
+                                      <p className="text-[10px] text-glupp-text-muted py-2 text-center">
+                                        Tous tes amis sont deja dans le crew ou invites
+                                      </p>
+                                    );
+                                  }
+
+                                  return availableFriends.map((friend) => {
+                                    const data = friend.friend_data;
+                                    const isInviting = invitingUserId === friend.friend_id;
+                                    return (
+                                      <div
+                                        key={friend.friend_id}
+                                        className="flex items-center gap-2.5 py-1.5"
+                                      >
+                                        <Avatar
+                                          url={data.avatar_url}
+                                          name={data.display_name || data.username}
+                                          size="sm"
+                                        />
+                                        <p className="flex-1 text-xs font-medium text-glupp-cream truncate">
+                                          {data.display_name || data.username}
+                                        </p>
+                                        <button
+                                          onClick={async () => {
+                                            setInvitingUserId(friend.friend_id);
+                                            try {
+                                              await inviteToCrew(crew.id, friend.friend_id);
+                                              setInvitingUserId(null);
+                                            } catch (err) {
+                                              console.error("Invite error:", err);
+                                              setInvitingUserId(null);
+                                            }
+                                          }}
+                                          disabled={isInviting}
+                                          className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-glupp-accent/10 text-glupp-accent text-[10px] font-semibold rounded hover:bg-glupp-accent/20 disabled:opacity-50 transition-colors"
+                                        >
+                                          {isInviting ? (
+                                            <Loader2 size={10} className="animate-spin" />
+                                          ) : (
+                                            <UserPlus size={10} />
+                                          )}
+                                          Inviter
+                                        </button>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </motion.div>
+                            )}
+                          </div>
                         </motion.div>
                       )}
                     </div>
