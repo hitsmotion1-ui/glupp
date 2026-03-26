@@ -26,6 +26,8 @@ import {
   Eye,
   MessageCircle,
   Heart,
+  Shield,
+  CalendarDays,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -114,6 +116,18 @@ function PersistentNotifCard({
       iconBg: "bg-[#4ECDC4]/15",
       iconColor: "text-[#4ECDC4]",
       accentBorder: "border-l-[#4ECDC4]",
+    },
+    crew_invite: {
+      icon: Shield,
+      iconBg: "bg-[#A78BFA]/15",
+      iconColor: "text-[#A78BFA]",
+      accentBorder: "border-l-[#A78BFA]",
+    },
+    crew_event: {
+      icon: CalendarDays,
+      iconBg: "bg-[#E08840]/15",
+      iconColor: "text-[#E08840]",
+      accentBorder: "border-l-[#E08840]",
     },
   };
 
