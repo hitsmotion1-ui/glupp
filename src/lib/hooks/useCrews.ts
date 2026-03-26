@@ -18,6 +18,7 @@ interface CrewMember {
     username: string;
     display_name: string;
     avatar_url: string | null;
+    avatar_id: string | null;
     xp: number;
   };
 }
@@ -54,7 +55,6 @@ export function useCrews() {
       } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Get crew IDs where user is accepted member
       const { data: memberships } = await supabase
         .from("crew_members")
         .select("crew_id, role")
@@ -66,7 +66,6 @@ export function useCrews() {
       const crewIds = memberships.map((m) => m.crew_id);
       const roleMap = new Map(memberships.map((m) => [m.crew_id, m.role]));
 
-      // Get crew details
       const { data: crewsData, error } = await supabase
         .from("crews")
         .select("*")
@@ -74,13 +73,12 @@ export function useCrews() {
 
       if (error || !crewsData) return [];
 
-      // Get ALL members for each crew (accepted + pending for admin view)
       const result: CrewWithMembers[] = [];
       for (const crew of crewsData) {
         const { data: allMembers } = await supabase
           .from("crew_members")
           .select(
-            "user_id, role, status, joined_at, profiles(username, display_name, avatar_url, xp)"
+            "user_id, role, status, joined_at, profiles(username, display_name, avatar_url, avatar_id, xp)"
           )
           .eq("crew_id", crew.id)
           .in("status", ["accepted", "pending"]);
@@ -110,7 +108,7 @@ export function useCrews() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // ─── Fetch pending invites for current user ───
+  // ─── Fetch pending invites ───
   const { data: invites = [], isLoading: loadingInvites } = useQuery({
     queryKey: ["crews", "invites"],
     queryFn: async () => {
@@ -152,8 +150,7 @@ export function useCrews() {
           invited_by: crew.created_by,
           invited_by_username: profile?.username || "Inconnu",
           member_count: count || 0,
-          created_at:
-            pending.find((p) => p.crew_id === crew.id)?.joined_at || "",
+          created_at: pending.find((p) => p.crew_id === crew.id)?.joined_at || "",
         });
       }
 
@@ -162,53 +159,29 @@ export function useCrews() {
     staleTime: 30 * 1000,
   });
 
-  // ─── Create crew (via RPC) ───
+  // ─── Create crew ───
   const createCrewMutation = useMutation({
-    mutationFn: async ({
-      name,
-      memberIds,
-    }: {
-      name: string;
-      memberIds: string[];
-    }) => {
-      const { data, error } = await supabase.rpc("create_crew", {
-        p_name: name,
-        p_member_ids: memberIds,
-      });
+    mutationFn: async ({ name, memberIds }: { name: string; memberIds: string[] }) => {
+      const { data, error } = await supabase.rpc("create_crew", { p_name: name, p_member_ids: memberIds });
       if (error) throw new Error(error.message);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.crews.all }); },
   });
 
-  // ─── Invite to crew ───
+  // ─── Invite ───
   const inviteMutation = useMutation({
-    mutationFn: async ({
-      crewId,
-      userId,
-    }: {
-      crewId: string;
-      userId: string;
-    }) => {
-      const { error } = await supabase.rpc("invite_to_crew", {
-        p_crew_id: crewId,
-        p_user_id: userId,
-      });
+    mutationFn: async ({ crewId, userId }: { crewId: string; userId: string }) => {
+      const { error } = await supabase.rpc("invite_to_crew", { p_crew_id: crewId, p_user_id: userId });
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.crews.all }); },
   });
 
-  // ─── Accept invite ───
+  // ─── Accept ───
   const acceptInviteMutation = useMutation({
     mutationFn: async (crewId: string) => {
-      const { error } = await supabase.rpc("accept_crew_invite", {
-        p_crew_id: crewId,
-      });
+      const { error } = await supabase.rpc("accept_crew_invite", { p_crew_id: crewId });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -217,82 +190,46 @@ export function useCrews() {
     },
   });
 
-  // ─── Decline invite ───
+  // ─── Decline ───
   const declineInviteMutation = useMutation({
     mutationFn: async (crewId: string) => {
-      const { error } = await supabase.rpc("decline_crew_invite", {
-        p_crew_id: crewId,
-      });
+      const { error } = await supabase.rpc("decline_crew_invite", { p_crew_id: crewId });
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crews", "invites"] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["crews", "invites"] }); },
   });
 
-  // ─── Leave crew ───
+  // ─── Leave ───
   const leaveCrewMutation = useMutation({
     mutationFn: async (crewId: string) => {
-      const { error } = await supabase.rpc("leave_crew", {
-        p_crew_id: crewId,
-      });
+      const { error } = await supabase.rpc("leave_crew", { p_crew_id: crewId });
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.crews.all }); },
   });
 
-  // ─── Kick from crew (admin only) ───
+  // ─── Kick ───
   const kickMutation = useMutation({
-    mutationFn: async ({
-      crewId,
-      userId,
-    }: {
-      crewId: string;
-      userId: string;
-    }) => {
-      const { error } = await supabase.rpc("kick_from_crew", {
-        p_crew_id: crewId,
-        p_user_id: userId,
-      });
+    mutationFn: async ({ crewId, userId }: { crewId: string; userId: string }) => {
+      const { error } = await supabase.rpc("kick_from_crew", { p_crew_id: crewId, p_user_id: userId });
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.crews.all });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.crews.all }); },
   });
 
-  // ─── Public API ───
   return {
-    crews,
-    isLoading,
-
-    invites,
-    loadingInvites,
-
-    createCrew: (name: string, memberIds: string[] = []) =>
-      createCrewMutation.mutateAsync({ name, memberIds }),
+    crews, isLoading, invites, loadingInvites,
+    createCrew: (name: string, memberIds: string[] = []) => createCrewMutation.mutateAsync({ name, memberIds }),
     creatingCrew: createCrewMutation.isPending,
-
-    inviteToCrew: (crewId: string, userId: string) =>
-      inviteMutation.mutateAsync({ crewId, userId }),
+    inviteToCrew: (crewId: string, userId: string) => inviteMutation.mutateAsync({ crewId, userId }),
     inviting: inviteMutation.isPending,
-
-    acceptInvite: (crewId: string) =>
-      acceptInviteMutation.mutateAsync(crewId),
+    acceptInvite: (crewId: string) => acceptInviteMutation.mutateAsync(crewId),
     acceptingInvite: acceptInviteMutation.isPending,
-
-    declineInvite: (crewId: string) =>
-      declineInviteMutation.mutateAsync(crewId),
+    declineInvite: (crewId: string) => declineInviteMutation.mutateAsync(crewId),
     decliningInvite: declineInviteMutation.isPending,
-
-    leaveCrew: (crewId: string) =>
-      leaveCrewMutation.mutateAsync(crewId),
+    leaveCrew: (crewId: string) => leaveCrewMutation.mutateAsync(crewId),
     leavingCrew: leaveCrewMutation.isPending,
-
-    kickFromCrew: (crewId: string, userId: string) =>
-      kickMutation.mutateAsync({ crewId, userId }),
+    kickFromCrew: (crewId: string, userId: string) => kickMutation.mutateAsync({ crewId, userId }),
     kicking: kickMutation.isPending,
   };
 }
