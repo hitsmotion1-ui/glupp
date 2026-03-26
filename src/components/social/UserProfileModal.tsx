@@ -42,6 +42,7 @@ interface UserProfile {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  avatar_id: string | null;
   xp: number;
   beers_tasted: number;
   duels_played: number;
@@ -258,6 +259,7 @@ export function UserProfileModal() {
             <Avatar
               url={profile.avatar_url}
               name={profile.display_name || profile.username}
+              fileName={profile.avatar_id ? `avatar-${profile.avatar_id}` : undefined}
               size="lg"
             />
             <h2 className="font-display text-xl font-bold text-glupp-cream mt-3">
