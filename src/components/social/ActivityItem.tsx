@@ -8,7 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { RarityBadge } from "@/components/beer/RarityBadge";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { beerEmoji } from "@/lib/utils/xp";
-import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2, Flag } from "lucide-react";
+import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2, Flag, Camera, Users } from "lucide-react";
 import type { ActivityEntry } from "@/lib/hooks/useActivities";
 import type { Rarity } from "@/types";
 import { ReportModal } from "@/components/global/ReportModal"; // 👈 L'import de la modale
@@ -94,6 +94,50 @@ function LevelUpContent({ activity }: { activity: ActivityEntry }) {
         <TrendingUp size={14} className="inline text-glupp-success mr-1" />
         est passé au niveau <span className="font-semibold text-glupp-gold">{String(meta.level_name || `Niveau ${Number(meta.level) || "?"}`)}</span>
       </p>
+    </div>
+  );
+}
+
+function CrewCheckinContent({ activity }: { activity: ActivityEntry }) {
+  const meta = activity.metadata as Record<string, unknown>;
+  const eventTitle = (meta.event_title as string) || "une sortie";
+  const taggedCount = (meta.tagged_count as number) || 0;
+  const taggedUserIds = (meta.tagged_user_ids as string[]) || [];
+
+  // Fetch tagged user profiles
+  const { data: taggedProfiles = [] } = useQuery({
+    queryKey: ["tagged-profiles", activity.id],
+    queryFn: async () => {
+      if (taggedUserIds.length === 0) return [];
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, username, display_name")
+        .in("id", taggedUserIds);
+      return data || [];
+    },
+    enabled: taggedUserIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const taggedNames = taggedProfiles.map((p: any) => p.display_name || p.username);
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-glupp-cream">
+        <Camera size={14} className="inline text-green-400 mr-1" />
+        a validé la sortie <span className="font-semibold text-glupp-accent">{eventTitle}</span>
+      </p>
+      {taggedNames.length > 0 && (
+        <p className="text-xs text-glupp-text-muted flex items-center gap-1">
+          <Users size={12} />
+          avec {taggedNames.join(", ")}
+        </p>
+      )}
+      {activity.photo_url && (
+        <a href={activity.photo_url} target="_blank" rel="noopener noreferrer" className="block mt-2 rounded-glupp overflow-hidden">
+          <img src={activity.photo_url} alt="Photo de la sortie" className="w-full max-h-64 object-cover hover:opacity-90 transition-opacity rounded-glupp" />
+        </a>
+      )}
     </div>
   );
 }
@@ -216,6 +260,7 @@ const { profile } = useProfile();
       case "duel": return <DuelContent activity={activity} />;
       case "trophy": return <TrophyContent activity={activity} />;
       case "level_up": return <LevelUpContent activity={activity} />;
+      case "crew_event_checkin": return <CrewCheckinContent activity={activity} />;
       default: return <p className="text-sm text-glupp-text-muted">Activité {activity.activity_type}</p>;
     }
   }, [activity]);

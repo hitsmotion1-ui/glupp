@@ -88,6 +88,8 @@ function EventCard({
   const { day, time, relative } = formatEventDate(event.event_date);
   const canCancel = event.created_by === currentUserId || isCrewAdmin;
   const today = isEventToday(event.event_date);
+  const hasCheckins = event.checkins && event.checkins.length > 0;
+  const alreadyCheckedIn = event.checkins?.some((c) => c.user_id === currentUserId);
 
   const goingCount = event.responses.filter((r) => r.response === "going").length;
   const maybeCount = event.responses.filter((r) => r.response === "maybe").length;
@@ -146,20 +148,27 @@ function EventCard({
         </div>
       </div>
 
-      {/* Response buttons */}
-      <div className="flex gap-1.5">
-        {responseButtons.map((btn) => {
-          const isSelected = event.my_response === btn.key;
-          return (
-            <button key={btn.key} onClick={() => respondToEvent(event.id, btn.key)} disabled={responding}
-              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-glupp text-[11px] font-medium border transition-all ${
-                isSelected ? `${btn.bg} ${btn.color}` : "border-glupp-border/50 text-glupp-text-muted hover:border-glupp-accent/30"
-              }`}>
-              {btn.icon} {btn.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Response buttons — locked after a checkin */}
+      {hasCheckins ? (
+        <div className="flex items-center gap-2 px-3 py-2 bg-green-400/10 border border-green-400/30 rounded-glupp">
+          <Check size={12} className="text-green-400 shrink-0" />
+          <p className="text-[10px] text-green-400">Sortie validee !</p>
+        </div>
+      ) : (
+        <div className="flex gap-1.5">
+          {responseButtons.map((btn) => {
+            const isSelected = event.my_response === btn.key;
+            return (
+              <button key={btn.key} onClick={() => respondToEvent(event.id, btn.key)} disabled={responding}
+                className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-glupp text-[11px] font-medium border transition-all ${
+                  isSelected ? `${btn.bg} ${btn.color}` : "border-glupp-border/50 text-glupp-text-muted hover:border-glupp-accent/30"
+                }`}>
+                {btn.icon} {btn.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Checkins photos */}
       {event.checkins && event.checkins.length > 0 && (
@@ -180,12 +189,20 @@ function EventCard({
         </div>
       )}
 
-      {/* Validate button — only on event day + only if going */}
-      {event.my_response === "going" && today && (
+      {/* Validate button — only on event day + only if going + not already checked in */}
+      {event.my_response === "going" && today && !alreadyCheckedIn && (
         <button onClick={() => onCheckin(event)}
           className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-400/10 border border-green-400/30 rounded-glupp text-xs font-medium text-green-400 hover:bg-green-400/15 transition-colors">
           <Camera size={14} /> Valider la sortie avec une photo (+20 XP)
         </button>
+      )}
+
+      {/* Already checked in message */}
+      {alreadyCheckedIn && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-green-400/10 border border-green-400/30 rounded-glupp">
+          <Camera size={12} className="text-green-400 shrink-0" />
+          <p className="text-[10px] text-green-400">Tu as deja valide cette sortie</p>
+        </div>
       )}
 
       {/* Info message if going but not today */}
