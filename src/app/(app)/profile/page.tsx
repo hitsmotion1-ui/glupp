@@ -52,8 +52,19 @@ export default function ProfilePage() {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
 
-  // 🆕 1. Nouvel état pour l'affichage instantané de l'avatar
+  // État local pour avatar + couleur de fond
   const [localAvatarId, setLocalAvatarId] = useState<string | null>(null);
+  const [localBgColor, setLocalBgColor] = useState<string | null>(null);
+
+  // Sync avec le profil au chargement (fix: avatar revient à curieux au changement d'onglet)
+  useEffect(() => {
+    if (profile?.avatar_id) {
+      setLocalAvatarId(profile.avatar_id);
+    }
+    if ((profile as any)?.avatar_bg_color) {
+      setLocalBgColor((profile as any).avatar_bg_color);
+    }
+  }, [profile?.avatar_id, (profile as any)?.avatar_bg_color]);
 
   // 🆕 2. Bloquer le défilement de la page en arrière-plan quand la modale est ouverte
   useEffect(() => {
@@ -79,21 +90,35 @@ export default function ProfilePage() {
 
   const handleUpdateAvatar = async (newAvatarId: string) => {
     if (!profile) return;
+    const previousId = localAvatarId;
     try {
-      // 🆕 On met à jour l'état local -> L'image change instantanément pour l'utilisateur
-      setLocalAvatarId(newAvatarId); 
-
+      setLocalAvatarId(newAvatarId);
       const { error } = await supabase
         .from('profiles')
         .update({ avatar_id: newAvatarId })
         .eq('id', profile.id);
-
       if (error) throw error;
-      
-      refetch(); 
-      
+      refetch();
     } catch (error) {
-      console.error("Erreur lors de la mise à jour de l'avatar", error);
+      console.error("Erreur avatar", error);
+      setLocalAvatarId(previousId || 'curieux');
+    }
+  };
+
+  const handleUpdateBgColor = async (color: string) => {
+    if (!profile) return;
+    const prev = localBgColor;
+    try {
+      setLocalBgColor(color);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_bg_color: color })
+        .eq('id', profile.id);
+      if (error) throw error;
+      refetch();
+    } catch (error) {
+      console.error("Erreur couleur", error);
+      setLocalBgColor(prev);
     }
   };
 
@@ -186,13 +211,18 @@ export default function ProfilePage() {
 
       {/* Avatar + Info */}
       <div className="flex flex-col items-center text-center">
-        <Avatar
-          url={profile.avatar_url}
-          fileName={currentFileName}
-          name={profile.display_name || profile.username}
-          size="lg"
+        <div
+          className="rounded-full cursor-pointer transition-transform hover:scale-105"
+          style={localBgColor ? { padding: '3px', background: localBgColor } : undefined}
           onClick={() => setIsAvatarPickerOpen(true)}
-        />
+        >
+          <Avatar
+            url={profile.avatar_url}
+            fileName={currentFileName}
+            name={profile.display_name || profile.username}
+            size="lg"
+          />
+        </div>
         <h2 className="font-display text-lg font-bold text-glupp-cream mt-3">
           {profile.display_name || profile.username}
         </h2>
@@ -376,8 +406,10 @@ export default function ProfilePage() {
             >
               <AvatarPicker 
                 avatars={avatars} 
-                currentAvatarId={activeAvatarId} 
-                onSelectAvatar={handleUpdateAvatar} 
+                currentAvatarId={activeAvatarId}
+                currentBgColor={localBgColor || undefined}
+                onSelectAvatar={handleUpdateAvatar}
+                onSelectBgColor={handleUpdateBgColor}
                 onClose={() => setIsAvatarPickerOpen(false)} 
               />
             </div>
