@@ -21,6 +21,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
+import { BeerImportExport } from "@/components/admin/BeerImportExport";
 
 // ═══════════════════════════════════════════
 // Country Emoji Picker Data
@@ -413,6 +414,8 @@ export default function AdminBeersPage() {
             </button>
           </div>
         )}
+
+        <BeerImportExport />
 
         {/* ── Pending Beers (Moderation) ── */}
         {pendingBeers.length > 0 && (
