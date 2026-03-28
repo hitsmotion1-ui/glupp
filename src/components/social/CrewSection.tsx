@@ -563,6 +563,3 @@ function CrewEventsSection({ crewId, currentUserId, isCrewAdmin, crewMembers, on
     </div>
   );
 }
-    </div>
-  );
-}
