@@ -213,7 +213,7 @@ export function useCrewEvents(crewId: string | null) {
       // Upload photo
       const timestamp = Date.now();
       const fileExt = photoFile.name.split(".").pop() || "jpg";
-      const filePath = `crew-events/${user.id}/${eventId}_${timestamp}.${fileExt}`;
+      const filePath = `${user.id}/crew-events/${eventId}_${timestamp}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("glupp-photos")
