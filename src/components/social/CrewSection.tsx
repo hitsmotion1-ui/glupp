@@ -489,15 +489,80 @@ function CrewEventsSection({ crewId, currentUserId, isCrewAdmin, crewMembers, on
 }) {
   const { events } = useCrewEvents(crewId);
   if (events.length === 0) return null;
+
+  const upcoming = events.filter((e) => !e.checkins || e.checkins.length === 0);
+  const validated = events.filter((e) => e.checkins && e.checkins.length > 0);
+
   return (
-    <div className="space-y-2 pt-1">
-      <p className="text-[10px] text-glupp-text-muted uppercase tracking-wider font-semibold flex items-center gap-1">
-        <CalendarDays size={10} /> Sorties a venir ({events.length})
-      </p>
-      {events.map((event) => (
-        <EventCard key={event.id} event={event} crewId={crewId} currentUserId={currentUserId}
-          isCrewAdmin={isCrewAdmin} crewMembers={crewMembers} onCheckin={onCheckin} />
-      ))}
+    <div className="space-y-3 pt-1">
+      {/* Upcoming — full cards */}
+      {upcoming.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] text-glupp-text-muted uppercase tracking-wider font-semibold flex items-center gap-1">
+            <CalendarDays size={10} /> A venir ({upcoming.length})
+          </p>
+          {upcoming.map((event) => (
+            <EventCard key={event.id} event={event} crewId={crewId} currentUserId={currentUserId}
+              isCrewAdmin={isCrewAdmin} crewMembers={crewMembers} onCheckin={onCheckin} />
+          ))}
+        </div>
+      )}
+
+      {/* Validated — compact carousel */}
+      {validated.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] text-glupp-text-muted uppercase tracking-wider font-semibold flex items-center gap-1">
+            <Check size={10} className="text-green-400" /> Sorties validees ({validated.length})
+          </p>
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+            {validated.map((event) => {
+              const photo = event.checkins?.[0]?.photo_url;
+              const goingCount = event.responses.filter((r) => r.response === "going").length;
+              const { relative } = formatEventDate(event.event_date);
+              return (
+                <div key={event.id} className="shrink-0 w-36">
+                  {/* Photo thumbnail */}
+                  {photo ? (
+                    <div className="relative w-36 h-24 rounded-glupp overflow-hidden mb-1.5">
+                      <img src={photo} alt={event.title} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-1.5 left-1.5 right-1.5">
+                        <p className="text-[10px] font-semibold text-white truncate">{event.title}</p>
+                      </div>
+                      <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 bg-green-400/90 rounded-full">
+                        <Check size={8} className="text-white" />
+                        <span className="text-[8px] text-white font-semibold">{goingCount}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-36 h-24 rounded-glupp bg-glupp-card-alt border border-glupp-border flex items-center justify-center mb-1.5">
+                      <div className="text-center">
+                        <p className="text-[10px] font-semibold text-glupp-cream truncate px-2">{event.title}</p>
+                        <div className="flex items-center justify-center gap-0.5 mt-1">
+                          <Check size={8} className="text-green-400" />
+                          <span className="text-[8px] text-green-400">{goingCount}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* Bar name + date */}
+                  <p className="text-[9px] text-glupp-text-muted truncate">
+                    {event.bar_name || event.location || ""}
+                  </p>
+                  {event.creator && (
+                    <p className="text-[8px] text-glupp-text-muted truncate">
+                      par {event.creator.display_name || event.creator.username}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
     </div>
   );
 }
