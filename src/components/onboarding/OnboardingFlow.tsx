@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { supabase } from "@/lib/supabase/client";
+import { useAvatars } from "@/lib/hooks/useAvatars";
+import Image from "next/image";
 import {
   ChevronRight,
   ChevronLeft,
@@ -16,6 +18,7 @@ import {
   MapPin,
   Zap,
   Star,
+  Check,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -124,8 +127,7 @@ const STEPS: OnboardingStep[] = [
       </div>
     ),
     title: "Duels de bieres",
-    description:
-      "Compare tes bieres en duels pour creer TON classement personnel.",
+    description: "Compare tes bieres en duels pour creer TON classement personnel.",
     color: "#A78BFA",
     features: [
       { icon: <Swords size={14} />, text: "2 bieres, 1 choix" },
@@ -181,8 +183,7 @@ const STEPS: OnboardingStep[] = [
       </div>
     ),
     title: "Potes & Crews",
-    description:
-      "Forme ton crew, compare vos collections, organisez vos sorties.",
+    description: "Forme ton crew, compare vos collections, organisez vos sorties.",
     color: "#E08840",
     features: [
       { icon: <Users size={14} />, text: "Cree ou rejoins un crew" },
@@ -191,6 +192,10 @@ const STEPS: OnboardingStep[] = [
     ],
   },
 ];
+
+// Le slide avatar est le dernier
+const TOTAL_SLIDES = STEPS.length + 1;
+const AVATAR_SLIDE_INDEX = STEPS.length;
 
 // ═══════════════════════════════════════════
 // Component
@@ -201,40 +206,43 @@ export function OnboardingFlow() {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(true);
   const [direction, setDirection] = useState(1);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>("curieux");
 
-  // Verifier dans la base de donnees si l'onboarding a deja ete vu
+  const { avatars, loading: avatarsLoading } = useAvatars(userId, 0);
+  const freeAvatars = avatars.filter((a) => a.unlock_type === "free");
+
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) {
-          setLoading(false);
-          return;
-        }
+        if (!user) { setLoading(false); return; }
+
+        setUserId(user.id);
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("has_seen_onboarding")
+          .select("has_seen_onboarding, avatar_id")
           .eq("id", user.id)
           .single();
 
         if (profile && !profile.has_seen_onboarding) {
+          if (profile.avatar_id) setSelectedAvatarId(profile.avatar_id);
           setShow(true);
         }
       } catch {
-        // En cas d'erreur, on n'affiche pas l'onboarding
+        // pas d'onboarding en cas d'erreur
       } finally {
         setLoading(false);
       }
     };
-
     checkOnboarding();
   }, []);
 
   const handleNext = () => {
-    if (step < STEPS.length - 1) {
+    if (step < TOTAL_SLIDES - 1) {
       setDirection(1);
       setStep(step + 1);
     } else {
@@ -250,7 +258,6 @@ export function OnboardingFlow() {
   };
 
   const handleFinish = async () => {
-    // Marquer comme vu dans la base de donnees
     try {
       const {
         data: { user },
@@ -258,21 +265,21 @@ export function OnboardingFlow() {
       if (user) {
         await supabase
           .from("profiles")
-          .update({ has_seen_onboarding: true })
+          .update({ has_seen_onboarding: true, avatar_id: selectedAvatarId })
           .eq("id", user.id);
       }
     } catch {
-      // Fallback localStorage si l'update echoue
       localStorage.setItem("glupp-onboarding-done", "true");
     }
-
     setShow(false);
   };
 
   if (loading || !show) return null;
 
-  const currentStep = STEPS[step];
-  const isLast = step === STEPS.length - 1;
+  const isAvatarSlide = step === AVATAR_SLIDE_INDEX;
+  const isLast = step === TOTAL_SLIDES - 1;
+  const currentStep = !isAvatarSlide ? STEPS[step] : null;
+  const currentColor = isAvatarSlide ? "#E08840" : currentStep!.color;
 
   return (
     <AnimatePresence>
@@ -282,20 +289,18 @@ export function OnboardingFlow() {
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[80] bg-glupp-bg flex flex-col"
       >
-        {/* Skip button — visible a partir du step 2 */}
+        {/* Skip */}
         <div className="flex justify-end p-4 h-14">
           {step > 0 && (
-            <button
-              onClick={handleFinish}
-              className="text-xs text-glupp-text-muted hover:text-glupp-cream transition-colors px-3 py-1.5 rounded-full border border-glupp-border"
-            >
+            <button onClick={handleFinish}
+              className="text-xs text-glupp-text-muted hover:text-glupp-cream transition-colors px-3 py-1.5 rounded-full border border-glupp-border">
               Passer
             </button>
           )}
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col items-center justify-center px-8">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 overflow-y-auto">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={step}
@@ -306,59 +311,126 @@ export function OnboardingFlow() {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="text-center max-w-sm w-full"
             >
-              {/* Icon area with glow */}
-              <div
-                className="flex items-center justify-center mb-8 h-24"
-                style={{
-                  filter: `drop-shadow(0 0 30px ${currentStep.color}30)`,
-                }}
-              >
-                {currentStep.icon}
-              </div>
+              {isAvatarSlide ? (
+                /* ═══ AVATAR SLIDE ═══ */
+                <div>
+                  <motion.div
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="text-5xl mb-4"
+                  >
+                    🎭
+                  </motion.div>
 
-              {/* Title */}
-              <h2
-                className="font-display text-2xl font-bold mb-3"
-                style={{ color: currentStep.color }}
-              >
-                {currentStep.title}
-              </h2>
+                  <h2 className="font-display text-2xl font-bold mb-2 text-glupp-accent">
+                    Choisis ton avatar
+                  </h2>
+                  <p className="text-glupp-text-soft text-sm leading-relaxed mb-6">
+                    C&apos;est ta tete de Gluppeur ! Tu pourras en debloquer d&apos;autres en montant de niveau.
+                  </p>
 
-              {/* Description */}
-              <p className="text-glupp-text-soft text-sm leading-relaxed mb-8">
-                {currentStep.description}
-              </p>
-
-              {/* Feature pills */}
-              {currentStep.features && (
-                <div className="space-y-2.5">
-                  {currentStep.features.map((feature, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15 + i * 0.1 }}
-                      className="flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left"
-                      style={{
-                        backgroundColor: `${currentStep.color}08`,
-                        borderColor: `${currentStep.color}20`,
-                      }}
-                    >
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                        style={{
-                          backgroundColor: `${currentStep.color}15`,
-                          color: currentStep.color,
-                        }}
-                      >
-                        {feature.icon}
-                      </div>
-                      <span className="text-sm text-glupp-cream">
-                        {feature.text}
-                      </span>
-                    </motion.div>
-                  ))}
+                  {avatarsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="w-8 h-8 border-2 border-glupp-accent border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-3 max-w-xs mx-auto">
+                      {freeAvatars.map((avatar, i) => {
+                        const isSelected = selectedAvatarId === avatar.id;
+                        return (
+                          <motion.button
+                            key={avatar.id}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: i * 0.05 }}
+                            onClick={() => setSelectedAvatarId(avatar.id)}
+                            className="flex flex-col items-center gap-1"
+                          >
+                            <div
+                              className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-all ${
+                                isSelected
+                                  ? "border-glupp-accent ring-2 ring-glupp-accent/30 scale-110"
+                                  : "border-glupp-border hover:border-glupp-accent/50"
+                              }`}
+                            >
+                              <Image
+                                src={`/avatars/${avatar.file_name}.png`}
+                                alt={avatar.name}
+                                fill
+                                className="object-cover"
+                                sizes="64px"
+                              />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-glupp-accent/20 flex items-center justify-center">
+                                  <div className="w-5 h-5 rounded-full bg-glupp-accent flex items-center justify-center">
+                                    <Check size={12} className="text-glupp-bg" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <span className={`text-[10px] leading-tight ${
+                              isSelected ? "text-glupp-accent font-semibold" : "text-glupp-text-muted"
+                            }`}>
+                              {avatar.name}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
+              ) : (
+                /* ═══ REGULAR SLIDES ═══ */
+                <>
+                  <div
+                    className="flex items-center justify-center mb-8 h-24"
+                    style={{ filter: `drop-shadow(0 0 30px ${currentStep!.color}30)` }}
+                  >
+                    {currentStep!.icon}
+                  </div>
+
+                  <h2
+                    className="font-display text-2xl font-bold mb-3"
+                    style={{ color: currentStep!.color }}
+                  >
+                    {currentStep!.title}
+                  </h2>
+
+                  <p className="text-glupp-text-soft text-sm leading-relaxed mb-8">
+                    {currentStep!.description}
+                  </p>
+
+                  {currentStep!.features && (
+                    <div className="space-y-2.5">
+                      {currentStep!.features.map((feature, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.15 + i * 0.1 }}
+                          className="flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left"
+                          style={{
+                            backgroundColor: `${currentStep!.color}08`,
+                            borderColor: `${currentStep!.color}20`,
+                          }}
+                        >
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                            style={{
+                              backgroundColor: `${currentStep!.color}15`,
+                              color: currentStep!.color,
+                            }}
+                          >
+                            {feature.icon}
+                          </div>
+                          <span className="text-sm text-glupp-cream">
+                            {feature.text}
+                          </span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </motion.div>
           </AnimatePresence>
@@ -366,15 +438,13 @@ export function OnboardingFlow() {
 
         {/* Bottom navigation */}
         <div className="p-6 space-y-4">
-          {/* Progress dots */}
           <div className="flex items-center justify-center gap-2">
-            {STEPS.map((_, i) => (
+            {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
               <motion.div
                 key={i}
                 animate={{
                   width: i === step ? 24 : 8,
-                  backgroundColor:
-                    i === step ? currentStep.color : "#3A3530",
+                  backgroundColor: i === step ? currentColor : "#3A3530",
                 }}
                 transition={{ duration: 0.3 }}
                 className="h-2 rounded-full"
@@ -382,7 +452,6 @@ export function OnboardingFlow() {
             ))}
           </div>
 
-          {/* Navigation buttons */}
           <div className="flex items-center gap-3">
             {step > 0 && (
               <Button variant="ghost" onClick={handlePrev} className="flex-1">
@@ -411,7 +480,6 @@ export function OnboardingFlow() {
           </div>
         </div>
 
-        {/* Safe area bottom */}
         <div className="pb-[env(safe-area-inset-bottom,0px)]" />
       </motion.div>
     </AnimatePresence>
