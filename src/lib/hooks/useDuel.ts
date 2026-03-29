@@ -14,6 +14,8 @@ export interface DuelResult {
   xp_gained: number;
 }
 
+const DAILY_DUEL_LIMIT = 3;
+
 const sessionPlayedPairs = new Set<string>();
 let lastDisplayedPairKey: string | null = null;
 
@@ -25,8 +27,6 @@ export function useDuel() {
   const incrementDuelCount = useAppStore((s) => s.incrementDuelCount);
 
   const [duelKey, setDuelKey] = useState<number>(Date.now());
-  
-  // 🆕 NOUVEL ÉTAT : L'utilisateur a-t-il terminé tous ses duels ?
   const [hasFinishedAllDuels, setHasFinishedAllDuels] = useState(false);
 
   const [currentDuel, setCurrentDuel] = useState<{
@@ -41,6 +41,31 @@ export function useDuel() {
 
   const [submitting, setSubmitting] = useState(false);
   const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
+
+  // ─── Count today's duels from database ───
+  const { data: todayDuelCount = 0, isLoading: loadingTodayCount } = useQuery({
+    queryKey: ["duels", "today-count"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return 0;
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { count, error } = await supabase
+        .from("duels")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("created_at", todayStart.toISOString());
+
+      if (error) return 0;
+      return count || 0;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const duelsRemaining = Math.max(0, DAILY_DUEL_LIMIT - todayDuelCount);
+  const hasReachedDailyLimit = todayDuelCount >= DAILY_DUEL_LIMIT;
 
   const { data: tastedBeers = [], isLoading: loadingBeers } = useQuery({
     queryKey: queryKeys.duel.tastedBeers,
@@ -101,14 +126,12 @@ export function useDuel() {
       return true;
     });
 
-    // 🎯 SI PLUS AUCUN DUEL N'EST DISPONIBLE :
     if (unplayedPairs.length === 0) {
       setHasFinishedAllDuels(true);
       setCurrentDuel({ beerA: null, beerB: null, winnerId: null, prevEloA: 0, prevEloB: 0 });
       return;
     }
 
-    // Sinon, on continue normalement avec un nouveau duel
     setHasFinishedAllDuels(false);
     const selectedPair = unplayedPairs[Math.floor(Math.random() * unplayedPairs.length)];
     const finalPair = Math.random() > 0.5 ? selectedPair : [selectedPair[1], selectedPair[0]];
@@ -123,7 +146,7 @@ export function useDuel() {
     });
     setDuelResult(null);
     setSubmitting(false);
-    setDuelKey(Date.now()); 
+    setDuelKey(Date.now());
   }, [tastedBeers, dbPlayedPairs]);
 
   useEffect(() => {
@@ -146,6 +169,8 @@ export function useDuel() {
   const voteMutation = useMutation({
     mutationFn: async (selectedWinnerId: string) => {
       if (!currentDuel.beerA || !currentDuel.beerB) throw new Error("Pas de duel");
+      if (hasReachedDailyLimit) throw new Error("Limite quotidienne atteinte");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non connecté");
 
@@ -170,6 +195,8 @@ export function useDuel() {
         sessionPlayedPairs.add(currentKey);
       }
 
+      // Invalider le compteur quotidien
+      queryClient.invalidateQueries({ queryKey: ["duels", "today-count"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
       queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
@@ -177,13 +204,17 @@ export function useDuel() {
       queryClient.invalidateQueries({ queryKey: ["duel_history_details"] });
 
       setTimeout(() => {
-        generatePair();
+        // Ne pas générer un nouveau duel si on vient d'atteindre la limite
+        if (todayDuelCount + 1 < DAILY_DUEL_LIMIT) {
+          generatePair();
+        }
       }, 1200);
     },
     onError: () => setSubmitting(false),
   });
 
   const submitVote = async (selectedWinnerId: string) => {
+    if (hasReachedDailyLimit) return;
     setSubmitting(true);
     voteMutation.mutate(selectedWinnerId);
   };
@@ -192,8 +223,7 @@ export function useDuel() {
       ? { a: duelResult.beer_a_elo - currentDuel.prevEloA, b: duelResult.beer_b_elo - currentDuel.prevEloB }
       : null;
 
-  // On ne charge pas si l'utilisateur a tout fini !
-  const isLoading = (loadingBeers || loadingPastDuels) && !currentDuel.beerA && !hasFinishedAllDuels;
+  const isLoading = (loadingBeers || loadingPastDuels || loadingTodayCount) && !currentDuel.beerA && !hasFinishedAllDuels;
 
   return {
     beerA: currentDuel.beerA,
@@ -204,7 +234,11 @@ export function useDuel() {
     winnerId: currentDuel.winnerId,
     eloDeltas,
     canDuel: tastedBeers.length >= 2,
-    hasFinishedAllDuels, // 👈 On exporte l'info vers la page
+    hasFinishedAllDuels,
+    hasReachedDailyLimit,
+    duelsRemaining,
+    todayDuelCount,
+    dailyLimit: DAILY_DUEL_LIMIT,
     duelCount: duelSessionCount,
     tastedCount: tastedBeers.length,
     generatePair,

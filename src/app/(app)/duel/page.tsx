@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ActivityItem } from "@/components/social/ActivityItem";
 import { GluppOfWeekBanner } from "@/components/gamification/GluppOfWeekBanner";
-import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw, History, Trophy } from "lucide-react";
+import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw, History, Trophy, Lock, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function DuelPage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  
+
   const {
     beerA,
     beerB,
@@ -23,6 +23,10 @@ export default function DuelPage() {
     submitting,
     canDuel,
     hasFinishedAllDuels,
+    hasReachedDailyLimit,
+    duelsRemaining,
+    todayDuelCount,
+    dailyLimit,
     duelCount,
     tastedCount,
     winnerId,
@@ -75,8 +79,67 @@ export default function DuelPage() {
 
   return (
     <div className="py-6 pb-24">
-      {/* 🎯 GESTION DE LA VICTOIRE VS DUEL NORMAL */}
-      {hasFinishedAllDuels ? (
+      {/* DAILY LIMIT REACHED */}
+      {hasReachedDailyLimit ? (
+        <div className="flex flex-col items-center justify-center px-6 py-8 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", bounce: 0.5 }}
+          >
+            <div className="relative mb-4">
+              <Swords size={56} className="text-glupp-text-muted mx-auto" />
+              <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-glupp-accent flex items-center justify-center">
+                <Lock size={14} className="text-glupp-bg" />
+              </div>
+            </div>
+          </motion.div>
+          <h2 className="font-display text-xl font-bold text-glupp-cream mb-2">
+            Duels du jour termines !
+          </h2>
+          <p className="text-glupp-text-soft text-sm mb-3 max-w-xs mx-auto">
+            Tu as joue tes {dailyLimit} duels aujourd&apos;hui. Reviens demain pour de nouveaux affrontements !
+          </p>
+
+          {/* Progress bar visual */}
+          <div className="w-full max-w-xs mx-auto mb-6">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-glupp-text-muted">{todayDuelCount}/{dailyLimit} duels</span>
+              <span className="text-xs text-glupp-accent font-medium flex items-center gap-1">
+                <Clock size={10} />
+                Reset a minuit
+              </span>
+            </div>
+            <div className="w-full h-2 bg-glupp-border rounded-full overflow-hidden">
+              <div className="h-full bg-glupp-accent rounded-full transition-all" style={{ width: "100%" }} />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+            <Link href="/collection">
+              <Button variant="primary" size="lg" className="w-full">
+                Explorer le Beerdex
+                <ArrowRight size={16} className="ml-2" />
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              onClick={() => setIsHistoryOpen(true)}
+              className="text-glupp-text-muted hover:text-glupp-cream"
+            >
+              <History size={16} className="mr-2" />
+              Voir mon historique
+            </Button>
+          </div>
+
+          <DuelHistoryModal
+            isOpen={isHistoryOpen}
+            onClose={() => setIsHistoryOpen(false)}
+          />
+        </div>
+
+      /* ALL DUELS FINISHED (no more pairs) */
+      ) : hasFinishedAllDuels ? (
         <div className="flex flex-col items-center justify-center px-6 py-8 text-center">
           <motion.div
             initial={{ scale: 0 }}
@@ -86,10 +149,10 @@ export default function DuelPage() {
             <Trophy size={56} className="text-glupp-gold mb-4 mx-auto" />
           </motion.div>
           <h2 className="font-display text-xl font-bold text-glupp-cream mb-2">
-            Tu as tout joué !
+            Tu as tout joue !
           </h2>
           <p className="text-glupp-text-soft text-sm mb-6 max-w-xs mx-auto">
-            Tu as duelé toutes les bières de ta collection. Ajoute de nouvelles bières pour débloquer de nouveaux affrontements !
+            Tu as duele toutes les bieres de ta collection. Ajoute de nouvelles bieres pour debloquer de nouveaux affrontements !
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
             <Link href="/collection">
@@ -98,8 +161,8 @@ export default function DuelPage() {
                 <ArrowRight size={16} className="ml-2" />
               </Button>
             </Link>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => setIsHistoryOpen(true)}
               className="text-glupp-text-muted hover:text-glupp-cream"
             >
@@ -107,10 +170,10 @@ export default function DuelPage() {
               Voir mon historique
             </Button>
           </div>
-          
-          <DuelHistoryModal 
-            isOpen={isHistoryOpen} 
-            onClose={() => setIsHistoryOpen(false)} 
+
+          <DuelHistoryModal
+            isOpen={isHistoryOpen}
+            onClose={() => setIsHistoryOpen(false)}
           />
         </div>
       ) : (
@@ -124,25 +187,34 @@ export default function DuelPage() {
               Choisis ta biere preferee pour mettre a jour le classement
             </p>
 
-            {/* Session counter */}
-            {duelCount > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-center gap-3 mt-3"
-              >
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-glupp-accent/10 text-glupp-accent text-xs font-medium">
-                  <Swords size={12} />
-                  {duelCount} duel{duelCount > 1 ? "s" : ""}
+            {/* Daily counter */}
+            <div className="flex items-center justify-center gap-3 mt-3">
+              {/* Duels remaining */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-glupp-card border border-glupp-border">
+                <Swords size={12} className="text-glupp-accent" />
+                <div className="flex gap-0.5">
+                  {Array.from({ length: dailyLimit }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        i < todayDuelCount ? "bg-glupp-accent" : "bg-glupp-border"
+                      }`}
+                    />
+                  ))}
                 </div>
-                {duelCount >= 3 && (
-                  <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-glupp-gold/10 text-glupp-gold text-xs font-medium">
-                    <Flame size={12} />
-                    En feu !
-                  </div>
-                )}
-              </motion.div>
-            )}
+                <span className="text-[10px] text-glupp-text-muted ml-0.5">
+                  {duelsRemaining} restant{duelsRemaining > 1 ? "s" : ""}
+                </span>
+              </div>
+
+              {/* Session streak */}
+              {duelCount >= 2 && (
+                <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-glupp-gold/10 text-glupp-gold text-xs font-medium">
+                  <Flame size={12} />
+                  En feu !
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Duel Cards */}
@@ -151,7 +223,7 @@ export default function DuelPage() {
               beerA={beerA}
               beerB={beerB}
               onSelect={submitVote}
-              disabled={submitting}
+              disabled={submitting || hasReachedDailyLimit}
               winnerId={winnerId}
               eloDeltas={eloDeltas}
               duelKey={duelKey}
@@ -186,12 +258,12 @@ export default function DuelPage() {
           </div>
 
           {/* La Modale d'Historique */}
-          <DuelHistoryModal 
-            isOpen={isHistoryOpen} 
-            onClose={() => setIsHistoryOpen(false)} 
+          <DuelHistoryModal
+            isOpen={isHistoryOpen}
+            onClose={() => setIsHistoryOpen(false)}
           />
 
-          {/* Pool info + suggestion */}
+          {/* Pool info */}
           <div className="mt-8 mx-4 p-3 bg-glupp-card-alt border border-glupp-border rounded-glupp text-center">
             <p className="text-xs text-glupp-text-soft mb-1">
               {tastedCount} biere{tastedCount > 1 ? "s" : ""} dans ton pool de duels
@@ -207,7 +279,7 @@ export default function DuelPage() {
         </>
       )}
 
-      {/* ⏬ LES SECTIONS QUI S'AFFICHERONT TOUT LE TEMPS ⏬ */}
+      {/* ⏬ SECTIONS PERMANENTES ⏬ */}
 
       {/* Glupp of the Week */}
       <div className="px-4 mt-8">
