@@ -7,6 +7,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // 👈 Intercepter les codes d'auth qui arrivent sur /login (Supabase PKCE flow)
+  if (request.nextUrl.pathname === "/login" && request.nextUrl.searchParams.has("code")) {
+    const code = request.nextUrl.searchParams.get("code");
+    const callbackUrl = new URL("/auth/callback", request.url);
+    callbackUrl.searchParams.set("code", code!);
+    callbackUrl.searchParams.set("type", "recovery");
+    callbackUrl.searchParams.set("next", "/reset-password");
+    return NextResponse.redirect(callbackUrl);
+  }
+
   return await updateSession(request);
 }
 
