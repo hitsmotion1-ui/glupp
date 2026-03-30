@@ -60,7 +60,7 @@ export function useProfile() {
 
       return null;
     },
-    staleTime: 1 * 60 * 1000, // 1 minute
+    staleTime: 30 * 1000, // 30 secondes — assez court pour que invalidateQueries force un refetch rapide
   });
 
   const level = profile ? getLevel(profile.xp) : getLevel(0);

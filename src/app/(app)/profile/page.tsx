@@ -52,14 +52,26 @@ export default function ProfilePage() {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
 
-  // État local pour avatar + couleur de fond
-// État local pour avatar + couleur de fond (optimistic update uniquement)
+  // État local pour avatar + couleur de fond (optimistic update uniquement)
   const [optimisticAvatarId, setOptimisticAvatarId] = useState<string | null>(null);
   const [optimisticBgColor, setOptimisticBgColor] = useState<string | null>(null);
 
+  // Clear optimistic quand le profil rattrape la valeur
+  useEffect(() => {
+    if (optimisticAvatarId && profile?.avatar_id === optimisticAvatarId) {
+      setOptimisticAvatarId(null);
+    }
+  }, [profile?.avatar_id, optimisticAvatarId]);
+
+  useEffect(() => {
+    if (optimisticBgColor !== null && (profile as any)?.avatar_bg_color === optimisticBgColor) {
+      setOptimisticBgColor(null);
+    }
+  }, [(profile as any)?.avatar_bg_color, optimisticBgColor]);
+
   // La source de vérité est le profil. L'optimistic ne sert que pendant le save.
   const activeAvatarId = optimisticAvatarId || profile?.avatar_id || 'curieux';
-  const activeBgColor = optimisticBgColor || (profile as any)?.avatar_bg_color || null;
+  const activeBgColor = optimisticBgColor !== null ? optimisticBgColor : ((profile as any)?.avatar_bg_color || null);
 
   // 🆕 2. Bloquer le défilement de la page en arrière-plan quand la modale est ouverte
   useEffect(() => {
@@ -92,26 +104,26 @@ export default function ProfilePage() {
         .update({ avatar_id: newAvatarId })
         .eq('id', profile.id);
       if (error) throw error;
+      // Force le rechargement du profil — l'optimistic se clear automatiquement
+      // quand profile.avatar_id === optimisticAvatarId (via useEffect ci-dessus)
       refetch();
-      // Clear optimistic une fois le profil rechargé
-      setTimeout(() => setOptimisticAvatarId(null), 500);
     } catch (error) {
       console.error("Erreur avatar", error);
-      setOptimisticAvatarId(null); // rollback
+      setOptimisticAvatarId(null);
     }
   };
 
   const handleUpdateBgColor = async (color: string) => {
     if (!profile) return;
-    setOptimisticBgColor(color || null);
+    const newColor = color || '';
+    setOptimisticBgColor(newColor);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ avatar_bg_color: color || null })
+        .update({ avatar_bg_color: newColor || null })
         .eq('id', profile.id);
       if (error) throw error;
       refetch();
-      setTimeout(() => setOptimisticBgColor(null), 500);
     } catch (error) {
       console.error("Erreur couleur", error);
       setOptimisticBgColor(null);
