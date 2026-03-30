@@ -161,7 +161,6 @@ export default function ProfilePage() {
   }
 
   // 🆕 On utilise l'avatar cliqué (localAvatarId) en priorité, sinon celui de la base de données
-  const activeAvatarId = localAvatarId || profile.avatar_id || 'curieux';
   const currentAvatarData = avatars.find(a => a.id === activeAvatarId) || avatars.find(a => a.id === 'curieux');
   const currentFileName = currentAvatarData?.file_name;
 
@@ -209,7 +208,7 @@ export default function ProfilePage() {
       <div className="flex flex-col items-center text-center">
         <div
           className="rounded-full cursor-pointer transition-transform hover:scale-105"
-          style={localBgColor ? { padding: '3px', background: localBgColor } : undefined}
+          style={activeBgColor ? { padding: '3px', background: activeBgColor } : undefined}
           onClick={() => setIsAvatarPickerOpen(true)}
         >
           <Avatar
@@ -403,7 +402,7 @@ export default function ProfilePage() {
               <AvatarPicker 
                 avatars={avatars} 
                 currentAvatarId={activeAvatarId}
-                currentBgColor={localBgColor || undefined}
+                currentBgColor={activeBgColor || undefined}
                 onSelectAvatar={handleUpdateAvatar}
                 onSelectBgColor={handleUpdateBgColor}
                 onClose={() => setIsAvatarPickerOpen(false)} 
