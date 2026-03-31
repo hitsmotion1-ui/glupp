@@ -14,12 +14,13 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const hasMinLength = password.length >= 8;
+const hasMinLength = password.length >= 8;
   const hasNumber = /[0-9]/.test(password);
   const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+  const hasUppercase = /[A-Z]/.test(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
   
-  const isPasswordValid = hasMinLength && hasNumber && hasSpecialChar;
+  const isPasswordValid = hasMinLength && hasNumber && hasSpecialChar && hasUppercase;
 
   useEffect(() => {
     // Vérifier si on a bien une session de récupération active (le hash dans l'URL)
@@ -121,6 +122,7 @@ export default function ResetPasswordPage() {
             <PasswordRule isValid={hasMinLength} text="Au moins 8 caractères" />
             <PasswordRule isValid={hasNumber} text="Au moins 1 chiffre" />
             <PasswordRule isValid={hasSpecialChar} text="Au moins 1 caractère spécial (!@#...)" />
+            <PasswordRule isValid={hasUppercase} text="Au moins 1 majuscule" />
           </div>
         </div>
 

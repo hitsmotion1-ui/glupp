@@ -18,7 +18,7 @@ export default function AuthLayout({
             priority      // Demande à Next.js de charger cette image en priorité
             className="mx-auto mb-3 object-contain" 
           />
-          <p className="text-glupp-text-soft text-sm">Every gulp counts.</p>
+          <p className="text-glupp-text-soft text-sm">Every glupp counts.</p>
         </div>
         {children}
       </div>
