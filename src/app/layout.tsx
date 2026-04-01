@@ -18,7 +18,19 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Glupp",
-  description: "Every gulp counts.",
+  description: "Every glupp counts.",
+  openGraph: {
+    title: "Glupp",
+    description: "Every glupp counts.",
+    siteName: "Glupp",
+    url: "https://glupp.fr",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Glupp",
+    description: "Every glupp counts.",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
