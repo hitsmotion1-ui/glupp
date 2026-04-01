@@ -35,6 +35,8 @@ import {
   MessageSquarePlus,
 } from "lucide-react";
 import { formatNumber } from "@/lib/utils/xp";
+import { InviteButton } from "@/components/social/InviteButton";
+
 
 type Section = "progression" | "trophies" | "friends" | "crews" | "passport";
 
@@ -286,6 +288,9 @@ export default function ProfilePage() {
           <p className="text-[10px] text-glupp-text-muted">Photos</p>
         </Card>
       </div>
+
+      {/* Inviter un ami */}
+      <InviteButton userId={profile.id} />
 
       {/* Bouton Feedback */}
       <div>
