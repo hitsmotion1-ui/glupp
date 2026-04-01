@@ -24,14 +24,14 @@ import type { Bar } from "@/types";
 
 interface BarReviewPanelProps {
   bar: Bar & { 
-    distance?: number; 
-    google_rating?: number; 
-    google_total_reviews?: number;
-    google_rating_updated_at?: string;
-    geo_lat?: number;
-    geo_lng?: number;
-    address?: string;
-    city?: string;
+    distance?: number | null; 
+    google_rating?: number | null; 
+    google_total_reviews?: number | null;
+    google_rating_updated_at?: string | null;
+    geo_lat?: number | null;
+    geo_lng?: number | null;
+    address?: string | null;
+    city?: string | null;
   };
   onClose: () => void;
 }
