@@ -467,6 +467,10 @@ export function GluppModal() {
             </span>
           </label>
 
+          <p className="text-[10px] text-glupp-text-muted -mt-1 mb-2 italic">
+            Immortalise ta premiere gorgee ! 🍺 C&apos;est toujours mieux sur le moment.
+          </p>
+
           {photoPreview ? (
             <div className="relative">
               <img
