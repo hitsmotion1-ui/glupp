@@ -28,6 +28,7 @@ interface BarFormData {
   geo_lat: string;
   geo_lng: string;
   google_rating: string;
+  google_total_reviews: string;
 }
 
 const EMPTY_FORM: BarFormData = {
@@ -37,6 +38,7 @@ const EMPTY_FORM: BarFormData = {
   geo_lat: "",
   geo_lng: "",
   google_rating: "",
+  google_total_reviews: "",
 };
 
 // ═══════════════════════════════════════════
@@ -237,31 +239,49 @@ function BarFormFields({
         </div>
       </div>
 
-      {/* Google Rating */}
-      <div>
+      {/* Google Rating + Reviews */}
+      <div className="p-3 bg-[#141210] border border-[#3A3530] rounded-lg space-y-3">
         <label className={labelClass}>
-          ⭐ Note Google (optionnel)
+          ⭐ Google (optionnel)
         </label>
         <div className="flex items-center gap-3">
-          <input
-            type="number"
-            value={form.google_rating}
-            onChange={(e) => updateField("google_rating", e.target.value)}
-            placeholder="Ex: 4.5"
-            step="0.1"
-            min="0"
-            max="5"
-            className={`${inputClass} w-32`}
-          />
+          <div className="flex-1">
+            <span className="text-[10px] text-[#6B6050] block mb-1">Note</span>
+            <input
+              type="number"
+              value={form.google_rating}
+              onChange={(e) => updateField("google_rating", e.target.value)}
+              placeholder="4.5"
+              step="0.1"
+              min="0"
+              max="5"
+              className={`${inputClass} w-full`}
+            />
+          </div>
+          <div className="flex-1">
+            <span className="text-[10px] text-[#6B6050] block mb-1">Nb avis</span>
+            <input
+              type="number"
+              value={form.google_total_reviews}
+              onChange={(e) => updateField("google_total_reviews", e.target.value)}
+              placeholder="312"
+              min="0"
+              className={`${inputClass} w-full`}
+            />
+          </div>
           {form.google_rating && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0 pt-4">
               {Array.from({ length: 5 }).map((_, i) => (
                 <span key={i} className={`text-sm ${i < Math.round(parseFloat(form.google_rating)) ? "text-yellow-400" : "text-[#3A3530]"}`}>★</span>
               ))}
-              <span className="text-xs text-[#A89888] ml-1">{form.google_rating}/5</span>
             </div>
           )}
         </div>
+        {form.google_rating && (
+          <p className="text-[10px] text-[#A89888]">
+            {form.google_rating}/5{form.google_total_reviews ? ` (${form.google_total_reviews} avis)` : ""}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -329,6 +349,7 @@ export default function AdminBarsPage() {
       geo_lat: bar.geo_lat != null ? String(bar.geo_lat) : "",
       geo_lng: bar.geo_lng != null ? String(bar.geo_lng) : "",
       google_rating: (bar as any).google_rating != null ? String((bar as any).google_rating) : "",
+      google_total_reviews: (bar as any).google_total_reviews != null ? String((bar as any).google_total_reviews) : "",
     });
   }, []);
 
@@ -353,6 +374,7 @@ export default function AdminBarsPage() {
         geo_lat: form.geo_lat ? parseFloat(form.geo_lat) : null,
         geo_lng: form.geo_lng ? parseFloat(form.geo_lng) : null,
         google_rating: form.google_rating ? parseFloat(form.google_rating) : null,
+        google_total_reviews: form.google_total_reviews ? parseInt(form.google_total_reviews) : null,
       });
       closeModal();
     } catch (err) {
@@ -370,6 +392,7 @@ export default function AdminBarsPage() {
         geo_lat: form.geo_lat ? parseFloat(form.geo_lat) : null,
         geo_lng: form.geo_lng ? parseFloat(form.geo_lng) : null,
         google_rating: form.google_rating ? parseFloat(form.google_rating) : null,
+        google_total_reviews: form.google_total_reviews ? parseInt(form.google_total_reviews) : null,
       });
       closeModal();
     } catch (err) {
@@ -441,6 +464,7 @@ export default function AdminBarsPage() {
       label: "Google",
       render: (bar) => {
         const gRating = (bar as any).google_rating;
+        const gReviews = (bar as any).google_total_reviews;
         const gUpdated = (bar as any).google_rating_updated_at;
         return (
           <div>
@@ -449,6 +473,9 @@ export default function AdminBarsPage() {
                 <>
                   <span className="text-sm font-bold text-yellow-400 tabular-nums">{Number(gRating).toFixed(1)}</span>
                   <span className="text-yellow-400 text-xs">★</span>
+                  {gReviews != null && (
+                    <span className="text-[10px] text-[#6B6050]">({gReviews})</span>
+                  )}
                 </>
               ) : (
                 <span className="text-[#6B6050]">&mdash;</span>

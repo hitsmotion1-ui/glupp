@@ -61,6 +61,7 @@ interface BarInput {
   geo_lng?: number | null;
   is_verified?: boolean;
   google_rating?: number | null;
+  google_total_reviews?: number | null;
 }
 
 // ═══════════════════════════════════════════
@@ -310,6 +311,7 @@ export function useAdmin() {
           geo_lat: input.geo_lat ?? null,
           geo_lng: input.geo_lng ?? null,
           google_rating: input.google_rating ?? null,
+          google_total_reviews: input.google_total_reviews ?? null,
           is_verified: false,
           rating: 0,
           total_votes: 0,
