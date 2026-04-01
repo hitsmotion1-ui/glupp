@@ -48,76 +48,174 @@ function BarFormFields({
   form: BarFormData;
   updateField: <K extends keyof BarFormData>(key: K, value: BarFormData[K]) => void;
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{
+    display_name: string;
+    lat: string;
+    lon: string;
+    address: {
+      road?: string;
+      house_number?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+      municipality?: string;
+      postcode?: string;
+    };
+  }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleGeoSearch = async () => {
+    const query = searchQuery.trim() || `${form.name} ${form.city}`.trim();
+    if (!query) return;
+
+    setSearching(true);
+    setHasSearched(true);
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5&accept-language=fr&countrycodes=fr,be,de,nl,lu,ch,es,it,gb,ie`
+      );
+      const data = await resp.json();
+      setSearchResults(data || []);
+    } catch (err) {
+      console.error("Geocoding error:", err);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectResult = (result: typeof searchResults[0]) => {
+    const addr = result.address;
+    const street = [addr.house_number, addr.road].filter(Boolean).join(" ");
+    const city = addr.city || addr.town || addr.village || addr.municipality || "";
+
+    updateField("address", street || result.display_name.split(",")[0] || "");
+    updateField("city", city);
+    updateField("geo_lat", parseFloat(result.lat).toFixed(6));
+    updateField("geo_lng", parseFloat(result.lon).toFixed(6));
+    setSearchResults([]);
+    setHasSearched(false);
+  };
+
+  const inputClass = "w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors";
+  const labelClass = "block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider";
+
   return (
     <div className="space-y-4">
       {/* Name */}
       <div>
-        <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-          Nom *
-        </label>
+        <label className={labelClass}>Nom *</label>
         <input
           type="text"
           value={form.name}
           onChange={(e) => updateField("name", e.target.value)}
           placeholder="Nom du bar"
-          className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+          className={inputClass}
         />
       </div>
 
-      {/* City + Address */}
+      {/* Geocoding search */}
+      <div className="p-3 bg-[#141210] border border-[#3A3530] rounded-lg space-y-3">
+        <label className={labelClass}>
+          <MapPin size={11} className="inline mr-1" />
+          Recherche automatique
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleGeoSearch())}
+            placeholder={form.name ? `${form.name}${form.city ? `, ${form.city}` : ""}` : "Ex: Le Hop Corner, Nantes"}
+            className={`${inputClass} flex-1`}
+          />
+          <button
+            type="button"
+            onClick={handleGeoSearch}
+            disabled={searching}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#4ECDC4]/15 text-[#4ECDC4] rounded-lg text-xs font-semibold hover:bg-[#4ECDC4]/25 disabled:opacity-50 transition-colors shrink-0"
+          >
+            {searching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+            Chercher
+          </button>
+        </div>
+
+        {/* Results */}
+        {searchResults.length > 0 && (
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {searchResults.map((result, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handleSelectResult(result)}
+                className="w-full text-left px-3 py-2 bg-[#1E1B16] border border-[#3A3530] rounded-lg text-xs text-[#F5E6D3] hover:border-[#4ECDC4]/50 hover:bg-[#4ECDC4]/5 transition-colors"
+              >
+                <p className="truncate">{result.display_name}</p>
+                <p className="text-[10px] text-[#6B6050] mt-0.5">
+                  {parseFloat(result.lat).toFixed(4)}, {parseFloat(result.lon).toFixed(4)}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {hasSearched && searchResults.length === 0 && !searching && (
+          <p className="text-[10px] text-[#6B6050] text-center py-2">Aucun resultat. Essaie avec plus de details.</p>
+        )}
+
+        <p className="text-[10px] text-[#6B6050]">
+          Tape le nom du bar + ville puis clique Chercher. Les champs se remplissent automatiquement.
+        </p>
+      </div>
+
+      {/* City + Address (editable, pre-filled by search) */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-            Ville
-          </label>
+          <label className={labelClass}>Ville</label>
           <input
             type="text"
             value={form.city}
             onChange={(e) => updateField("city", e.target.value)}
             placeholder="Ex: Paris"
-            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+            className={inputClass}
           />
         </div>
         <div>
-          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-            Adresse
-          </label>
+          <label className={labelClass}>Adresse</label>
           <input
             type="text"
             value={form.address}
             onChange={(e) => updateField("address", e.target.value)}
             placeholder="Ex: 12 rue de la Biere"
-            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+            className={inputClass}
           />
         </div>
       </div>
 
-      {/* Geo coordinates */}
+      {/* Geo coordinates (editable, pre-filled by search) */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-            Latitude
-          </label>
+          <label className={labelClass}>Latitude</label>
           <input
             type="number"
             value={form.geo_lat}
             onChange={(e) => updateField("geo_lat", e.target.value)}
             placeholder="Ex: 48.8566"
             step="0.0001"
-            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+            className={inputClass}
           />
         </div>
         <div>
-          <label className="block mb-1 text-xs font-semibold text-[#A89888] uppercase tracking-wider">
-            Longitude
-          </label>
+          <label className={labelClass}>Longitude</label>
           <input
             type="number"
             value={form.geo_lng}
             onChange={(e) => updateField("geo_lng", e.target.value)}
             placeholder="Ex: 2.3522"
             step="0.0001"
-            className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 focus:ring-1 focus:ring-[#E08840]/25 transition-colors"
+            className={inputClass}
           />
         </div>
       </div>
