@@ -17,12 +17,22 @@ import {
   ChevronUp,
   Edit3,
   MessageSquare,
+  Navigation,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Bar } from "@/types";
 
 interface BarReviewPanelProps {
-  bar: Bar & { distance?: number; google_rating?: number };
+  bar: Bar & { 
+    distance?: number; 
+    google_rating?: number; 
+    google_total_reviews?: number;
+    google_rating_updated_at?: string;
+    geo_lat?: number;
+    geo_lng?: number;
+    address?: string;
+    city?: string;
+  };
   onClose: () => void;
 }
 
@@ -135,11 +145,18 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
           <div className="flex items-center justify-center gap-1.5 mb-1">
             <span className="text-lg">G</span>
             <span className="font-display font-bold text-glupp-cream text-lg">
-              {bar.google_rating ? bar.google_rating.toFixed(1) : bar.rating > 0 ? bar.rating.toFixed(1) : "--"}
+              {bar.google_rating ? Number(bar.google_rating).toFixed(1) : "--"}
             </span>
           </div>
-          <p className="text-[10px] text-glupp-text-muted">Avis Google</p>
-          <StarRating value={Math.round(bar.google_rating || bar.rating || 0)} readonly size={12} />
+          <p className="text-[10px] text-glupp-text-muted">
+            Avis Google{bar.google_total_reviews ? ` (${bar.google_total_reviews})` : ""}
+          </p>
+          <StarRating value={Math.round(bar.google_rating || 0)} readonly size={12} />
+          {bar.google_rating_updated_at && (
+            <p className="text-[8px] text-glupp-text-muted mt-1">
+              MAJ {new Date(bar.google_rating_updated_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "2-digit" })}
+            </p>
+          )}
         </Card>
 
         {/* Glupp Rating */}
@@ -156,6 +173,28 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
           <StarRating value={Math.round(stats.avg_overall)} readonly size={12} />
         </Card>
       </div>
+
+      {/* Navigate to bar button */}
+      {(bar.geo_lat && bar.geo_lng) || bar.address ? (
+        <button
+          onClick={() => {
+            let url: string;
+            if (bar.geo_lat && bar.geo_lng) {
+              // Coordonnées dispo — ouvrir directement avec lat/lng
+              url = `https://www.google.com/maps/dir/?api=1&destination=${bar.geo_lat},${bar.geo_lng}`;
+            } else {
+              // Fallback sur l'adresse
+              const addr = [bar.address, bar.city].filter(Boolean).join(", ");
+              url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;
+            }
+            window.open(url, "_blank");
+          }}
+          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#4ECDC4]/10 border border-[#4ECDC4]/30 rounded-glupp text-sm font-medium text-[#4ECDC4] hover:bg-[#4ECDC4]/15 transition-colors"
+        >
+          <Navigation size={14} />
+          S&apos;y rendre
+        </button>
+      ) : null}
 
       {/* Criteria breakdown */}
       {stats.total_reviews > 0 && (
