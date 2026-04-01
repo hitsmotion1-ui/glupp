@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
@@ -8,20 +8,28 @@ import { Button } from "@/components/ui/Button";
 import { CheckCircle2, XCircle, Gift } from "lucide-react";
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  
+
   const [isAdult, setIsAdult] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
-  
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  
+
   // Code de parrainage (depuis l'URL ?ref=xxx ou localStorage)
   const [referralCode, setReferralCode] = useState<string | null>(null);
 
@@ -31,7 +39,6 @@ export default function RegisterPage() {
     const code = urlRef || storedRef || null;
     if (code) {
       setReferralCode(code);
-      // Sauvegarder au cas où il recharge la page
       localStorage.setItem("glupp-referral-code", code);
     }
   }, [searchParams]);
@@ -41,7 +48,7 @@ export default function RegisterPage() {
   const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
   const hasUppercase = /[A-Z]/.test(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
-  
+
   const isPasswordValid = hasMinLength && hasNumber && hasSpecialChar && hasUppercase;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,7 +78,6 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // 1. Vérifier si le pseudo existe déjà
       const { data: existingUser } = await supabase
         .from("profiles")
         .select("id")
@@ -84,7 +90,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // 2. Créer le compte (passer le code de parrainage dans les metadata)
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -92,7 +97,7 @@ export default function RegisterPage() {
           data: {
             username,
             display_name: username,
-            age_verified: true, 
+            age_verified: true,
             terms_accepted: true,
             referral_code: referralCode || undefined,
           },
@@ -109,22 +114,18 @@ export default function RegisterPage() {
         return;
       }
 
-      // 3. Si parrainage, compléter le referral
       if (referralCode && data.user) {
         try {
           await supabase.rpc("complete_referral", {
             p_code: referralCode,
             p_new_user_id: data.user.id,
           });
-          // Nettoyer le code
           localStorage.removeItem("glupp-referral-code");
         } catch (refErr) {
-          // Ne pas bloquer l'inscription si le parrainage échoue
           console.error("Erreur parrainage:", refErr);
         }
       }
 
-      // 4. Afficher l'écran de succès
       setIsSuccess(true);
     } catch (err: any) {
       setError("Une erreur est survenue lors de l'inscription.");
@@ -133,7 +134,7 @@ export default function RegisterPage() {
     }
   };
 
-  const PasswordRule = ({ isValid, text }: { isValid: boolean, text: string }) => (
+  const PasswordRule = ({ isValid, text }: { isValid: boolean; text: string }) => (
     <div className={`flex items-center gap-1.5 text-xs ${isValid ? "text-glupp-success" : "text-glupp-text-muted"}`}>
       {isValid ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
       <span>{text}</span>
@@ -149,7 +150,7 @@ export default function RegisterPage() {
         <h2 className="text-2xl font-display font-bold text-glupp-cream">Génial !</h2>
         <div className="p-4 bg-glupp-card border border-glupp-border rounded-xl">
           <p className="text-glupp-text-soft text-sm leading-relaxed">
-            Ton compte a été créé avec succès.<br/><br/>
+            Ton compte a été créé avec succès.<br /><br />
             <strong className="text-glupp-cream">Va vérifier tes emails</strong> et clique sur le lien pour confirmer ton compte et pouvoir te connecter !
           </p>
           {referralCode && (
@@ -158,9 +159,9 @@ export default function RegisterPage() {
             </p>
           )}
         </div>
-        <Button 
-          variant="primary" 
-          className="w-full mt-4" 
+        <Button
+          variant="primary"
+          className="w-full mt-4"
           onClick={() => router.push("/login")}
         >
           Aller se connecter
@@ -171,7 +172,6 @@ export default function RegisterPage() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Referral badge */}
       {referralCode && (
         <div className="flex items-center gap-2 px-3 py-2 bg-glupp-accent/10 border border-glupp-accent/30 rounded-xl">
           <Gift size={14} className="text-glupp-accent shrink-0" />
@@ -226,7 +226,7 @@ export default function RegisterPage() {
           className="w-full px-4 py-3 bg-glupp-card border border-glupp-border rounded-glupp text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
           placeholder="Créer un mot de passe"
         />
-        
+
         <div className="mt-2 p-3 bg-glupp-bg/50 rounded-lg space-y-1.5 border border-glupp-border/50">
           <PasswordRule isValid={hasMinLength} text="Au moins 8 caractères" />
           <PasswordRule isValid={hasUppercase} text="Au moins 1 majuscule" />
@@ -246,8 +246,10 @@ export default function RegisterPage() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
           className={`w-full px-4 py-3 bg-glupp-card border rounded-glupp text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none transition-colors ${
-            confirmPassword.length > 0 
-              ? (passwordsMatch ? "border-glupp-success focus:border-glupp-success" : "border-glupp-error focus:border-glupp-error")
+            confirmPassword.length > 0
+              ? passwordsMatch
+                ? "border-glupp-success focus:border-glupp-success"
+                : "border-glupp-error focus:border-glupp-error"
               : "border-glupp-border focus:border-glupp-accent"
           }`}
           placeholder="Répéter le mot de passe"
@@ -260,11 +262,11 @@ export default function RegisterPage() {
       <div className="pt-2 pb-1 space-y-3">
         <label className="flex items-start gap-3 cursor-pointer group">
           <div className="relative flex items-center mt-0.5">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               checked={isAdult}
               onChange={(e) => setIsAdult(e.target.checked)}
-              className="peer appearance-none w-5 h-5 border-2 border-glupp-border rounded bg-glupp-bg checked:bg-glupp-accent checked:border-glupp-accent transition-colors cursor-pointer" 
+              className="peer appearance-none w-5 h-5 border-2 border-glupp-border rounded bg-glupp-bg checked:bg-glupp-accent checked:border-glupp-accent transition-colors cursor-pointer"
             />
             <svg className="absolute w-3 h-3 left-1 pointer-events-none opacity-0 peer-checked:opacity-100 text-glupp-bg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -277,11 +279,11 @@ export default function RegisterPage() {
 
         <label className="flex items-start gap-3 cursor-pointer group">
           <div className="relative flex items-center mt-0.5">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               checked={acceptTerms}
               onChange={(e) => setAcceptTerms(e.target.checked)}
-              className="peer appearance-none w-5 h-5 border-2 border-glupp-border rounded bg-glupp-bg checked:bg-glupp-accent checked:border-glupp-accent transition-colors cursor-pointer" 
+              className="peer appearance-none w-5 h-5 border-2 border-glupp-border rounded bg-glupp-bg checked:bg-glupp-accent checked:border-glupp-accent transition-colors cursor-pointer"
             />
             <svg className="absolute w-3 h-3 left-1 pointer-events-none opacity-0 peer-checked:opacity-100 text-glupp-bg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -299,10 +301,10 @@ export default function RegisterPage() {
         </p>
       )}
 
-      <Button 
-        type="submit" 
-        variant="primary" 
-        className="w-full mt-2" 
+      <Button
+        type="submit"
+        variant="primary"
+        className="w-full mt-2"
         loading={loading}
         disabled={!isAdult || !acceptTerms || !isPasswordValid || !passwordsMatch}
       >
