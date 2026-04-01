@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Gift } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,14 +20,29 @@ export default function RegisterPage() {
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false); // 👈 Nouvel état pour l'écran de succès
+  const [isSuccess, setIsSuccess] = useState(false);
+  
+  // Code de parrainage (depuis l'URL ?ref=xxx ou localStorage)
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const urlRef = searchParams.get("ref");
+    const storedRef = localStorage.getItem("glupp-referral-code");
+    const code = urlRef || storedRef || null;
+    if (code) {
+      setReferralCode(code);
+      // Sauvegarder au cas où il recharge la page
+      localStorage.setItem("glupp-referral-code", code);
+    }
+  }, [searchParams]);
 
   const hasMinLength = password.length >= 8;
   const hasNumber = /[0-9]/.test(password);
   const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+  const hasUppercase = /[A-Z]/.test(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
   
-  const isPasswordValid = hasMinLength && hasNumber && hasSpecialChar;
+  const isPasswordValid = hasMinLength && hasNumber && hasSpecialChar && hasUppercase;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +72,7 @@ export default function RegisterPage() {
 
     try {
       // 1. Vérifier si le pseudo existe déjà
-      const { data: existingUser, error: checkError } = await supabase
+      const { data: existingUser } = await supabase
         .from("profiles")
         .select("id")
         .ilike("username", username)
@@ -68,7 +84,7 @@ export default function RegisterPage() {
         return;
       }
 
-      // 2. Créer le compte
+      // 2. Créer le compte (passer le code de parrainage dans les metadata)
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -77,13 +93,13 @@ export default function RegisterPage() {
             username,
             display_name: username,
             age_verified: true, 
-            terms_accepted: true
+            terms_accepted: true,
+            referral_code: referralCode || undefined,
           },
         },
       });
 
       if (signUpError) {
-        // Supabase renvoie une erreur spécifique si l'email existe déjà
         if (signUpError.message.includes("already registered") || signUpError.message.includes("unique")) {
           setError("Cet email est déjà utilisé. Essaie de te connecter.");
         } else {
@@ -93,7 +109,22 @@ export default function RegisterPage() {
         return;
       }
 
-      // 3. Afficher l'écran de succès pour demander de vérifier les emails
+      // 3. Si parrainage, compléter le referral
+      if (referralCode && data.user) {
+        try {
+          await supabase.rpc("complete_referral", {
+            p_code: referralCode,
+            p_new_user_id: data.user.id,
+          });
+          // Nettoyer le code
+          localStorage.removeItem("glupp-referral-code");
+        } catch (refErr) {
+          // Ne pas bloquer l'inscription si le parrainage échoue
+          console.error("Erreur parrainage:", refErr);
+        }
+      }
+
+      // 4. Afficher l'écran de succès
       setIsSuccess(true);
     } catch (err: any) {
       setError("Une erreur est survenue lors de l'inscription.");
@@ -109,7 +140,6 @@ export default function RegisterPage() {
     </div>
   );
 
-  // 👈 Écran de succès affiché après l'inscription
   if (isSuccess) {
     return (
       <div className="text-center space-y-6 py-8 animate-in fade-in zoom-in duration-500">
@@ -122,6 +152,11 @@ export default function RegisterPage() {
             Ton compte a été créé avec succès.<br/><br/>
             <strong className="text-glupp-cream">Va vérifier tes emails</strong> et clique sur le lien pour confirmer ton compte et pouvoir te connecter !
           </p>
+          {referralCode && (
+            <p className="text-glupp-accent text-xs mt-3">
+              🎁 +25 XP de bienvenue grâce à ton parrain !
+            </p>
+          )}
         </div>
         <Button 
           variant="primary" 
@@ -134,9 +169,18 @@ export default function RegisterPage() {
     );
   }
 
-  // 👇 Le formulaire normal si on n'est pas en succès
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Referral badge */}
+      {referralCode && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-glupp-accent/10 border border-glupp-accent/30 rounded-xl">
+          <Gift size={14} className="text-glupp-accent shrink-0" />
+          <p className="text-xs text-glupp-accent">
+            Tu as été invité ! <span className="font-semibold">+25 XP offerts</span> à l&apos;inscription.
+          </p>
+        </div>
+      )}
+
       <div>
         <label htmlFor="username" className="block text-sm text-glupp-text-soft mb-1">
           Pseudo
@@ -185,6 +229,7 @@ export default function RegisterPage() {
         
         <div className="mt-2 p-3 bg-glupp-bg/50 rounded-lg space-y-1.5 border border-glupp-border/50">
           <PasswordRule isValid={hasMinLength} text="Au moins 8 caractères" />
+          <PasswordRule isValid={hasUppercase} text="Au moins 1 majuscule" />
           <PasswordRule isValid={hasNumber} text="Au moins 1 chiffre" />
           <PasswordRule isValid={hasSpecialChar} text="Au moins 1 caractère spécial (!@#...)" />
         </div>
@@ -226,7 +271,7 @@ export default function RegisterPage() {
             </svg>
           </div>
           <span className="text-sm text-glupp-text-soft group-hover:text-glupp-cream transition-colors leading-tight">
-            Je certifie avoir plus de 18 ans et l'âge légal pour consommer de l'alcool dans mon pays de résidence.
+            Je certifie avoir plus de 18 ans et l&apos;âge légal pour consommer de l&apos;alcool dans mon pays de résidence.
           </span>
         </label>
 
@@ -243,7 +288,7 @@ export default function RegisterPage() {
             </svg>
           </div>
           <span className="text-sm text-glupp-text-soft group-hover:text-glupp-cream transition-colors leading-tight">
-            J'accepte les <Link href="/legal/terms" target="_blank" className="text-glupp-accent hover:underline">Conditions d'Utilisation</Link> et la <Link href="/legal/privacy" target="_blank" className="text-glupp-accent hover:underline">Politique de Confidentialité</Link>.
+            J&apos;accepte les <Link href="/legal/terms" target="_blank" className="text-glupp-accent hover:underline">Conditions d&apos;Utilisation</Link> et la <Link href="/legal/privacy" target="_blank" className="text-glupp-accent hover:underline">Politique de Confidentialité</Link>.
           </span>
         </label>
       </div>
@@ -271,9 +316,8 @@ export default function RegisterPage() {
         </Link>
       </p>
 
-      {/* 🆕 Message sanitaire auth */}
       <p className="text-[10px] text-glupp-text-muted text-center mt-6 leading-relaxed border-t border-glupp-border/50 pt-4">
-        L'abus d'alcool est dangereux pour la santé, à consommer avec modération.<br />
+        L&apos;abus d&apos;alcool est dangereux pour la santé, à consommer avec modération.<br />
         Réservé aux personnes majeures.
       </p>
     </form>
