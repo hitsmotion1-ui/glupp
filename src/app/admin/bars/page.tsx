@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAdmin } from "@/lib/hooks/useAdmin";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
@@ -27,6 +27,7 @@ interface BarFormData {
   city: string;
   geo_lat: string;
   geo_lng: string;
+  google_rating: string;
 }
 
 const EMPTY_FORM: BarFormData = {
@@ -35,6 +36,7 @@ const EMPTY_FORM: BarFormData = {
   city: "",
   geo_lat: "",
   geo_lng: "",
+  google_rating: "",
 };
 
 // ═══════════════════════════════════════════
@@ -66,6 +68,14 @@ function BarFormFields({
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Auto-remplir le champ de recherche quand le nom ou la ville change
+  useEffect(() => {
+    const parts = [form.name, form.city].filter(Boolean);
+    if (parts.length > 0 && !hasSearched) {
+      setSearchQuery(parts.join(", "));
+    }
+  }, [form.name, form.city]);
+
   const handleGeoSearch = async () => {
     const query = searchQuery.trim() || `${form.name} ${form.city}`.trim();
     if (!query) return;
@@ -95,6 +105,13 @@ function BarFormFields({
     updateField("city", city);
     updateField("geo_lat", parseFloat(result.lat).toFixed(6));
     updateField("geo_lng", parseFloat(result.lon).toFixed(6));
+
+    // Si le nom du bar est vide, prendre le premier segment du résultat
+    if (!form.name.trim()) {
+      const firstPart = result.display_name.split(",")[0]?.trim();
+      if (firstPart) updateField("name", firstPart);
+    }
+
     setSearchResults([]);
     setHasSearched(false);
   };
@@ -219,6 +236,33 @@ function BarFormFields({
           />
         </div>
       </div>
+
+      {/* Google Rating */}
+      <div>
+        <label className={labelClass}>
+          ⭐ Note Google (optionnel)
+        </label>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            value={form.google_rating}
+            onChange={(e) => updateField("google_rating", e.target.value)}
+            placeholder="Ex: 4.5"
+            step="0.1"
+            min="0"
+            max="5"
+            className={`${inputClass} w-32`}
+          />
+          {form.google_rating && (
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <span key={i} className={`text-sm ${i < Math.round(parseFloat(form.google_rating)) ? "text-yellow-400" : "text-[#3A3530]"}`}>★</span>
+              ))}
+              <span className="text-xs text-[#A89888] ml-1">{form.google_rating}/5</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -258,6 +302,7 @@ export default function AdminBarsPage() {
       city: bar.city ?? "",
       geo_lat: bar.geo_lat != null ? String(bar.geo_lat) : "",
       geo_lng: bar.geo_lng != null ? String(bar.geo_lng) : "",
+      google_rating: (bar as any).google_rating != null ? String((bar as any).google_rating) : "",
     });
   }, []);
 
@@ -281,6 +326,7 @@ export default function AdminBarsPage() {
         city: form.city.trim() || null,
         geo_lat: form.geo_lat ? parseFloat(form.geo_lat) : null,
         geo_lng: form.geo_lng ? parseFloat(form.geo_lng) : null,
+        google_rating: form.google_rating ? parseFloat(form.google_rating) : null,
       });
       closeModal();
     } catch (err) {
@@ -297,6 +343,7 @@ export default function AdminBarsPage() {
         city: form.city.trim() || null,
         geo_lat: form.geo_lat ? parseFloat(form.geo_lat) : null,
         geo_lng: form.geo_lng ? parseFloat(form.geo_lng) : null,
+        google_rating: form.google_rating ? parseFloat(form.google_rating) : null,
       });
       closeModal();
     } catch (err) {
