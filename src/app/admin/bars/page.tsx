@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useAdmin } from "@/lib/hooks/useAdmin";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
@@ -276,6 +276,7 @@ export default function AdminBarsPage() {
 
   // ── Filters ──
   const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState("name");
 
   // ── Modals ──
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -285,6 +286,31 @@ export default function AdminBarsPage() {
   // ── Query: bars list ──
   const { data, isLoading } = admin.useAdminBars(search || undefined);
   const bars = data?.bars ?? [];
+
+  // ── Sorted bars ──
+  const sortedBars = useMemo(() => {
+    const sorted = [...bars];
+    switch (sortMode) {
+      case "google_oldest":
+        sorted.sort((a: any, b: any) => {
+          const aDate = a.google_rating_updated_at ? new Date(a.google_rating_updated_at).getTime() : 0;
+          const bDate = b.google_rating_updated_at ? new Date(b.google_rating_updated_at).getTime() : 0;
+          return aDate - bDate;
+        });
+        break;
+      case "google_missing":
+        sorted.sort((a: any, b: any) => {
+          const aHas = a.google_rating != null ? 1 : 0;
+          const bHas = b.google_rating != null ? 1 : 0;
+          if (aHas !== bHas) return aHas - bHas;
+          return a.name.localeCompare(b.name);
+        });
+        break;
+      default:
+        sorted.sort((a: any, b: any) => a.name.localeCompare(b.name));
+    }
+    return sorted;
+  }, [bars, sortMode]);
 
   // ── Handlers ──
   const updateField = useCallback(
@@ -411,11 +437,41 @@ export default function AdminBarsPage() {
       ),
     },
     {
+      key: "google_rating",
+      label: "Google",
+      render: (bar) => {
+        const gRating = (bar as any).google_rating;
+        const gUpdated = (bar as any).google_rating_updated_at;
+        return (
+          <div>
+            <div className="flex items-center gap-1">
+              {gRating != null ? (
+                <>
+                  <span className="text-sm font-bold text-yellow-400 tabular-nums">{Number(gRating).toFixed(1)}</span>
+                  <span className="text-yellow-400 text-xs">★</span>
+                </>
+              ) : (
+                <span className="text-[#6B6050]">&mdash;</span>
+              )}
+            </div>
+            {gUpdated && (
+              <p className="text-[9px] text-[#6B6050] mt-0.5">
+                {new Date(gUpdated).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "2-digit" })}
+              </p>
+            )}
+            {gRating != null && !gUpdated && (
+              <p className="text-[9px] text-red-400/60 mt-0.5">Pas de date</p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: "rating",
-      label: "Note",
+      label: "Glupp",
       render: (bar) => (
         <div className="flex items-center gap-1">
-          <span className="text-sm font-bold text-[#F0C460] tabular-nums">
+          <span className="text-sm font-bold text-[#E08840] tabular-nums">
             {bar.rating > 0 ? bar.rating.toFixed(1) : "\u2014"}
           </span>
           {bar.total_votes > 0 && (
@@ -523,7 +579,37 @@ export default function AdminBarsPage() {
               {data?.total ?? 0} bar{(data?.total ?? 0) > 1 ? "s" : ""}
             </span>
           )}
+
+          {/* Sort */}
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value)}
+            className="px-3 py-2 bg-[#1E1B16] border border-[#3A3530] rounded-lg text-xs text-[#A89888] focus:outline-none focus:border-[#E08840]/50 transition-colors shrink-0"
+          >
+            <option value="name">Tri: A-Z</option>
+            <option value="google_oldest">Tri: Note Google ancienne</option>
+            <option value="google_missing">Tri: Sans note Google</option>
+          </select>
         </div>
+
+        {/* Missing Google rating alert */}
+        {!isLoading && (() => {
+          const missingCount = bars.filter((b: any) => b.google_rating == null).length;
+          const outdatedCount = bars.filter((b: any) => {
+            if (!b.google_rating_updated_at) return false;
+            const days = (Date.now() - new Date(b.google_rating_updated_at).getTime()) / (1000 * 60 * 60 * 24);
+            return days > 90;
+          }).length;
+          if (missingCount === 0 && outdatedCount === 0) return null;
+          return (
+            <div className="flex items-center gap-3 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-400">
+              <span>⚠️</span>
+              {missingCount > 0 && <span>{missingCount} bar{missingCount > 1 ? "s" : ""} sans note Google</span>}
+              {missingCount > 0 && outdatedCount > 0 && <span>·</span>}
+              {outdatedCount > 0 && <span>{outdatedCount} note{outdatedCount > 1 ? "s" : ""} Google de +90 jours</span>}
+            </div>
+          );
+        })()}
 
         {/* ── Table ── */}
         {isLoading ? (
@@ -533,7 +619,7 @@ export default function AdminBarsPage() {
         ) : (
           <DataTable<Bar>
             columns={columns}
-            data={bars}
+            data={sortedBars}
             pageSize={10}
           />
         )}
