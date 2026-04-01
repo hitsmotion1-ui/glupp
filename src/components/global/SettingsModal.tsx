@@ -26,6 +26,7 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
   
   const [username, setUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarId, setAvatarId] = useState<string | null>(null);
   const [city, setCity] = useState("");
   
   const [email, setEmail] = useState("");
@@ -81,10 +82,11 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("city")
+          .select("city, avatar_id")
           .eq("id", userId)
           .single();
         if (profile?.city) setCity(profile.city);
+        if (profile?.avatar_id) setAvatarId(profile.avatar_id);
         
         if (typeof window !== "undefined" && "Notification" in window) {
            setPushEnabled(Notification.permission === "granted");
@@ -252,7 +254,9 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
             <div className="flex flex-col items-center gap-3">
               <div className="relative group">
                 <div className="w-24 h-24 rounded-full overflow-hidden bg-glupp-card border-2 border-glupp-border relative">
-                  {avatarUrl ? (
+                  {avatarId ? (
+                    <Image src={`/avatars/avatar-${avatarId}.png`} alt="Avatar" fill className="object-cover" />
+                  ) : avatarUrl ? (
                     <Image src={avatarUrl} alt="Avatar" fill className="object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-3xl bg-glupp-bg">👽</div>
