@@ -60,6 +60,7 @@ interface BarInput {
   geo_lat?: number | null;
   geo_lng?: number | null;
   is_verified?: boolean;
+  google_rating?: number | null;
 }
 
 // ═══════════════════════════════════════════
@@ -308,6 +309,7 @@ export function useAdmin() {
           city: input.city ?? null,
           geo_lat: input.geo_lat ?? null,
           geo_lng: input.geo_lng ?? null,
+          google_rating: input.google_rating ?? null,
           is_verified: false,
           rating: 0,
           total_votes: 0,
