@@ -244,8 +244,7 @@ export function useAdmin() {
 
   const approveBeerMutation = useMutation({
     mutationFn: async (beerId: string) => {
-      const { data, error } = await supabase.rpc("approve_beer", { p_beer_id: beerId });
-      if (error) throw new Error(error.message);
+    const { data, error } = await supabase.rpc("approve_beer_and_credit_xp", { p_beer_id: beerId });      if (error) throw new Error(error.message);
       return data;
     },
     onSuccess: () => {
