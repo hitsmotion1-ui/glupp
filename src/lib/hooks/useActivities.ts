@@ -110,7 +110,7 @@ export function useActivities() {
       if (activity.activity_type === "glupp" && meta.reglupp) return false;
       
       // 2. 🆕 On cache les duels du flux principal
-      if (activity.activity_type === "duel") return false;
+//      if (activity.activity_type === "duel") return false;
       
       return true;
     });
