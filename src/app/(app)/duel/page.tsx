@@ -137,8 +137,6 @@ export default function DuelPage() {
             onClose={() => setIsHistoryOpen(false)}
           />
       </div>
-
-      {/* ALL DUELS FINISHED (no more pairs) */}
       ) : hasFinishedAllDuels ? (
         <div className="flex flex-col items-center justify-center px-6 py-8 text-center">
           <motion.div
