@@ -278,14 +278,13 @@ export default function DuelPage() {
       )}
 
       {/* ⏬ SECTIONS PERMANENTES ⏬ */}
-      <p className="text-xs text-red-500 px-4">DEBUG: {recentActivities.length} activités</p>
       {/* Glupp of the Week */}
       <div className="px-4 mt-8">
         <GluppOfWeekBanner />
       </div>
 
       {/* Recent Activity */}
-      {true && (
+      {recentActivities.length > 0 && (
         <div className="mt-6 px-4 space-y-3">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-glupp-cream">
