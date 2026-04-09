@@ -1009,7 +1009,7 @@ function TasteSliders({
               className="text-xs font-bold tabular-nums w-4 text-center"
               style={{ color: dim.color }}
             >
-              {values[dim.key]}
+              {values[dim.key].toFixed(1)}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -1018,7 +1018,7 @@ function TasteSliders({
               type="range"
               min={1}
               max={5}
-              step={1}
+              step={0.5}
               value={values[dim.key]}
               onChange={(e) => onChange(dim.key, parseInt(e.target.value))}
               className="flex-1 h-2 rounded-full appearance-none cursor-pointer"

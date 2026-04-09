@@ -37,7 +37,7 @@ export function TasteProfile({
             />
           </div>
           <span className="text-xs text-glupp-text-muted w-4">
-            {values[dim.key]}
+            {Number(values[dim.key]).toFixed(1)}
           </span>
         </div>
       ))}

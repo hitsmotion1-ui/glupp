@@ -404,16 +404,16 @@ export function BeerModal() {
                         <span>{dim.emoji}</span> {dim.label}
                       </span>
                       <span className="text-[11px] font-bold tabular-nums" style={{ color: dim.color }}>
-                        {tasteDraft[dim.key]}
+                        {tasteDraft[dim.key].toFixed(1)}
                       </span>
                     </div>
                     {/* 🛠️ L'ASTUCE ICI : min est à 0 pour que 1 se place à 20%, et on utilise Math.max(1, value) */}
                     <input
                       type="range"
-                      min={0} max={5} step={1}
+                      min={0} max={5} step={0.5}
                       value={tasteDraft[dim.key]}
                       onChange={(e) => {
-                        const newValue = Math.max(1, parseInt(e.target.value));
+                        const newValue = Math.max(1, parseFloat(e.target.value));
                         setTasteDraft((prev) => ({ ...prev, [dim.key]: newValue }));
                       }}
                       className="w-full h-2 rounded-full appearance-none cursor-pointer"
