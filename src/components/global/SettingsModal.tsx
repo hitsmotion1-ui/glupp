@@ -156,7 +156,7 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
           .select("id")
           .ilike("username", username)
           .neq("id", userId)
-          .single();
+          .maybeSingle();
 
         if (existingUser) {
           setErrorMsg("Ce pseudo est déjà utilisé par un autre Glupper !");
