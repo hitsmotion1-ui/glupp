@@ -51,6 +51,9 @@ interface AppState {
   showNotifications: boolean;
   setShowNotifications: (show: boolean) => void;
 
+  highlightedActivityId: string | null;
+  setHighlightedActivityId: (id: string | null) => void;
+
   selectedTrophyId: string | null;
   openTrophyModal: (trophyId: string) => void;
   closeTrophyModal: () => void;
@@ -98,6 +101,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   showNotifications: false,
   setShowNotifications: (show) => set({ showNotifications: show }),
+
+  highlightedActivityId: null,
+  setHighlightedActivityId: (id) => set({ highlightedActivityId: id }),
 
   selectedTrophyId: null,
   openTrophyModal: (trophyId) => set({ selectedTrophyId: trophyId }),

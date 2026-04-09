@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Avatar } from "@/components/ui/Avatar";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -30,7 +31,6 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -53,15 +53,15 @@ function PersistentNotifCard({
 }: {
   notif: UnifiedNotification;
   onMarkRead: (id: string) => void;
-  onNavigate?: (path: string) => void;
+  onNavigate?: (activityId?: string) => void;
 }) {
   const p = notif.persistent!;
-
   const isClickable = ["comment", "reaction", "like"].includes(p.type);
   const handleClick = () => {
     if (isClickable && onNavigate) {
       onMarkRead(p.id);
-      onNavigate("/social");
+      const activityId = p.metadata?.activity_id as string | undefined;
+      onNavigate(activityId);
     }
   };
 
@@ -197,7 +197,7 @@ function PersistentNotifCard({
         )}
         <p className="text-[10px] text-glupp-text-muted mt-0.5">
           {timeAgo(p.created_at)}
-          {isClickable && <span className="ml-2 text-glupp-accent">Voir →</span>}
+          {isClickable && <span className="ml-2 text-glupp-accent font-medium">Voir →</span>}
         </p>
       </div>
 
@@ -222,6 +222,7 @@ export function NotificationModal() {
   const showNotifications = useAppStore((s) => s.showNotifications);
   const setShowNotifications = useAppStore((s) => s.setShowNotifications);
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
+  const setHighlightedActivityId = useAppStore((s) => s.setHighlightedActivityId);
   const router = useRouter();
 
   const { notifications, isLoading, markAsRead, markAllAsRead, celebrateUnreadApprovals } =
@@ -317,9 +318,12 @@ export function NotificationModal() {
                   <PersistentNotifCard
                     notif={notif}
                     onMarkRead={markAsRead}
-                    onNavigate={(path) => {
+                    onNavigate={(activityId) => {
+                      if (activityId) {
+                        setHighlightedActivityId(activityId);
+                      }
                       setShowNotifications(false);
-                      router.push(path);
+                      router.push("/social");
                     }}
                   />
                 ) : (
