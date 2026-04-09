@@ -99,21 +99,60 @@ export function useActivities() {
     };
   }, [queryClient]);
 
-// 🧹 FILTRAGE: On personnalise le flux
+// 🧹 FILTRAGE + REGROUPEMENT: On personnalise le flux
   const activities = useMemo(() => {
     const rawActivities = data?.pages.flatMap((page) => page) ?? [];
     
-    return rawActivities.filter((activity) => {
+    // Séparer duels et non-duels
+    const nonDuels: ActivityEntry[] = [];
+    const duelsByUser = new Map<string, ActivityEntry[]>();
+
+    for (const activity of rawActivities) {
       const meta = activity.metadata || {};
       
-      // 1. On cache les reglupps
-      if (activity.activity_type === "glupp" && meta.reglupp) return false;
+      // Cacher les reglupps
+      if (activity.activity_type === "glupp" && meta.reglupp) continue;
       
-      // 2. 🆕 On cache les duels du flux principal
-//      if (activity.activity_type === "duel") return false;
-      
-      return true;
+      if (activity.activity_type === "duel") {
+        // Regrouper les duels par user
+        const key = activity.user_id;
+        if (!duelsByUser.has(key)) duelsByUser.set(key, []);
+        duelsByUser.get(key)!.push(activity);
+      } else {
+        nonDuels.push(activity);
+      }
+    }
+
+    // Créer des entrées groupées pour les duels
+    const groupedDuels: ActivityEntry[] = [];
+    duelsByUser.forEach((duels, userId) => {
+      if (duels.length === 0) return;
+      // Prendre le duel le plus récent comme base et ajouter les infos de groupe dans metadata
+      const mostRecent = duels[0]; // déjà trié par date DESC
+      const groupedEntry: ActivityEntry = {
+        ...mostRecent,
+        activity_type: "duel_group",
+        metadata: {
+          ...mostRecent.metadata,
+          duels: duels.slice(0, 5).map(d => ({
+            beer_id: d.beer_id,
+            beer_name: d.beer_data?.name || "?",
+            beer_style: d.beer_data?.style || "",
+            beer_country: d.beer_data?.country || "",
+            loser_id: (d.metadata as any)?.loser,
+          })),
+          total_duels: duels.length,
+        },
+      };
+      groupedDuels.push(groupedEntry);
     });
+
+    // Fusionner : glupps/trophées/level_up d'abord, puis duels groupés intercalés
+    const merged = [...nonDuels, ...groupedDuels];
+    // Re-trier par date
+    merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return merged;
   }, [data]);
 
   return {

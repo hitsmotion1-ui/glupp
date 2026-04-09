@@ -74,6 +74,90 @@ function DuelContent({ activity }: { activity: ActivityEntry }) {
   );
 }
 
+function DuelGroupContent({ activity }: { activity: ActivityEntry }) {
+  const openBeerModal = useAppStore((s) => s.openBeerModal);
+  const meta = activity.metadata as Record<string, unknown>;
+  const duels = (meta.duels as Array<{
+    beer_id: string;
+    beer_name: string;
+    beer_style: string;
+    beer_country: string;
+    loser_id: string;
+  }>) || [];
+  const totalDuels = (meta.total_duels as number) || duels.length;
+
+  // Fetch loser beer names
+  const loserIds = duels.map(d => d.loser_id).filter(Boolean);
+  const { data: loserBeers = [] } = useQuery({
+    queryKey: ["loser-beers", ...loserIds],
+    queryFn: async () => {
+      if (loserIds.length === 0) return [];
+      const { data } = await supabase
+        .from("beers")
+        .select("id, name, style, country")
+        .in("id", loserIds);
+      return data || [];
+    },
+    enabled: loserIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loserMap = new Map(loserBeers.map((b: any) => [b.id, b]));
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-glupp-cream">
+        <Swords size={14} className="inline text-glupp-accent mr-1" />
+        a fait <span className="font-semibold text-glupp-accent">{totalDuels} duel{totalDuels > 1 ? "s" : ""}</span>
+      </p>
+      <div className="space-y-1.5">
+        {duels.map((duel, i) => {
+          const loser = loserMap.get(duel.loser_id);
+          return (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-glupp-bg/50 rounded-lg text-xs"
+            >
+              {/* Winner */}
+              <button
+                onClick={() => openBeerModal(duel.beer_id)}
+                className="flex items-center gap-1 font-semibold text-glupp-gold hover:underline truncate flex-1 min-w-0"
+              >
+                <span className="text-[10px]">{beerEmoji(duel.beer_style)}</span>
+                <span className="truncate">{duel.beer_name}</span>
+              </button>
+
+              {/* VS */}
+              <span className="text-[9px] text-glupp-text-muted font-bold shrink-0 px-1">VS</span>
+
+              {/* Loser */}
+              {loser ? (
+                <button
+                  onClick={() => openBeerModal(duel.loser_id)}
+                  className="flex items-center gap-1 text-glupp-text-muted hover:text-glupp-cream truncate flex-1 min-w-0 justify-end opacity-50"
+                >
+                  <span className="truncate">{loser.name}</span>
+                  <span className="text-[10px]">{beerEmoji(loser.style)}</span>
+                </button>
+              ) : (
+                <span className="text-glupp-text-muted opacity-40 truncate flex-1 text-right">...</span>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+      {totalDuels > 5 && (
+        <p className="text-[10px] text-glupp-text-muted text-center">
+          + {totalDuels - 5} autre{totalDuels - 5 > 1 ? "s" : ""} duel{totalDuels - 5 > 1 ? "s" : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TrophyContent({ activity }: { activity: ActivityEntry }) {
   const meta = activity.metadata as Record<string, unknown>;
   return (
@@ -155,12 +239,6 @@ const { profile } = useProfile();
   // 👈 État pour la modale de signalement
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handler = (e: Event) => { e.stopImmediatePropagation(); setLightboxUrl((e as CustomEvent).detail); };
-    window.addEventListener('glupp-lightbox', handler);
-    return () => window.removeEventListener('glupp-lightbox', handler);
-  }, []);
 
   // ==========================================
   // 🔌 ÉCOUTEUR TEMPS RÉEL (Spécifique à CETTE carte)
@@ -265,6 +343,7 @@ const { profile } = useProfile();
     switch (activity.activity_type) {
       case "glupp": return <GluppContent activity={activity} />;
       case "duel": return <DuelContent activity={activity} />;
+      case "duel_group": return <DuelGroupContent activity={activity} />;
       case "trophy": return <TrophyContent activity={activity} />;
       case "level_up": return <LevelUpContent activity={activity} />;
       case "crew_event_checkin": return <CrewCheckinContent activity={activity} />;
