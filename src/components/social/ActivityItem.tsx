@@ -156,12 +156,6 @@ const { profile } = useProfile();
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handler = (e: Event) => setLightboxUrl((e as CustomEvent).detail);
-    window.addEventListener('glupp-lightbox', handler);
-    return () => window.removeEventListener('glupp-lightbox', handler);
-  }, []);
-
   // ==========================================
   // 🔌 ÉCOUTEUR TEMPS RÉEL (Spécifique à CETTE carte)
   // ==========================================
