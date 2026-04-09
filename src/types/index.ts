@@ -86,12 +86,14 @@ export interface Profile {
 export interface UserAdminDetail {
   profile: Profile & { is_admin?: boolean };
   recent_beers: {
+    beer_id?: string;
     beer_name: string;
     brewery: string;
     style: string;
     rarity: Rarity;
     tasted_at: string;
     rating: number | null;
+    photo_url?: string | null;
   }[];
   trophies: {
     name: string;
@@ -100,6 +102,21 @@ export interface UserAdminDetail {
     xp_reward: number;
     completed_at: string | null;
   }[];
+  recent_activity?: {
+    id: string;
+    activity_type: string;
+    beer_name: string | null;
+    beer_id: string | null;
+    photo_url: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+  }[];
+  stats?: {
+    glupps_today: number;
+    glupps_week: number;
+    duels_today: number;
+    total_beers: number;
+  };
 }
 
 // ─── Bar ───
