@@ -210,8 +210,6 @@ export function OnboardingFlow() {
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>("curieux");
   const [city, setCity] = useState("");
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
-  const [city, setCity] = useState("");
-  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   
   const { avatars, loading: avatarsLoading } = useAvatars(userId, 0);
   const freeAvatars = avatars.filter((a) => a.unlock_type === "free");
