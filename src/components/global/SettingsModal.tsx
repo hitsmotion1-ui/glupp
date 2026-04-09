@@ -167,8 +167,9 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
 
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ 
-          username, 
+       .update({ 
+          username,
+          display_name: username,
           avatar_url: avatarUrl,
           city,
           updated_at: new Date().toISOString()
