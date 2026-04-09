@@ -8,7 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { RarityBadge } from "@/components/beer/RarityBadge";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { beerEmoji } from "@/lib/utils/xp";
-import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2, Flag, Camera, Users } from "lucide-react";
+import { Swords, Trophy, TrendingUp, MessageCircle, Send, Loader2, Flag, Camera, Users, X } from "lucide-react";
 import type { ActivityEntry } from "@/lib/hooks/useActivities";
 import type { Rarity } from "@/types";
 import { ReportModal } from "@/components/global/ReportModal"; // 👈 L'import de la modale
@@ -54,9 +54,9 @@ function GluppContent({ activity }: { activity: ActivityEntry }) {
         {xp > 0 && <span className="text-xs font-medium text-glupp-accent">+{xp} XP</span>}
       </div>
       {activity.photo_url && (
-        <a href={activity.photo_url} target="_blank" rel="noopener noreferrer" className="block mt-2 rounded-glupp overflow-hidden">
+        <button onClick={() => window.dispatchEvent(new CustomEvent('glupp-lightbox', { detail: activity.photo_url }))} className="block mt-2 rounded-glupp overflow-hidden w-full">
           <img src={activity.photo_url} alt="Photo glupp" className="w-full max-h-52 object-cover hover:opacity-90 transition-opacity" />
-        </a>
+        </button>
       )}
     </div>
   );
@@ -134,9 +134,9 @@ function CrewCheckinContent({ activity }: { activity: ActivityEntry }) {
         </p>
       )}
       {activity.photo_url && (
-        <a href={activity.photo_url} target="_blank" rel="noopener noreferrer" className="block mt-2 rounded-glupp overflow-hidden">
+        <button onClick={() => window.dispatchEvent(new CustomEvent('glupp-lightbox', { detail: activity.photo_url }))} className="block mt-2 rounded-glupp overflow-hidden w-full text-left">
           <img src={activity.photo_url} alt="Photo de la sortie" className="w-full max-h-64 object-cover hover:opacity-90 transition-opacity rounded-glupp" />
-        </a>
+        </button>
       )}
     </div>
   );
@@ -154,6 +154,13 @@ const { profile } = useProfile();
   
   // 👈 État pour la modale de signalement
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => setLightboxUrl((e as CustomEvent).detail);
+    window.addEventListener('glupp-lightbox', handler);
+    return () => window.removeEventListener('glupp-lightbox', handler);
+  }, []);
 
   // ==========================================
   // 🔌 ÉCOUTEUR TEMPS RÉEL (Spécifique à CETTE carte)
@@ -373,6 +380,27 @@ const { profile } = useProfile();
         activityId={activity.id}
         reportedUserId={activity.user_id}
       />
+
+      {/* Lightbox photo */}
+      {lightboxUrl && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button 
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-black/50 rounded-full z-10"
+          >
+            <X size={24} />
+          </button>
+          <img 
+            src={lightboxUrl} 
+            alt="Photo" 
+            className="max-w-full max-h-[85vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 }
