@@ -30,6 +30,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -48,11 +49,21 @@ function timeAgo(dateStr: string): string {
 function PersistentNotifCard({
   notif,
   onMarkRead,
+  onNavigate,
 }: {
   notif: UnifiedNotification;
   onMarkRead: (id: string) => void;
+  onNavigate?: (path: string) => void;
 }) {
   const p = notif.persistent!;
+
+  const isClickable = ["comment", "reaction", "like"].includes(p.type);
+  const handleClick = () => {
+    if (isClickable && onNavigate) {
+      onMarkRead(p.id);
+      onNavigate("/social");
+    }
+  };
 
   const configMap: Record<
     string,
@@ -142,9 +153,10 @@ function PersistentNotifCard({
 
   return (
     <div
+      onClick={isClickable ? handleClick : undefined}
       className={`relative flex items-start gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp border-l-2 ${config.accentBorder} ${
         !p.is_read ? "bg-glupp-accent/5" : ""
-      }`}
+      } ${isClickable ? "cursor-pointer hover:bg-glupp-accent/5 transition-colors" : ""}`}
     >
       <div className="relative shrink-0">
         <div
@@ -185,6 +197,7 @@ function PersistentNotifCard({
         )}
         <p className="text-[10px] text-glupp-text-muted mt-0.5">
           {timeAgo(p.created_at)}
+          {isClickable && <span className="ml-2 text-glupp-accent">Voir →</span>}
         </p>
       </div>
 
@@ -209,6 +222,7 @@ export function NotificationModal() {
   const showNotifications = useAppStore((s) => s.showNotifications);
   const setShowNotifications = useAppStore((s) => s.setShowNotifications);
   const openUserProfileModal = useAppStore((s) => s.openUserProfileModal);
+  const router = useRouter();
 
   const { notifications, isLoading, markAsRead, markAllAsRead, celebrateUnreadApprovals } =
     useNotifications();
@@ -303,6 +317,10 @@ export function NotificationModal() {
                   <PersistentNotifCard
                     notif={notif}
                     onMarkRead={markAsRead}
+                    onNavigate={(path) => {
+                      setShowNotifications(false);
+                      router.push(path);
+                    }}
                   />
                 ) : (
                   <div className="flex items-start gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp">
