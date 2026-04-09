@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useAdmin } from "@/lib/hooks/useAdmin";
+import { supabase } from "@/lib/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { getLevel, getLevelProgress, getNextLevel } from "@/lib/utils/xp";
 import type { Profile } from "@/types";
 import {
@@ -20,6 +22,10 @@ import {
   Camera,
   Calendar,
   Trophy,
+  Plus,
+  Trash2,
+  Activity,
+  MessageSquare,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -76,8 +82,39 @@ export default function UsersPage() {
   // ── Detail panel ──
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
+  // ── Add beer modal ──
+  const [showAddBeerModal, setShowAddBeerModal] = useState(false);
+  const [addBeerSearch, setAddBeerSearch] = useState("");
+  const [addBeerComment, setAddBeerComment] = useState("");
+  const [addBeerError, setAddBeerError] = useState<string | null>(null);
+
+  // ── Remove beer modal ──
+  const [removeBeerTarget, setRemoveBeerTarget] = useState<{ beerId: string; beerName: string } | null>(null);
+  const [removeBeerComment, setRemoveBeerComment] = useState("");
+
+  // ── Activity tab in detail panel ──
+  const [detailTab, setDetailTab] = useState<"beerdex" | "activity" | "trophies">("beerdex");
+
   const { data: users = [], isLoading, isError, error } = admin.useAdminUsers(debouncedSearch || undefined);
   const { data: userDetail, isLoading: loadingDetail } = admin.useUserAdminDetail(selectedUserId);
+
+  // ── Beer search for add-to-beerdex ──
+  const { data: beerSearchResults = [] } = useQuery({
+    queryKey: ["admin", "beer-search", addBeerSearch],
+    queryFn: async () => {
+      if (addBeerSearch.trim().length < 2) return [];
+      const { data } = await supabase
+        .from("beers")
+        .select("id, name, brewery, rarity, country")
+        .eq("status", "approved")
+        .or(`name.ilike.%${addBeerSearch}%,brewery.ilike.%${addBeerSearch}%`)
+        .order("name")
+        .limit(10);
+      return data || [];
+    },
+    enabled: addBeerSearch.trim().length >= 2,
+    staleTime: 10 * 1000,
+  });
 
   // ─── Search with debounce ────────────────
 
@@ -475,47 +512,144 @@ export default function UsersPage() {
                   ))}
                 </div>
 
-                {/* Dernières bières */}
-                <div>
-                  <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-3">
-                    Dernières bières
-                  </h4>
-                  {userDetail.recent_beers.length === 0 ? (
-                    <p className="text-xs text-[#6B6050] italic">Aucune bière goûtée</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {userDetail.recent_beers.map((b, i) => (
-                        <div key={i} className="flex items-center gap-2.5 p-2.5 bg-[#141210] rounded-lg">
-                          <span className="text-base shrink-0">{RARITY_EMOJI[b.rarity] ?? "⚪"}</span>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium text-[#F5E6D3] truncate">{b.beer_name}</p>
-                            <p className="text-[10px] text-[#6B6050] truncate">{b.brewery}</p>
-                          </div>
-                          <span className="text-[10px] text-[#6B6050] shrink-0">{timeAgo(b.tasted_at)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                {/* Stats alerte (glupps/jour) */}
+                {userDetail.stats && (
+                  <div className="flex flex-wrap gap-2 text-[10px]">
+                    <span className="px-2 py-1 bg-[#141210] rounded text-[#A89888]">
+                      Aujourd&apos;hui : {userDetail.stats.glupps_today} glupps · {userDetail.stats.duels_today} duels
+                    </span>
+                    <span className="px-2 py-1 bg-[#141210] rounded text-[#A89888]">
+                      7j : {userDetail.stats.glupps_week} glupps
+                    </span>
+                    {userDetail.stats.glupps_today > 10 && (
+                      <span className="px-2 py-1 bg-red-500/15 rounded text-red-400 font-semibold">
+                        ⚠️ Activité suspecte
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Tabs */}
+                <div className="flex bg-[#141210] rounded-lg p-0.5 border border-[#3A3530]">
+                  {[
+                    { key: "beerdex" as const, label: "Beerdex", icon: Beer },
+                    { key: "activity" as const, label: "Activité", icon: Activity },
+                    { key: "trophies" as const, label: "Trophées", icon: Trophy },
+                  ].map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setDetailTab(key)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-semibold rounded-md transition-colors ${
+                        detailTab === key ? "bg-[#3A3530] text-[#F5E6D3]" : "text-[#6B6050] hover:text-[#A89888]"
+                      }`}
+                    >
+                      <Icon size={11} />
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Trophées */}
-                <div>
-                  <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-3">
-                    Trophées ({userDetail.trophies.length})
-                  </h4>
-                  {userDetail.trophies.length === 0 ? (
-                    <p className="text-xs text-[#6B6050] italic">Aucun trophée obtenu</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {userDetail.trophies.map((t, i) => (
-                        <div key={i} className="flex items-center gap-2 p-2 bg-[#141210] rounded-lg">
-                          <span className="text-lg shrink-0">{t.emoji}</span>
-                          <p className="text-[10px] font-medium text-[#F5E6D3] leading-tight">{t.name}</p>
-                        </div>
-                      ))}
+                {/* Tab: Beerdex */}
+                {detailTab === "beerdex" && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider">
+                        Beerdex ({userDetail.stats?.total_beers || userDetail.recent_beers.length})
+                      </h4>
+                      <button
+                        onClick={() => { setShowAddBeerModal(true); setAddBeerSearch(""); setAddBeerComment(""); setAddBeerError(null); }}
+                        className="flex items-center gap-1 px-2 py-1 bg-[#E08840]/10 text-[#E08840] text-[10px] font-semibold rounded-lg hover:bg-[#E08840]/20 transition-colors"
+                      >
+                        <Plus size={10} />
+                        Ajouter
+                      </button>
                     </div>
-                  )}
-                </div>
+                    {userDetail.recent_beers.length === 0 ? (
+                      <p className="text-xs text-[#6B6050] italic">Aucune bière goûtée</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {userDetail.recent_beers.map((b: any, i: number) => (
+                          <div key={i} className="flex items-center gap-2 p-2 bg-[#141210] rounded-lg group">
+                            <span className="text-sm shrink-0">{RARITY_EMOJI[b.rarity] ?? "⚪"}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-medium text-[#F5E6D3] truncate">{b.beer_name}</p>
+                              <p className="text-[9px] text-[#6B6050] truncate">{b.brewery}</p>
+                            </div>
+                            <span className="text-[9px] text-[#6B6050] shrink-0">{timeAgo(b.tasted_at)}</span>
+                            <button
+                              onClick={() => setRemoveBeerTarget({ beerId: b.beer_id, beerName: b.beer_name })}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-[#6B6050] hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
+                              title="Retirer du beerdex"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Activity */}
+                {detailTab === "activity" && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-3">
+                      Activité récente
+                    </h4>
+                    {userDetail.recent_activity && userDetail.recent_activity.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {userDetail.recent_activity.map((a: any, i: number) => (
+                          <div key={i} className="flex items-start gap-2 p-2 bg-[#141210] rounded-lg">
+                            <span className="text-sm shrink-0 mt-0.5">
+                              {a.activity_type === "glupp" ? "🍺" : a.activity_type === "duel" ? "⚔️" : a.activity_type === "trophy" ? "🏆" : a.activity_type === "level_up" ? "📈" : "📌"}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] text-[#F5E6D3]">
+                                <span className="font-semibold capitalize">{a.activity_type}</span>
+                                {a.beer_name && <span className="text-[#E08840]"> — {a.beer_name}</span>}
+                              </p>
+                              {a.metadata && (
+                                <p className="text-[9px] text-[#6B6050] truncate">
+                                  {a.metadata.xp ? `+${a.metadata.xp} XP` : ""}
+                                  {a.metadata.bar ? ` · ${a.metadata.bar}` : ""}
+                                  {a.metadata.trophy_name ? a.metadata.trophy_name : ""}
+                                  {a.metadata.level_name ? `Niveau ${a.metadata.level_name}` : ""}
+                                </p>
+                              )}
+                            </div>
+                            <span className="text-[9px] text-[#6B6050] shrink-0">{timeAgo(a.created_at)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#6B6050] italic">Aucune activité</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Trophées */}
+                {detailTab === "trophies" && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-3">
+                      Trophées ({userDetail.trophies.length})
+                    </h4>
+                    {userDetail.trophies.length === 0 ? (
+                      <p className="text-xs text-[#6B6050] italic">Aucun trophée obtenu</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {userDetail.trophies.map((t: any, i: number) => (
+                          <div key={i} className="flex items-center gap-2 p-2 bg-[#141210] rounded-lg">
+                            <span className="text-lg shrink-0">{t.emoji}</span>
+                            <div>
+                              <p className="text-[10px] font-medium text-[#F5E6D3] leading-tight">{t.name}</p>
+                              {t.completed_at && <p className="text-[8px] text-[#6B6050]">{timeAgo(t.completed_at)}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Actions rapides */}
                 <div className="border-t border-[#3A3530] pt-4 space-y-2">
@@ -527,7 +661,7 @@ export default function UsersPage() {
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-[#F0C460]/10 hover:bg-[#F0C460]/20 text-[#F0C460] text-sm font-semibold rounded-lg transition-colors"
                   >
                     <SlidersHorizontal size={14} />
-                    Ajuster l'XP
+                    Ajuster l&apos;XP
                   </button>
                   <button
                     onClick={() => {
@@ -686,6 +820,138 @@ export default function UsersPage() {
                   <SlidersHorizontal size={14} />
                 )}
                 {Number(xpAmount) < 0 ? "Retirer" : "Attribuer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Add Beer to User Modal                     */}
+      {/* ═══════════════════════════════════════════ */}
+      {showAddBeerModal && selectedUserId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAddBeerModal(false)} />
+          <div className="relative w-full max-w-md bg-[#1E1B16] border border-[#3A3530] rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#3A3530]">
+              <div>
+                <h2 className="text-base font-bold text-[#F5E6D3]">Ajouter une bière</h2>
+                <p className="text-xs text-[#6B6050] mt-0.5">au beerdex de {selectedUser?.username}</p>
+              </div>
+              <button onClick={() => setShowAddBeerModal(false)} className="w-8 h-8 rounded-lg text-[#A89888] hover:text-[#F5E6D3] hover:bg-[#3A3530] flex items-center justify-center transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {addBeerError && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+                  <AlertTriangle size={14} className="shrink-0" />
+                  <span>{addBeerError}</span>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-1.5">Rechercher une bière</label>
+                <input
+                  type="text"
+                  value={addBeerSearch}
+                  onChange={(e) => setAddBeerSearch(e.target.value)}
+                  placeholder="Nom ou brasserie..."
+                  className="w-full px-3 py-2.5 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 transition-colors"
+                />
+              </div>
+              {beerSearchResults.length > 0 && (
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {beerSearchResults.map((beer: any) => (
+                    <button
+                      key={beer.id}
+                      onClick={async () => {
+                        setAddBeerError(null);
+                        try {
+                          await admin.addBeerToUser(selectedUserId!, beer.id, addBeerComment.trim() || undefined);
+                          setShowAddBeerModal(false);
+                        } catch (err) {
+                          setAddBeerError(err instanceof Error ? err.message : "Erreur");
+                        }
+                      }}
+                      disabled={admin.addingBeerToUser}
+                      className="w-full flex items-center gap-2.5 p-2.5 bg-[#141210] rounded-lg text-left hover:bg-[#E08840]/10 hover:border-[#E08840]/30 border border-transparent transition-colors disabled:opacity-50"
+                    >
+                      <span className="text-sm">{RARITY_EMOJI[beer.rarity] ?? "⚪"}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-[#F5E6D3] truncate">{beer.country} {beer.name}</p>
+                        <p className="text-[10px] text-[#6B6050] truncate">{beer.brewery}</p>
+                      </div>
+                      <Plus size={14} className="text-[#E08840] shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-1.5">Commentaire (optionnel)</label>
+                <input
+                  type="text"
+                  value={addBeerComment}
+                  onChange={(e) => setAddBeerComment(e.target.value)}
+                  placeholder="Raison de l'ajout..."
+                  className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* Remove Beer Confirmation Modal              */}
+      {/* ═══════════════════════════════════════════ */}
+      {removeBeerTarget && selectedUserId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setRemoveBeerTarget(null)} />
+          <div className="relative w-full max-w-sm bg-[#1E1B16] border border-[#3A3530] rounded-2xl shadow-2xl p-6 space-y-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Trash2 size={20} className="text-red-400" />
+              </div>
+              <h3 className="font-bold text-[#F5E6D3]">Retirer du Beerdex</h3>
+              <p className="text-xs text-[#A89888] mt-1">
+                Retirer <span className="text-[#E08840] font-semibold">{removeBeerTarget.beerName}</span> du beerdex de {selectedUser?.username} ? L&apos;XP correspondante sera retirée.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#A89888] uppercase tracking-wider mb-1.5">
+                <MessageSquare size={10} className="inline mr-1" />
+                Commentaire pour l&apos;utilisateur
+              </label>
+              <input
+                type="text"
+                value={removeBeerComment}
+                onChange={(e) => setRemoveBeerComment(e.target.value)}
+                placeholder="Ex: Bière ajoutée par erreur"
+                className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-red-500/50 transition-colors"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setRemoveBeerTarget(null); setRemoveBeerComment(""); }}
+                className="flex-1 px-4 py-2.5 text-sm text-[#A89888] hover:text-[#F5E6D3] rounded-lg transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await admin.removeBeerFromUser(selectedUserId!, removeBeerTarget.beerId, removeBeerComment.trim() || undefined);
+                    setRemoveBeerTarget(null);
+                    setRemoveBeerComment("");
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
+                disabled={admin.removingBeerFromUser}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {admin.removingBeerFromUser ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Retirer
               </button>
             </div>
           </div>

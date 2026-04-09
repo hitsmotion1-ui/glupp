@@ -691,6 +691,40 @@ export function useAdmin() {
     },
   });
 
+  // ── Admin: Add beer to user beerdex ──
+  const addBeerToUserMutation = useMutation({
+    mutationFn: async ({ userId, beerId, comment }: { userId: string; beerId: string; comment?: string }) => {
+      const { data, error } = await supabase.rpc("admin_add_beer_to_user", {
+        p_user_id: userId,
+        p_beer_id: beerId,
+        p_comment: comment || null,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "user-detail"] });
+    },
+  });
+
+  // ── Admin: Remove beer from user beerdex ──
+  const removeBeerFromUserMutation = useMutation({
+    mutationFn: async ({ userId, beerId, comment }: { userId: string; beerId: string; comment?: string }) => {
+      const { data, error } = await supabase.rpc("admin_remove_beer_from_user", {
+        p_user_id: userId,
+        p_beer_id: beerId,
+        p_comment: comment || null,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "user-detail"] });
+    },
+  });
+
   return {
     stats,
     loadingStats,
@@ -737,5 +771,9 @@ export function useAdmin() {
     useAdminActivities,
     useAdminGlupps,
     GLUPPS_PAGE_SIZE,
+        addBeerToUser: (userId: string, beerId: string, comment?: string) => addBeerToUserMutation.mutateAsync({ userId, beerId, comment }),
+    addingBeerToUser: addBeerToUserMutation.isPending,
+    removeBeerFromUser: (userId: string, beerId: string, comment?: string) => removeBeerFromUserMutation.mutateAsync({ userId, beerId, comment }),
+    removingBeerFromUser: removeBeerFromUserMutation.isPending,
   };
 }
