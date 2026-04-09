@@ -208,7 +208,11 @@ export function OnboardingFlow() {
   const [direction, setDirection] = useState(1);
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>("curieux");
-
+  const [city, setCity] = useState("");
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  const [city, setCity] = useState("");
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  
   const { avatars, loading: avatarsLoading } = useAvatars(userId, 0);
   const freeAvatars = avatars.filter((a) => a.unlock_type === "free");
 
@@ -241,6 +245,19 @@ export function OnboardingFlow() {
     checkOnboarding();
   }, []);
 
+  // Autocomplétion ville via API Géo gouv
+  useEffect(() => {
+    if (city.length < 2) { setCitySuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://geo.api.gouv.fr/communes?nom=${city}&fields=departement&boost=population&limit=5`);
+        const data = await res.json();
+        setCitySuggestions(data.map((c: any) => `${c.nom} (${c.departement?.code || ''})`));
+      } catch { /* ignore */ }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [city]);
+
   const handleNext = () => {
     if (step < TOTAL_SLIDES - 1) {
       setDirection(1);
@@ -265,7 +282,11 @@ export function OnboardingFlow() {
       if (user) {
         await supabase
           .from("profiles")
-          .update({ has_seen_onboarding: true, avatar_id: selectedAvatarId })
+          .update({ 
+            has_seen_onboarding: true, 
+            avatar_id: selectedAvatarId,
+            city: city.trim() || null,
+          })
           .eq("id", user.id);
       }
     } catch {
@@ -378,6 +399,33 @@ export function OnboardingFlow() {
                       })}
                     </div>
                   )}
+
+                  {/* Ville */}
+                  <div className="mt-6 max-w-xs mx-auto text-left relative">
+                    <label className="text-xs text-glupp-text-muted mb-1 block">📍 Ta ville</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => { setCity(e.target.value); setCitySuggestions([]); }}
+                      placeholder="Ex: Nantes, Lyon, Paris..."
+                      className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
+                    />
+                    {citySuggestions.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-glupp-card border border-glupp-border rounded-glupp overflow-hidden shadow-lg">
+                        {citySuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => { setCity(s); setCitySuggestions([]); }}
+                            className="w-full text-left px-3 py-2 text-sm text-glupp-cream hover:bg-glupp-accent/10 transition-colors"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-glupp-text-muted mt-1">Optionnel — pour trouver des Gluppeurs pres de chez toi</p>
+                  </div>
                 </div>
               ) : (
                 /* ═══ REGULAR SLIDES ═══ */

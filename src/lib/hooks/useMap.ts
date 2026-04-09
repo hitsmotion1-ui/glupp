@@ -18,7 +18,7 @@ export function useMap() {
   const queryClient = useQueryClient();
 
   const [mapState, setMapState] = useState<MapState>({
-    center: { lat: 46.87, lng: -1.01 }, // Par défaut : Les Herbiers !
+    center: { lat: 46.60, lng: 2.21 }, // Par défaut : centre de la France
     zoom: 13,
     userLocation: null,
     locationError: null,
