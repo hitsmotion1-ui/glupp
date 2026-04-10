@@ -10,6 +10,7 @@ import { LogOut, Camera, Loader2, Save, MapPin, Shield, User as UserIcon, Bell }
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link"; // 👈 Ajout de Link
+import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -40,8 +41,8 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🔔 État pour les notifications Push
-  const [pushEnabled, setPushEnabled] = useState(false);
+  // 🔔 Push notifications via hook
+  const { isSupported: pushSupported, isSubscribed: pushEnabled, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
 
   // 🌍 État pour l'autocomplétion des villes
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
@@ -87,10 +88,6 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
           .single();
         if (profile?.city) setCity(profile.city);
         if (profile?.avatar_id) setAvatarId(profile.avatar_id);
-        
-        if (typeof window !== "undefined" && "Notification" in window) {
-           setPushEnabled(Notification.permission === "granted");
-        }
       };
       fetchExtraData();
     }
@@ -125,21 +122,12 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
   };
 
   const handlePushToggle = async () => {
-    if (!pushEnabled) {
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-          setPushEnabled(true);
-          console.log("Permission Push accordée !");
-        } else {
-          setErrorMsg("Permission de notification refusée dans le navigateur.");
-        }
-      } catch (err) {
-         setErrorMsg("Erreur lors de la demande de permission.");
-      }
+    if (pushEnabled) {
+      const ok = await pushUnsubscribe();
+      if (!ok) setErrorMsg("Erreur lors de la désactivation des notifications.");
     } else {
-        setPushEnabled(false);
-        console.log("Push désactivé");
+      const ok = await pushSubscribe();
+      if (!ok) setErrorMsg("Permission de notification refusée ou erreur.");
     }
   };
 
