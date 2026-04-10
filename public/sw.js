@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════
-// GLUPP — Service Worker
+// GLUPP — Service Worker (PWA + Push)
 // ═══════════════════════════════════════════
 
-const CACHE_NAME = "glupp-v1";
+const CACHE_NAME = "glupp-v2";
 const STATIC_ASSETS = [
   "/",
   "/duel",
@@ -26,64 +26,87 @@ self.addEventListener("install", (event) => {
 // Activate: clean old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
+    })
   );
   self.clients.claim();
 });
 
-// Fetch: network-first for API, cache-first for static
+// Fetch: network-first, fallback to cache
 self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
+  if (event.request.method !== "GET") return;
+  if (event.request.url.includes("/api/") || event.request.url.includes("supabase")) return;
 
-  // Skip non-GET requests
-  if (request.method !== "GET") return;
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, clone);
+        });
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
+});
 
-  // Skip Supabase API calls — always network
-  if (url.hostname.includes("supabase")) return;
+// ═══════════════════════════════════════════
+// Push Notifications
+// ═══════════════════════════════════════════
 
-  // Skip auth-related
-  if (url.pathname.includes("/auth/")) return;
+self.addEventListener("push", (event) => {
+  let data = { title: "Glupp", body: "Tu as une nouvelle notification !", icon: "/icon-192x192.png", url: "/" };
 
-  // For navigation requests (pages): network-first with cache fallback
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => caches.match(request) || caches.match("/"))
-    );
-    return;
+  try {
+    if (event.data) {
+      const payload = event.data.json();
+      data = {
+        title: payload.title || data.title,
+        body: payload.body || data.body,
+        icon: payload.icon || data.icon,
+        url: payload.url || data.url,
+      };
+    }
+  } catch (e) {
+    if (event.data) {
+      data.body = event.data.text();
+    }
   }
 
-  // For static assets (JS, CSS, images): cache-first
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    url.pathname.endsWith(".png") ||
-    url.pathname.endsWith(".svg") ||
-    url.pathname.endsWith(".woff2")
-  ) {
-    event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-            return response;
-          })
-      )
-    );
-    return;
-  }
+  const options = {
+    body: data.body,
+    icon: data.icon,
+    badge: "/icon-192x192.png",
+    vibrate: [100, 50, 100],
+    data: { url: data.url },
+    actions: [
+      { action: "open", title: "Ouvrir" },
+    ],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Clic sur la notification
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.includes("glupp.fr") && "focus" in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
 });
