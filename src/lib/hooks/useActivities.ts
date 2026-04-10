@@ -114,6 +114,9 @@ export function useActivities() {
       if (activity.activity_type === "glupp" && meta.reglupp) continue;
       
       if (activity.activity_type === "duel") {
+        // Ne garder que les duels du jour
+        const isToday = new Date(activity.created_at).toDateString() === new Date().toDateString();
+        if (!isToday) continue;
         // Regrouper les duels par user
         const key = activity.user_id;
         if (!duelsByUser.has(key)) duelsByUser.set(key, []);
@@ -134,7 +137,7 @@ export function useActivities() {
         activity_type: "duel_group",
         metadata: {
           ...mostRecent.metadata,
-          duels: duels.slice(0, 5).map(d => ({
+          duels: duels.slice(0, 3).map(d => ({
             beer_id: d.beer_id,
             beer_name: d.beer_data?.name || "?",
             beer_style: d.beer_data?.style || "",
