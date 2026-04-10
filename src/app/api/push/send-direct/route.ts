@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import webpush from "web-push";
 
-webpush.setVapidDetails(
-  "mailto:contact@glupp.fr",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+const webpush = require("web-push");
 
 export async function POST(request: NextRequest) {
   try {
+    webpush.setVapidDetails(
+      "mailto:contact@glupp.fr",
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+      process.env.VAPID_PRIVATE_KEY!
+    );
+
     const { endpoint, p256dh, auth, payload } = await request.json();
 
     if (!endpoint || !p256dh || !auth || !payload) {
