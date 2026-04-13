@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase/client";
 import { BEER_STYLES } from "@/lib/utils/beerDefaults";
 import { getRegionSuggestions } from "@/lib/utils/regionSuggestions";
 import { beerEmoji } from "@/lib/utils/xp";
-import { Beer, Send, CheckCircle, ChevronDown, Search, Loader2, AlertTriangle, Camera, X, Clock } from "lucide-react";
+import { Beer, Send, CheckCircle, ChevronDown, Search, Loader2, AlertTriangle, Camera, X, Clock, MapPin, Navigation } from "lucide-react";
 
 const COUNTRIES = [
   { code: "FR", flag: "\u{1F1EB}\u{1F1F7}", name: "France" },
@@ -64,6 +64,13 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
   const [error, setError] = useState<string | null>(null);
   const [wantsToGlupp, setWantsToGlupp] = useState(false);
 
+  // Géolocalisation pour le glupp
+  const [geoLat, setGeoLat] = useState<number | null>(null);
+  const [geoLng, setGeoLng] = useState<number | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoCity, setGeoCity] = useState<string | null>(null);
+
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
   const [showDuplicateCheck, setShowDuplicateCheck] = useState(false);
   const [checkedDuplicates, setCheckedDuplicates] = useState(false);
@@ -92,10 +99,42 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
       setCheckedDuplicates(false);
       setSubmitted(false);
       setWantsToGlupp(false);
+      setGeoLat(null);
+      setGeoLng(null);
+      setGeoLoading(false);
+      setGeoError(null);
+      setGeoCity(null);
     }
   }, [isOpen, prefillName, prefillBarcode]);
 
   const selectedCountry = COUNTRIES.find((c) => c.code === countryCode) || COUNTRIES[0];
+
+  // Demander la géolocalisation quand l'user active le glupp
+  useEffect(() => {
+    if (wantsToGlupp && !geoLat && !geoLoading) {
+      setGeoLoading(true);
+      setGeoError(null);
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          setGeoLat(pos.coords.latitude);
+          setGeoLng(pos.coords.longitude);
+          // Reverse geocode pour afficher la ville
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&accept-language=fr`);
+            const data = await res.json();
+            const city = data.address?.city || data.address?.town || data.address?.village || null;
+            setGeoCity(city);
+          } catch { /* ignore */ }
+          setGeoLoading(false);
+        },
+        () => {
+          setGeoError("Localisation refusée");
+          setGeoLoading(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  }, [wantsToGlupp, geoLat, geoLoading]);
   const regionSuggestions = useMemo(() => getRegionSuggestions(countryCode), [countryCode]);
 
   const filteredStyles = useMemo(() => {
@@ -162,13 +201,39 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
 
       const beer = await addBeer(input);
 
-      // Stocker le flag wants_glupp dans la biere
-      // Le glupp sera declenche automatiquement quand l'admin validera
+      // Si l'user veut glupper, enregistrer le glupp en pending
       if (wantsToGlupp && beer) {
-        await supabase
-          .from("beers")
-          .update({ wants_glupp: true })
-          .eq("id", beer.id);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Upload photo
+          let photoUrl: string | null = null;
+          if (photoFile) {
+            const timestamp = Date.now();
+            const fileExt = photoFile.name.split(".").pop() || "jpg";
+            const filePath = `${user.id}/${beer.id}_${timestamp}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+              .from("glupp-photos")
+              .upload(filePath, photoFile, { cacheControl: "3600", upsert: false });
+            if (!uploadError) {
+              const { data: { publicUrl } } = supabase.storage.from("glupp-photos").getPublicUrl(filePath);
+              photoUrl = publicUrl;
+            }
+          }
+
+          // Enregistrer le glupp (XP sera attribuée à la validation via approve_beer_and_credit_xp)
+          const { error: rpcError } = await supabase.rpc("register_glupp", {
+            p_user_id: user.id,
+            p_beer_id: beer.id,
+            p_photo_url: photoUrl,
+            p_geo_lat: geoLat,
+            p_geo_lng: geoLng,
+            p_bar_name: geoCity ? `${geoCity}` : null,
+          });
+
+          if (rpcError) {
+            console.warn("Glupp registration deferred:", rpcError.message);
+          }
+        }
       }
 
       setSubmitted(true);
@@ -205,6 +270,11 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
     setCheckedDuplicates(false);
     setSubmitted(false);
     setWantsToGlupp(false);
+    setGeoLat(null);
+    setGeoLng(null);
+    setGeoLoading(false);
+    setGeoError(null);
+    setGeoCity(null);
     setShowStylePicker(false);
     setShowCountryPicker(false);
     onClose();
@@ -390,6 +460,25 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
           </label>
         </div>
 
+        {/* Localisation si glupp activé */}
+        {wantsToGlupp && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-xs">
+            <MapPin size={14} className={geoLat ? "text-glupp-success" : geoLoading ? "text-glupp-accent animate-pulse" : "text-glupp-text-muted"} />
+            {geoLoading ? (
+              <span className="text-glupp-text-muted">Localisation en cours...</span>
+            ) : geoLat ? (
+              <span className="text-glupp-success">
+                <Navigation size={10} className="inline mr-1" />
+                Position enregistree {geoCity && <span className="text-glupp-text-muted">({geoCity})</span>} — +20 XP
+              </span>
+            ) : geoError ? (
+              <span className="text-glupp-text-muted">{geoError} — le glupp sera enregistre sans localisation</span>
+            ) : (
+              <span className="text-glupp-text-muted">En attente de localisation...</span>
+            )}
+          </div>
+        )}
+
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">
             Photo {wantsToGlupp ? (<span className="text-glupp-error font-medium">(obligatoire pour glupper)</span>) : "(optionnel)"}
@@ -405,7 +494,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
             <label className="flex items-center gap-2 px-3 py-2.5 bg-glupp-bg border border-glupp-border border-dashed rounded-glupp cursor-pointer hover:border-glupp-accent transition-colors">
               <Camera size={16} className="text-glupp-text-muted" />
               <span className="text-sm text-glupp-text-muted">Prendre une photo</span>
-              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
             </label>
           )}
         </div>
