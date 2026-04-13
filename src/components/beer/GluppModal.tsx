@@ -21,6 +21,8 @@ import {
   Home,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { ShareModal, type BeerCardData } from "@/components/social/ShareModal";
+
 
 type LocationType = "bar" | "home" | "other" | null;
 
@@ -54,6 +56,8 @@ export function GluppModal() {
   const [newBarName, setNewBarName] = useState("");
   const [newBarCity, setNewBarCity] = useState("");
   const [barsLoading, setBarsLoading] = useState(false);
+
+  const [shareData, setShareData] = useState<BeerCardData | null>(null);
 
   // Home city
   const [homeCity, setHomeCity] = useState("");
@@ -318,7 +322,20 @@ export function GluppModal() {
       const result = data as { xp_gained: number; rarity: string };
       showXPToast(result.xp_gained, "Glupp !");
       triggerCelebration();
-      closeGluppModal();
+      // Préparer la Beer Card pour le partage
+      setShareData({
+        beerName: beer.name,
+        brewery: beer.brewery,
+        style: beer.style,
+        country: beer.country,
+        rarity: beer.rarity as Rarity,
+        xpGained: result.xp_gained,
+        photoUrl: photoUrl,
+        barName: barName,
+        username: profile?.username || "Glupper",
+        avatarUrl: profile?.avatar_url || null,
+        level: getLevel(profile?.xp || 0),
+      });
 
       // Cascade invalidation
       queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
@@ -654,6 +671,13 @@ export function GluppModal() {
           Confirmer le Glupp ! (+{xp.total} XP)
         </Button>
       </div>
+      {shareData && (
+        <ShareModal
+          isOpen={!!shareData}
+          onClose={() => { setShareData(null); closeGluppModal(); }}
+          data={shareData}
+        />
+      )}
     </Modal>
   );
 }
