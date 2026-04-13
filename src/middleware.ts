@@ -22,6 +22,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
+  if (request.nextUrl.pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
+
   return await updateSession(request);
 }
 

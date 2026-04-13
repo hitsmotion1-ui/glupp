@@ -44,6 +44,11 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
   // 🔔 Push notifications via hook
   const { isSupported: pushSupported, isSubscribed: pushEnabled, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
 
+  // ⚔️ Duel reminder
+  const [duelReminderEnabled, setDuelReminderEnabled] = useState(false);
+  const [duelReminderHour, setDuelReminderHour] = useState(18);
+  const [duelReminderMinute, setDuelReminderMinute] = useState(0);
+
   // 🌍 État pour l'autocomplétion des villes
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
 
@@ -83,11 +88,14 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("city, avatar_id")
+          .select("city, avatar_id, duel_reminder_enabled, duel_reminder_hour, duel_reminder_minute")
           .eq("id", userId)
           .single();
         if (profile?.city) setCity(profile.city);
         if (profile?.avatar_id) setAvatarId(profile.avatar_id);
+        if (profile?.duel_reminder_enabled) setDuelReminderEnabled(true);
+        if (profile?.duel_reminder_hour != null) setDuelReminderHour(profile.duel_reminder_hour);
+        if (profile?.duel_reminder_minute != null) setDuelReminderMinute(profile.duel_reminder_minute);
       };
       fetchExtraData();
     }
@@ -131,6 +139,25 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
     }
   };
 
+  const handleDuelReminderToggle = async () => {
+    const newValue = !duelReminderEnabled;
+    setDuelReminderEnabled(newValue);
+    if (userId) {
+      await supabase.from("profiles").update({ duel_reminder_enabled: newValue }).eq("id", userId);
+    }
+  };
+
+  const handleDuelReminderTimeChange = async (hour: number, minute: number) => {
+    setDuelReminderHour(hour);
+    setDuelReminderMinute(minute);
+    if (userId) {
+      await supabase.from("profiles").update({ 
+        duel_reminder_hour: hour, 
+        duel_reminder_minute: minute 
+      }).eq("id", userId);
+    }
+  };
+
   const handleSave = async () => {
     if (!userId) return;
     try {
@@ -160,6 +187,9 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
           display_name: username,
           avatar_url: avatarUrl,
           city,
+          duel_reminder_enabled: duelReminderEnabled,
+          duel_reminder_hour: duelReminderHour,
+          duel_reminder_minute: duelReminderMinute,
           updated_at: new Date().toISOString()
         })
         .eq("id", userId);
@@ -321,6 +351,50 @@ export function SettingsModal({ isOpen, onClose, currentUsername, currentAvatarU
                   >
                     <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 left-0.5 transition-transform ${pushEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                   </button>
+                </div>
+
+                {/* Rappel de duel */}
+                <div className="p-4 rounded-xl bg-glupp-bg border border-glupp-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm text-glupp-text">Rappel de duels ⚔️</p>
+                      <p className="text-xs text-glupp-text-soft mt-1 max-w-[200px]">
+                        Un rappel quotidien si tu n&apos;as pas joue tes duels.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={handleDuelReminderToggle}
+                      className={`w-12 h-6 rounded-full relative transition-colors ${duelReminderEnabled ? 'bg-glupp-accent' : 'bg-glupp-border'}`}
+                      aria-label="Activer le rappel de duels"
+                    >
+                      <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 left-0.5 transition-transform ${duelReminderEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  {duelReminderEnabled && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-glupp-border/50">
+                      <span className="text-xs text-glupp-text-muted">Heure du rappel :</span>
+                      <select
+                        value={duelReminderHour}
+                        onChange={(e) => handleDuelReminderTimeChange(parseInt(e.target.value), duelReminderMinute)}
+                        className="bg-glupp-card border border-glupp-border rounded-lg px-2 py-1 text-sm text-glupp-cream focus:outline-none focus:border-glupp-accent"
+                      >
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <option key={i} value={i}>{String(i).padStart(2, "0")}</option>
+                        ))}
+                      </select>
+                      <span className="text-glupp-text-muted">:</span>
+                      <select
+                        value={duelReminderMinute}
+                        onChange={(e) => handleDuelReminderTimeChange(duelReminderHour, parseInt(e.target.value))}
+                        className="bg-glupp-card border border-glupp-border rounded-lg px-2 py-1 text-sm text-glupp-cream focus:outline-none focus:border-glupp-accent"
+                      >
+                        {[0, 15, 30, 45].map((m) => (
+                          <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
