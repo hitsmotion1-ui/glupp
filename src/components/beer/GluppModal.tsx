@@ -8,7 +8,7 @@ import { queryKeys } from "@/lib/queries/queryKeys";
 import type { Beer, Bar } from "@/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { beerEmoji, RARITY_CONFIG, type Rarity } from "@/lib/utils/xp";
+import { beerEmoji, RARITY_CONFIG, getLevel, type Rarity } from "@/lib/utils/xp";
 import { RarityBadge } from "./RarityBadge";
 import {
   Camera,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { ShareModal, type BeerCardData } from "@/components/social/ShareModal";
+import { useProfile } from "@/lib/hooks/useProfile";
 
 
 type LocationType = "bar" | "home" | "other" | null;
@@ -58,7 +59,7 @@ export function GluppModal() {
   const [barsLoading, setBarsLoading] = useState(false);
 
   const [shareData, setShareData] = useState<BeerCardData | null>(null);
-
+  const { profile } = useProfile();
   // Home city
   const [homeCity, setHomeCity] = useState("");
 
