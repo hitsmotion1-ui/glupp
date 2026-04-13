@@ -4,7 +4,22 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { MapPin, Send, CheckCircle, Navigation } from "lucide-react";
+import { MapPin, Send, CheckCircle, Navigation, Search, Loader2 } from "lucide-react";
+
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: {
+    road?: string;
+    house_number?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    postcode?: string;
+  };
+}
 
 interface SubmitBarModalProps {
   isOpen: boolean;
@@ -22,39 +37,84 @@ export function SubmitBarModal({ isOpen, onClose }: SubmitBarModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
 
-  // Auto-detect location on open
+  // Autocomplétion Nominatim
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [geocoded, setGeocoded] = useState(false);
+
+  // Debounced search
   useEffect(() => {
-    if (isOpen && !form.geo_lat && !form.geo_lng) {
-      detectLocation();
+    if (searchQuery.length < 3) {
+      setSuggestions([]);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
 
-  const detectLocation = () => {
-    if (!navigator.geolocation) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm((f) => ({
-          ...f,
-          geo_lat: pos.coords.latitude.toFixed(7),
-          geo_lng: pos.coords.longitude.toFixed(7),
-        }));
-        setLocating(false);
-      },
-      () => {
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&addressdetails=1&limit=5&accept-language=fr&countrycodes=fr,be,de,ch,lu`
+        );
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+      } catch {
+        setSuggestions([]);
+      }
+      setSearching(false);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Auto-update search query when name or city changes
+  useEffect(() => {
+    if (!geocoded && (form.name.length >= 2 || form.city.length >= 2)) {
+      setSearchQuery(`${form.name} ${form.city}`.trim());
+    }
+  }, [form.name, form.city, geocoded]);
+
+  const selectSuggestion = (result: NominatimResult) => {
+    const addr = result.address || {};
+    const city = addr.city || addr.town || addr.village || "";
+    const road = addr.road || "";
+    const houseNumber = addr.house_number || "";
+    const address = [houseNumber, road].filter(Boolean).join(" ");
+
+    setForm({
+      name: form.name, // On garde le nom saisi par l'user
+      address: address || form.address,
+      city: city || form.city,
+      geo_lat: result.lat,
+      geo_lng: result.lon,
+    });
+    setSuggestions([]);
+    setGeocoded(true);
   };
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
       setError("Le nom du bar est obligatoire");
       return;
+    }
+
+    // Si pas géocodé, tenter un géocodage automatique
+    if (!form.geo_lat || !form.geo_lng) {
+      try {
+        const q = `${form.name} ${form.address} ${form.city}`.trim();
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=fr`
+        );
+        const data = await res.json();
+        if (data?.length > 0) {
+          setForm((f) => ({
+            ...f,
+            geo_lat: data[0].lat,
+            geo_lng: data[0].lon,
+          }));
+        }
+      } catch { /* continue without geocoding */ }
     }
 
     setSubmitting(true);
@@ -108,6 +168,9 @@ export function SubmitBarModal({ isOpen, onClose }: SubmitBarModalProps) {
     setForm({ name: "", address: "", city: "", geo_lat: "", geo_lng: "" });
     setSubmitted(false);
     setError(null);
+    setSuggestions([]);
+    setSearchQuery("");
+    setGeocoded(false);
     onClose();
   };
 
@@ -152,11 +215,52 @@ export function SubmitBarModal({ isOpen, onClose }: SubmitBarModalProps) {
           <input
             type="text"
             value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setGeocoded(false); }}
             placeholder="Ex: Le Hop Corner"
             className="w-full px-3 py-2.5 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
           />
         </div>
+
+        {/* City */}
+        <div>
+          <label className="text-xs text-glupp-text-muted block mb-1">Ville *</label>
+          <input
+            type="text"
+            value={form.city}
+            onChange={(e) => { setForm((f) => ({ ...f, city: e.target.value })); setGeocoded(false); }}
+            placeholder="Ex: Nantes, Lyon, Clermont-Ferrand..."
+            className="w-full px-3 py-2.5 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
+          />
+        </div>
+
+        {/* Suggestions Nominatim */}
+        {suggestions.length > 0 && !geocoded && (
+          <div className="border border-glupp-border rounded-glupp overflow-hidden bg-glupp-card">
+            <div className="px-3 py-1.5 bg-glupp-bg border-b border-glupp-border">
+              <p className="text-[10px] text-glupp-text-muted flex items-center gap-1">
+                <Search size={10} />
+                Suggestions — clique pour selectionner
+              </p>
+            </div>
+            {suggestions.map((s) => (
+              <button
+                key={s.place_id}
+                type="button"
+                onClick={() => selectSuggestion(s)}
+                className="w-full text-left px-3 py-2.5 text-sm text-glupp-cream hover:bg-glupp-accent/10 transition-colors border-b border-glupp-border/30 last:border-0"
+              >
+                <p className="text-xs text-glupp-cream truncate">{s.display_name}</p>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {searching && (
+          <p className="text-[10px] text-glupp-text-muted flex items-center gap-1.5">
+            <Loader2 size={10} className="animate-spin" />
+            Recherche en cours...
+          </p>
+        )}
 
         {/* Address */}
         <div>
@@ -170,29 +274,17 @@ export function SubmitBarModal({ isOpen, onClose }: SubmitBarModalProps) {
           />
         </div>
 
-        {/* City */}
-        <div>
-          <label className="text-xs text-glupp-text-muted block mb-1">Ville</label>
-          <input
-            type="text"
-            value={form.city}
-            onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-            placeholder="Ex: Les Herbiers"
-            className="w-full px-3 py-2.5 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-          />
-        </div>
-
-        {/* GPS auto-detect (invisible pour l'user) */}
-        {locating && (
-          <p className="text-xs text-glupp-text-muted flex items-center gap-1.5">
-            <Navigation size={10} className="animate-pulse text-glupp-accent" />
-            Detection de ta position...
+        {/* Geocoding status */}
+        {geocoded && form.geo_lat && (
+          <p className="text-[10px] text-green-400 flex items-center gap-1.5">
+            <Navigation size={10} />
+            Position trouvee — le bar sera bien place sur la carte
           </p>
         )}
-        {!locating && form.geo_lat && form.geo_lng && (
-          <p className="text-[10px] text-green-400 flex items-center gap-1">
-            <Navigation size={9} />
-            Position detectee automatiquement
+        {!geocoded && form.name.length >= 2 && form.city.length >= 2 && !searching && suggestions.length === 0 && (
+          <p className="text-[10px] text-glupp-text-muted flex items-center gap-1.5">
+            <MapPin size={10} />
+            Aucun resultat — le bar sera localise automatiquement a la validation
           </p>
         )}
 
@@ -204,9 +296,9 @@ export function SubmitBarModal({ isOpen, onClose }: SubmitBarModalProps) {
           <Button variant="ghost" className="flex-1" onClick={handleClose}>
             Annuler
           </Button>
-          <Button variant="primary" className="flex-1" onClick={handleSubmit} disabled={submitting}>
+          <Button variant="primary" className="flex-1" onClick={handleSubmit} disabled={submitting || !form.name.trim()}>
             {submitting ? (
-              <div className="animate-spin w-4 h-4 border-2 border-glupp-bg border-t-transparent rounded-full" />
+              <Loader2 size={14} className="animate-spin" />
             ) : (
               <>
                 <Send size={14} className="mr-1.5" />
