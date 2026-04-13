@@ -10,6 +10,7 @@ import { BEER_STYLES } from "@/lib/utils/beerDefaults";
 import { getRegionSuggestions } from "@/lib/utils/regionSuggestions";
 import { beerEmoji } from "@/lib/utils/xp";
 import { Beer, Send, CheckCircle, ChevronDown, Search, Loader2, AlertTriangle, Camera, X, Clock, MapPin, Navigation } from "lucide-react";
+import { BrewerySelect } from "@/components/beer/BrewerySelect";
 
 const COUNTRIES = [
   { code: "FR", flag: "\u{1F1EB}\u{1F1F7}", name: "France" },
@@ -422,7 +423,11 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
 
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">Brasserie *</label>
-          <input type="text" value={brewery} onChange={(e) => { setBrewery(e.target.value); setCheckedDuplicates(false); }} placeholder="Ex: Brasserie d'Achouffe" className={inputClass} />
+          <BrewerySelect
+            value={brewery}
+            onChange={(name) => { setBrewery(name); setCheckedDuplicates(false); }}
+            className={inputClass}
+          />
         </div>
 
         <div className="relative">
