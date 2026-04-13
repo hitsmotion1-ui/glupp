@@ -19,6 +19,8 @@ import {
   Zap,
   Star,
   Check,
+  Bell,
+  BellRing,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -193,9 +195,10 @@ const STEPS: OnboardingStep[] = [
   },
 ];
 
-// Le slide avatar est le dernier
-const TOTAL_SLIDES = STEPS.length + 1;
+// Le slide avatar est l'avant-dernier, le slide notifications est le dernier
+const TOTAL_SLIDES = STEPS.length + 2;
 const AVATAR_SLIDE_INDEX = STEPS.length;
+const NOTIF_SLIDE_INDEX = STEPS.length + 1;
 
 // ═══════════════════════════════════════════
 // Component
@@ -210,6 +213,8 @@ export function OnboardingFlow() {
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>("curieux");
   const [city, setCity] = useState("");
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  const [pushRequested, setPushRequested] = useState(false);
+  const [pushGranted, setPushGranted] = useState(false);
   
   const { avatars, loading: avatarsLoading } = useAvatars(userId, 0);
   const freeAvatars = avatars.filter((a) => a.unlock_type === "free");
@@ -256,6 +261,44 @@ export function OnboardingFlow() {
     return () => clearTimeout(timer);
   }, [city]);
 
+  const handleEnablePush = async () => {
+    setPushRequested(true);
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+
+      const registration = await navigator.serviceWorker.ready;
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidKey) return;
+
+      const padding = "=".repeat((4 - (vapidKey.length % 4)) % 4);
+      const base64 = (vapidKey + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = window.atob(base64);
+      const keyArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) keyArray[i] = rawData.charCodeAt(i);
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyArray as BufferSource,
+      });
+
+      const subJson = subscription.toJSON();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("push_subscriptions").upsert({
+          user_id: user.id,
+          endpoint: subJson.endpoint!,
+          p256dh: subJson.keys!.p256dh!,
+          auth: subJson.keys!.auth!,
+        }, { onConflict: "user_id,endpoint" });
+      }
+      setPushGranted(true);
+    } catch {
+      // Permission refusée ou erreur — on continue
+    }
+  };
+
   const handleNext = () => {
     if (step < TOTAL_SLIDES - 1) {
       setDirection(1);
@@ -296,9 +339,10 @@ export function OnboardingFlow() {
   if (loading || !show) return null;
 
   const isAvatarSlide = step === AVATAR_SLIDE_INDEX;
+  const isNotifSlide = step === NOTIF_SLIDE_INDEX;
   const isLast = step === TOTAL_SLIDES - 1;
-  const currentStep = !isAvatarSlide ? STEPS[step] : null;
-  const currentColor = isAvatarSlide ? "#E08840" : currentStep!.color;
+  const currentStep = (!isAvatarSlide && !isNotifSlide) ? STEPS[step] : null;
+  const currentColor = isAvatarSlide ? "#E08840" : isNotifSlide ? "#4ECDC4" : currentStep!.color;
 
   return (
     <AnimatePresence>
@@ -424,6 +468,92 @@ export function OnboardingFlow() {
                     )}
                     <p className="text-[10px] text-glupp-text-muted mt-1">Optionnel — pour trouver des Gluppeurs pres de chez toi</p>
                   </div>
+                </div>
+              ) : isNotifSlide ? (
+                /* ═══ NOTIFICATION SLIDE ═══ */
+                <div>
+                  <motion.div
+                    animate={{ rotate: [0, -10, 10, -10, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}
+                    className="text-5xl mb-4"
+                  >
+                    {pushGranted ? "✅" : "🔔"}
+                  </motion.div>
+
+                  <h2 className="font-display text-2xl font-bold mb-2 text-[#4ECDC4]">
+                    {pushGranted ? "Notifications activees !" : "Reste connecte !"}
+                  </h2>
+                  <p className="text-glupp-text-soft text-sm leading-relaxed mb-6">
+                    {pushGranted 
+                      ? "Tu seras prevenu quand quelqu'un reagit a tes glupps, commente ou te defie !"
+                      : "Active les notifications pour ne rien rater : commentaires, reactions, badges, et plus encore."
+                    }
+                  </p>
+
+                  {!pushGranted && (
+                    <div className="space-y-3 mb-6">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                        className="flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left bg-[#4ECDC4]/8 border-[#4ECDC4]/20"
+                      >
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-[#4ECDC4]/15 text-[#4ECDC4]">
+                          <BellRing size={14} />
+                        </div>
+                        <span className="text-sm text-glupp-cream">Quand on commente ton glupp</span>
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25 }}
+                        className="flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left bg-[#4ECDC4]/8 border-[#4ECDC4]/20"
+                      >
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-[#4ECDC4]/15 text-[#4ECDC4]">
+                          <Trophy size={14} />
+                        </div>
+                        <span className="text-sm text-glupp-cream">Quand tu debloques un badge</span>
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.35 }}
+                        className="flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left bg-[#4ECDC4]/8 border-[#4ECDC4]/20"
+                      >
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-[#4ECDC4]/15 text-[#4ECDC4]">
+                          <Users size={14} />
+                        </div>
+                        <span className="text-sm text-glupp-cream">Quand un ami te defie ou te tague</span>
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {!pushGranted && !pushRequested && (
+                    <button
+                      onClick={handleEnablePush}
+                      className="w-full max-w-xs mx-auto flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-[#4ECDC4] text-glupp-bg font-bold text-sm hover:bg-[#4ECDC4]/90 transition-colors"
+                    >
+                      <Bell size={16} />
+                      Activer les notifications
+                    </button>
+                  )}
+
+                  {pushRequested && !pushGranted && (
+                    <p className="text-xs text-glupp-text-muted mt-2">
+                      Pas de souci, tu pourras les activer plus tard dans les parametres.
+                    </p>
+                  )}
+
+                  {pushGranted && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", bounce: 0.5 }}
+                      className="text-4xl"
+                    >
+                      🎉
+                    </motion.div>
+                  )}
                 </div>
               ) : (
                 /* ═══ REGULAR SLIDES ═══ */
