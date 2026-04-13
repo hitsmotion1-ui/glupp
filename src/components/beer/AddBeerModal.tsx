@@ -64,12 +64,20 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
   const [error, setError] = useState<string | null>(null);
   const [wantsToGlupp, setWantsToGlupp] = useState(false);
 
-  // Géolocalisation pour le glupp
+  // Localisation pour le glupp
+  type LocationType = "bar" | "onsite" | null;
+  const [locationType, setLocationType] = useState<LocationType>(null);
   const [geoLat, setGeoLat] = useState<number | null>(null);
   const [geoLng, setGeoLng] = useState<number | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoCity, setGeoCity] = useState<string | null>(null);
+  const [selectedBarId, setSelectedBarId] = useState<string | null>(null);
+  const [showNewBar, setShowNewBar] = useState(false);
+  const [newBarName, setNewBarName] = useState("");
+  const [newBarCity, setNewBarCity] = useState("");
+  const [onsiteLabel, setOnsiteLabel] = useState("");
+  const [bars, setBars] = useState<Array<{ id: string; name: string; city: string | null; geo_lat: number | null; geo_lng: number | null }>>([]);
 
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
   const [showDuplicateCheck, setShowDuplicateCheck] = useState(false);
@@ -99,26 +107,40 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
       setCheckedDuplicates(false);
       setSubmitted(false);
       setWantsToGlupp(false);
+      setLocationType(null);
       setGeoLat(null);
       setGeoLng(null);
       setGeoLoading(false);
       setGeoError(null);
       setGeoCity(null);
+      setSelectedBarId(null);
+      setShowNewBar(false);
+      setNewBarName("");
+      setNewBarCity("");
+      setOnsiteLabel("");
     }
   }, [isOpen, prefillName, prefillBarcode]);
 
   const selectedCountry = COUNTRIES.find((c) => c.code === countryCode) || COUNTRIES[0];
 
-  // Demander la géolocalisation quand l'user active le glupp
+  // Charger les bars quand l'user choisit "Dans un bar"
   useEffect(() => {
-    if (wantsToGlupp && !geoLat && !geoLoading) {
+    if (locationType === "bar" && bars.length === 0) {
+      supabase.from("bars").select("id, name, city, geo_lat, geo_lng").order("name").then(({ data }) => {
+        if (data) setBars(data);
+      });
+    }
+  }, [locationType, bars.length]);
+
+  // Demander la géolocalisation quand l'user choisit un type de localisation
+  useEffect(() => {
+    if (wantsToGlupp && locationType && !geoLat && !geoLoading) {
       setGeoLoading(true);
       setGeoError(null);
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           setGeoLat(pos.coords.latitude);
           setGeoLng(pos.coords.longitude);
-          // Reverse geocode pour afficher la ville
           try {
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&accept-language=fr`);
             const data = await res.json();
@@ -134,7 +156,7 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
         { enableHighAccuracy: true, timeout: 10000 }
       );
     }
-  }, [wantsToGlupp, geoLat, geoLoading]);
+  }, [wantsToGlupp, locationType, geoLat, geoLoading]);
   const regionSuggestions = useMemo(() => getRegionSuggestions(countryCode), [countryCode]);
 
   const filteredStyles = useMemo(() => {
@@ -220,14 +242,52 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
             }
           }
 
+          // Déterminer la localisation
+          let finalGeoLat = geoLat;
+          let finalGeoLng = geoLng;
+          let barName: string | null = null;
+
+          if (locationType === "bar") {
+            if (showNewBar && newBarName.trim()) {
+              // Géocoder le nouveau bar
+              let barLat: number | null = null;
+              let barLng: number | null = null;
+              try {
+                const geoQuery = `${newBarName.trim()} ${newBarCity.trim() || ""}`.trim();
+                const geoResp = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(geoQuery)}&format=json&limit=1&accept-language=fr`);
+                const geoData = await geoResp.json();
+                if (geoData?.length > 0) {
+                  barLat = parseFloat(geoData[0].lat);
+                  barLng = parseFloat(geoData[0].lon);
+                }
+              } catch { /* ignore */ }
+
+              const { data: newBar } = await supabase
+                .from("bars")
+                .insert({ name: newBarName.trim(), city: newBarCity.trim() || null, geo_lat: barLat, geo_lng: barLng })
+                .select()
+                .single();
+              if (newBar) {
+                barName = newBar.name;
+                if (barLat && barLng) { finalGeoLat = barLat; finalGeoLng = barLng; }
+              }
+            } else if (selectedBarId) {
+              const bar = bars.find(b => b.id === selectedBarId);
+              barName = bar?.name || null;
+              if (bar?.geo_lat && bar?.geo_lng) { finalGeoLat = bar.geo_lat; finalGeoLng = bar.geo_lng; }
+            }
+          } else if (locationType === "onsite") {
+            barName = `Sur place${onsiteLabel ? ` (${onsiteLabel})` : geoCity ? ` (${geoCity})` : ""}`;
+          }
+
           // Enregistrer le glupp (XP sera attribuée à la validation via approve_beer_and_credit_xp)
           const { error: rpcError } = await supabase.rpc("register_glupp", {
             p_user_id: user.id,
             p_beer_id: beer.id,
             p_photo_url: photoUrl,
-            p_geo_lat: geoLat,
-            p_geo_lng: geoLng,
-            p_bar_name: geoCity ? `${geoCity}` : null,
+            p_geo_lat: finalGeoLat,
+            p_geo_lng: finalGeoLng,
+            p_bar_name: barName,
           });
 
           if (rpcError) {
@@ -270,11 +330,17 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
     setCheckedDuplicates(false);
     setSubmitted(false);
     setWantsToGlupp(false);
+    setLocationType(null);
     setGeoLat(null);
     setGeoLng(null);
     setGeoLoading(false);
     setGeoError(null);
     setGeoCity(null);
+    setSelectedBarId(null);
+    setShowNewBar(false);
+    setNewBarName("");
+    setNewBarCity("");
+    setOnsiteLabel("");
     setShowStylePicker(false);
     setShowCountryPicker(false);
     onClose();
@@ -462,19 +528,80 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
 
         {/* Localisation si glupp activé */}
         {wantsToGlupp && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-xs">
-            <MapPin size={14} className={geoLat ? "text-glupp-success" : geoLoading ? "text-glupp-accent animate-pulse" : "text-glupp-text-muted"} />
-            {geoLoading ? (
-              <span className="text-glupp-text-muted">Localisation en cours...</span>
-            ) : geoLat ? (
-              <span className="text-glupp-success">
-                <Navigation size={10} className="inline mr-1" />
-                Position enregistree {geoCity && <span className="text-glupp-text-muted">({geoCity})</span>} — +20 XP
-              </span>
-            ) : geoError ? (
-              <span className="text-glupp-text-muted">{geoError} — le glupp sera enregistre sans localisation</span>
-            ) : (
-              <span className="text-glupp-text-muted">En attente de localisation...</span>
+          <div className="space-y-2">
+            <label className="text-xs text-glupp-text-muted block">📍 Ou es-tu ?</label>
+            <div className="flex gap-2">
+              {[
+                { type: "bar" as LocationType, label: "Dans un bar", icon: "🍻" },
+                { type: "onsite" as LocationType, label: "Sur place", icon: "📍" },
+              ].map((opt) => (
+                <button
+                  key={opt.type}
+                  type="button"
+                  onClick={() => setLocationType(locationType === opt.type ? null : opt.type)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-glupp border text-xs transition-all ${
+                    locationType === opt.type
+                      ? "border-glupp-accent bg-glupp-accent/10 text-glupp-cream"
+                      : "border-glupp-border bg-glupp-bg text-glupp-text-muted hover:border-glupp-accent/50"
+                  }`}
+                >
+                  <span>{opt.icon}</span>
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Sélecteur de bar */}
+            {locationType === "bar" && (
+              <div className="space-y-2">
+                <select
+                  value={showNewBar ? "__new__" : selectedBarId || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "__new__") { setShowNewBar(true); setSelectedBarId(null); }
+                    else if (v === "") { setSelectedBarId(null); setShowNewBar(false); }
+                    else { setSelectedBarId(v); setShowNewBar(false); }
+                  }}
+                  className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream appearance-none focus:outline-none focus:border-glupp-accent"
+                >
+                  <option value="">-- Choisir un bar --</option>
+                  {bars.map((bar) => (
+                    <option key={bar.id} value={bar.id}>{bar.name}{bar.city ? ` (${bar.city})` : ""}</option>
+                  ))}
+                  <option value="__new__">+ Ajouter un bar</option>
+                </select>
+                {showNewBar && (
+                  <div className="space-y-2">
+                    <input type="text" value={newBarName} onChange={(e) => setNewBarName(e.target.value)} placeholder="Nom du bar" className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent" />
+                    <input type="text" value={newBarCity} onChange={(e) => setNewBarCity(e.target.value)} placeholder="Ville" className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sur place — lieu libre */}
+            {locationType === "onsite" && (
+              <input
+                type="text"
+                value={onsiteLabel || geoCity || ""}
+                onChange={(e) => setOnsiteLabel(e.target.value)}
+                placeholder="Chez un pote, festival, maison... (optionnel)"
+                className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent"
+              />
+            )}
+
+            {/* Indicateur GPS */}
+            {locationType && (
+              <div className="flex items-center gap-2 px-3 py-1.5 text-[10px]">
+                <MapPin size={12} className={geoLat ? "text-glupp-success" : geoLoading ? "text-glupp-accent animate-pulse" : "text-glupp-text-muted"} />
+                {geoLoading ? (
+                  <span className="text-glupp-text-muted">Localisation en cours...</span>
+                ) : geoLat ? (
+                  <span className="text-glupp-success">Position enregistree {geoCity && `(${geoCity})`} — +20 XP</span>
+                ) : geoError ? (
+                  <span className="text-glupp-text-muted">{geoError}</span>
+                ) : null}
+              </div>
             )}
           </div>
         )}

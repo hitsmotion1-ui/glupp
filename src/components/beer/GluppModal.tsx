@@ -296,7 +296,7 @@ export function GluppModal() {
           barName = selectedBar?.name || null;
         }
       } else if (locationType === "home") {
-        barName = `Chez moi${homeCity ? ` (${homeCity})` : geoCity ? ` (${geoCity})` : ""}`;
+        barName = `Sur place${homeCity ? ` (${homeCity})` : geoCity ? ` (${geoCity})` : ""}`;
       }
 
       // 3. Register glupp
@@ -370,7 +370,7 @@ export function GluppModal() {
           <div className="flex gap-2 mb-2">
             {[
               { type: "bar" as LocationType, label: "Dans un bar", icon: "🍻" },
-              { type: "home" as LocationType, label: "Chez moi", icon: "🏠" },
+              { type: "home" as LocationType, label: "Sur place", icon: "📍" },
             ].map((opt) => (
               <button
                 key={opt.type}
@@ -432,15 +432,15 @@ export function GluppModal() {
             </div>
           )}
 
-          {/* Home city — when "Chez moi" selected */}
+          {/* Location detail — when "Sur place" selected */}
           {locationType === "home" && (
             <div className="flex items-center gap-2">
-              <Home size={14} className="text-glupp-text-muted shrink-0" />
+              <MapPin size={14} className="text-glupp-text-muted shrink-0" />
               <input
                 type="text"
                 value={homeCity || geoCity || ""}
                 onChange={(e) => setHomeCity(e.target.value)}
-                placeholder="Ville (optionnel)"
+                placeholder="Lieu / Ville (optionnel)"
                 className="flex-1 px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
               />
               {geoCity && !homeCity && (
