@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
+import { BrewerySelect } from "@/components/beer/BrewerySelect";
 import { RARITY_CONFIG } from "@/lib/utils/xp";
 import type { Beer, Rarity } from "@/types";
 import {
@@ -1102,14 +1103,9 @@ function BeerForm({
             </div>
             <div>
               <label className={labelClass}>Brasserie *</label>
-              <input
-                type="text"
-                <BrewerySelect
+              <BrewerySelect
                 value={form.brewery}
                 onChange={(name) => onChange("brewery", name)}
-                className="w-full px-3 py-2 bg-[#141210] border border-[#3A3530] rounded-lg text-sm text-[#F5E6D3] placeholder:text-[#6B6050] focus:outline-none focus:border-[#E08840]/50"
-              />
-                placeholder="Ex: Brasserie d'Achouffe"
                 className={inputClass}
               />
             </div>
