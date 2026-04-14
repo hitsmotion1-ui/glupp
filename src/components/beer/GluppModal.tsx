@@ -23,6 +23,7 @@ import {
 import { motion } from "framer-motion";
 import { ShareModal, type BeerCardData } from "@/components/social/ShareModal";
 import { useProfile } from "@/lib/hooks/useProfile";
+import { useMilestones } from "@/lib/hooks/useMilestones";
 
 
 type LocationType = "bar" | "home" | "other" | null;
@@ -60,6 +61,7 @@ export function GluppModal() {
 
   const [shareData, setShareData] = useState<BeerCardData | null>(null);
   const { profile } = useProfile();
+  const { checkAfterGlupp } = useMilestones();
   // Home city
   const [homeCity, setHomeCity] = useState("");
 
@@ -320,10 +322,21 @@ export function GluppModal() {
         return;
       }
 
-      const result = data as { xp_gained: number; rarity: string };
+      const result = data as { xp_gained: number; rarity: string; trophies_awarded?: string[] };
       showXPToast(result.xp_gained, "Glupp !");
       triggerCelebration();
-      // Préparer la Beer Card pour le partage
+      // Vérifier les milestones (paliers bières, level up, trophées)
+      const prevBeers = profile?.beers_tasted || 0;
+      const prevXp = profile?.xp || 0;
+      const newXp = prevXp + result.xp_gained;
+      checkAfterGlupp(
+        profile?.username || "Glupper",
+        prevBeers,
+        prevBeers + 1,
+        prevXp,
+        newXp,
+        result.trophies_awarded || [],
+      );
       setShareData({
         beerName: beer.name,
         brewery: beer.brewery,

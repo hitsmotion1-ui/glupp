@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Beer } from "@/types";
+import type { MilestoneData } from "@/components/social/MilestoneModal";
 
 interface XPToast {
   amount: number;
@@ -15,6 +16,11 @@ interface DuelState {
 }
 
 interface AppState {
+
+  milestoneData: MilestoneData | null;
+  showMilestone: (data: MilestoneData) => void;
+  clearMilestone: () => void;
+
   // Beer detail modal
   selectedBeerId: string | null;
   openBeerModal: (beerId: string) => void;
@@ -68,6 +74,8 @@ interface AppState {
   clearDuel: () => void;
   duelSessionCount: number;
   incrementDuelCount: () => void;
+
+  
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -121,4 +129,8 @@ export const useAppStore = create<AppState>((set) => ({
   duelSessionCount: 0,
   incrementDuelCount: () =>
     set((s) => ({ duelSessionCount: s.duelSessionCount + 1 })),
+
+  milestoneData: null,
+  showMilestone: (data) => set({ milestoneData: data }),
+  clearMilestone: () => set({ milestoneData: null }),
 }));

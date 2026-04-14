@@ -19,6 +19,7 @@ import { Plus, ScanLine, Search, Beer as BeerIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { beerEmoji } from "@/lib/utils/xp";
 import type { Beer } from "@/types";
+import { GlobalMilestone } from "@/components/global/GlobalMilestone";
 
 export function GlobalModals() {
   const openBeerModal = useAppStore((s) => s.openBeerModal);
@@ -156,6 +157,7 @@ export function GlobalModals() {
       <TrophyDetailModal />
       <NotificationModal />
       <UserProfileModal />
+      <GlobalMilestone />
 
       {/* Close FAB backdrop */}
       <AnimatePresence>
