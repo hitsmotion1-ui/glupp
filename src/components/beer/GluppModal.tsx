@@ -64,6 +64,10 @@ export function GluppModal() {
   const { checkAfterGlupp } = useMilestones();
   // Home city
   const [homeCity, setHomeCity] = useState("");
+  const [pendingMilestone, setPendingMilestone] = useState<{
+    username: string; prevBeers: number; newBeers: number;
+    prevXp: number; newXp: number; trophies: string[];
+  } | null>(null);
 
   // Fetch beer + bars when modal opens
   useEffect(() => {
@@ -325,18 +329,15 @@ export function GluppModal() {
       const result = data as { xp_gained: number; rarity: string; trophies_awarded?: string[] };
       showXPToast(result.xp_gained, "Glupp !");
       triggerCelebration();
-      // Vérifier les milestones (paliers bières, level up, trophées)
-      const prevBeers = profile?.beers_tasted || 0;
-      const prevXp = profile?.xp || 0;
-      const newXp = prevXp + result.xp_gained;
-      checkAfterGlupp(
-        profile?.username || "Glupper",
-        prevBeers,
-        prevBeers + 1,
-        prevXp,
-        newXp,
-        result.trophies_awarded || [],
-      );
+      // Stocker le milestone en attente (sera déclenché après fermeture de la Beer Card)
+      setPendingMilestone({
+        username: profile?.username || "Glupper",
+        prevBeers: profile?.beers_tasted || 0,
+        newBeers: (profile?.beers_tasted || 0) + 1,
+        prevXp: profile?.xp || 0,
+        newXp: (profile?.xp || 0) + result.xp_gained,
+        trophies: result.trophies_awarded || [],
+      });
       setShareData({
         beerName: beer.name,
         brewery: beer.brewery,
@@ -688,7 +689,16 @@ export function GluppModal() {
       {shareData && (
         <ShareModal
           isOpen={!!shareData}
-          onClose={() => { setShareData(null); closeGluppModal(); }}
+          onClose={() => {
+            setShareData(null);
+            // Déclencher le milestone maintenant que la Beer Card est fermée
+            if (pendingMilestone) {
+              const { username, prevBeers, newBeers, prevXp, newXp, trophies } = pendingMilestone;
+              checkAfterGlupp(username, prevBeers, newBeers, prevXp, newXp, trophies);
+              setPendingMilestone(null);
+            }
+            closeGluppModal();
+          }}
           data={shareData}
         />
       )}
