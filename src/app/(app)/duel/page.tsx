@@ -12,6 +12,7 @@ import { GluppOfWeekBanner } from "@/components/gamification/GluppOfWeekBanner";
 import { Swords, ArrowRight, Beer, Flame, ChevronRight, RefreshCw, History, Trophy, Lock, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { DailyChallengesWidget } from "@/components/gamification/DailyChallengesWidget";
 
 export default function DuelPage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -278,6 +279,10 @@ export default function DuelPage() {
       )}
 
       {/* ⏬ SECTIONS PERMANENTES ⏬ */}
+      
+      
+      {/* Défis quotidiens */}
+      <DailyChallengesWidget />
       {/* Glupp of the Week */}
       <div className="px-4 mt-8">
         <GluppOfWeekBanner />

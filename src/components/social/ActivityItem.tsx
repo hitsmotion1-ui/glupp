@@ -309,6 +309,7 @@ const { profile } = useProfile();
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["reactions", activity.id] });
+      queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
     }
   });
 
@@ -345,6 +346,7 @@ const { profile } = useProfile();
     },
     onSuccess: () => {
       setCommentText("");
+      queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
     }
   });
 

@@ -358,6 +358,7 @@ export function GluppModal() {
       queryClient.invalidateQueries({ queryKey: queryKeys.duel.tastedBeers });
       queryClient.invalidateQueries({ queryKey: queryKeys.ranking.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.beers.all });
+      queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
     } catch {
       setError("Une erreur est survenue.");
     } finally {
