@@ -158,6 +158,7 @@ export function GlobalModals() {
       <NotificationModal />
       <UserProfileModal />
       <GlobalMilestone />
+      <ChangelogModal />
 
       {/* Close FAB backdrop */}
       <AnimatePresence>
