@@ -129,6 +129,7 @@ export function BeerModal() {
       } else {
         setEditingTaste(false);
         await queryClient.invalidateQueries({ queryKey: ["userBeer", selectedBeerId] });
+        await queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });        
         await refetchUserBeer();
       }
     } catch (err: any) {
