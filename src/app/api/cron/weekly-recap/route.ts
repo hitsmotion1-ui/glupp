@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export async function POST(req: Request) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-  
-  // Vérifier l'auth cron
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function GET(request: NextRequest) {
   try {
-    // Récupérer tous les users actifs avec push subscriptions
+    const authHeader = request.headers.get("authorization");
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     const { data: users } = await supabase
       .from("profiles")
       .select("id, username")
@@ -27,7 +27,6 @@ export async function POST(req: Request) {
     let sent = 0;
 
     for (const user of users) {
-      // Récupérer le recap de la semaine
       const { data: recap } = await supabase.rpc("get_weekly_recap", {
         p_user_id: user.id,
       });
@@ -38,7 +37,6 @@ export async function POST(req: Request) {
       const duels = recap.duels || 0;
       const xp = recap.xp_gained || 0;
 
-      // Construire le message
       let message: string;
       if (glupps === 0 && duels === 0) {
         message = `Semaine tranquille @${user.username} ! Reviens glupper cette semaine 🍺`;
@@ -50,7 +48,6 @@ export async function POST(req: Request) {
         message = `${parts.join(", ")} cette semaine ! Consulte ton recap 📊`;
       }
 
-      // Insérer la notification (le trigger push se charge de l'envoi)
       await supabase.from("notifications").insert({
         user_id: user.id,
         type: "system",
