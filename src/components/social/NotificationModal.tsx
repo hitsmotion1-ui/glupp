@@ -56,10 +56,15 @@ function PersistentNotifCard({
   onNavigate?: (activityId?: string) => void;
 }) {
   const p = notif.persistent!;
-  const isClickable = ["comment", "reaction", "like"].includes(p.type);
+  const hasUrl = !!p.metadata?.url;
+  const isClickable = ["comment", "reaction", "like"].includes(p.type) || hasUrl;
   const handleClick = () => {
-    if (isClickable && onNavigate) {
-      onMarkRead(p.id);
+    if (!isClickable) return;
+    onMarkRead(p.id);
+    if (hasUrl) {
+      // Redirection directe (ex: /recap)
+      window.location.href = p.metadata.url as string;
+    } else if (onNavigate) {
       const activityId = p.metadata?.activity_id as string | undefined;
       onNavigate(activityId);
     }
