@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { beerEmoji } from "@/lib/utils/xp";
 import type { Beer } from "@/types";
 import { GlobalMilestone } from "@/components/global/GlobalMilestone";
+import { ChangelogModal } from "@/components/global/ChangelogModal";
 
 export function GlobalModals() {
   const openBeerModal = useAppStore((s) => s.openBeerModal);
