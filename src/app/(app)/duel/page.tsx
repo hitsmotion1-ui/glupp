@@ -280,7 +280,7 @@ export default function DuelPage() {
 
       {/* ⏬ SECTIONS PERMANENTES ⏬ */}
       
-      
+    
       {/* Défis quotidiens */}
       <DailyChallengesWidget />
       {/* Glupp of the Week */}

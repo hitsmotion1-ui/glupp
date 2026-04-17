@@ -18,16 +18,17 @@ interface Challenge {
   condition_value: Record<string, unknown>;
 }
 
-interface DailyChallengesData {
-  challenges: Challenge[];
+interface ChallengesData {
+  daily: Challenge[];
+  weekly: Challenge[];
   streak: number;
-  all_completed: boolean;
+  all_daily_completed: boolean;
 }
 
 interface CheckResult {
   newly_completed: string[];
   xp_earned: number;
-  all_completed: boolean;
+  all_daily_completed: boolean;
   streak: number;
 }
 
@@ -50,10 +51,10 @@ export function useDailyChallenges() {
         return null;
       }
 
-      return data as DailyChallengesData;
+      return data as ChallengesData;
     },
     staleTime: 30 * 1000,
-    refetchInterval: 60 * 1000, // Refresh toutes les minutes pour détecter les progrès
+    refetchInterval: 60 * 1000,
   });
 
   const checkMutation = useMutation({
@@ -70,7 +71,7 @@ export function useDailyChallenges() {
     },
     onSuccess: (result) => {
       if (result.xp_earned > 0) {
-        showXPToast(result.xp_earned, result.all_completed ? "Combo !" : "Défi !");
+        showXPToast(result.xp_earned, result.all_daily_completed ? "Combo !" : "Défi !");
       }
       queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -78,13 +79,14 @@ export function useDailyChallenges() {
   });
 
   return {
-    challenges: data?.challenges || [],
+    dailyChallenges: data?.daily || [],
+    weeklyChallenges: data?.weekly || [],
     streak: data?.streak || 0,
-    allCompleted: data?.all_completed || false,
+    allDailyCompleted: data?.all_daily_completed || false,
     isLoading,
     checkChallenges: checkMutation.mutateAsync,
     checking: checkMutation.isPending,
   };
 }
 
-export type { Challenge, DailyChallengesData };
+export type { Challenge, ChallengesData };
