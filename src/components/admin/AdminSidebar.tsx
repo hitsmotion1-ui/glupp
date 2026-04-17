@@ -18,6 +18,7 @@ import {
   Star,
   Sparkles,
   ShieldAlert,
+  Megaphone,
 } from "lucide-react";
 
 const navItems = [
@@ -42,6 +43,7 @@ const navItems = [
     exact: false,
     badge: "reports" // 👈 Identifiant du badge signalement
   },
+  { href: "/admin/changelog", label: "Changelog", icon: Megaphone, exact: false },
   {
     href: "/admin/settings",
     label: "Paramètres",
