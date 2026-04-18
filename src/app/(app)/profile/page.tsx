@@ -55,12 +55,12 @@ export default function ProfilePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const [isTitleSelectorOpen, setIsTitleSelectorOpen] = useState(false);
 
   // État local pour avatar + couleur de fond (optimistic update uniquement)
   const [optimisticAvatarId, setOptimisticAvatarId] = useState<string | null>(null);
   const [optimisticBgColor, setOptimisticBgColor] = useState<string | null>(null);
 
-  const [isTitleSelectorOpen, setIsTitleSelectorOpen] = useState(false);
   // Clear optimistic quand le profil rattrape la valeur
   useEffect(() => {
     if (optimisticAvatarId && profile?.avatar_id === optimisticAvatarId) {
@@ -445,6 +445,15 @@ export default function ProfilePage() {
             </div>
          </div>
       )}
+      {/* Title Selector */}
+      <TitleSelector
+        isOpen={isTitleSelectorOpen}
+        onClose={() => setIsTitleSelectorOpen(false)}
+        userId={profile.id}
+        currentXp={profile.xp}
+        currentTitle={(profile as any).custom_title || null}
+        onTitleChanged={refetch}
+      />
     </div>
   );
 }
@@ -480,15 +489,6 @@ function CollapsibleSection({
         )}
       </button>
       {isOpen && <div className="pb-2">{children}</div>}
-      {/* Title Selector */}
-        <TitleSelector
-          isOpen={isTitleSelectorOpen}
-          onClose={() => setIsTitleSelectorOpen(false)}
-          userId={profile.id}
-          currentXp={profile.xp}
-          currentTitle={(profile as any).custom_title || null}
-          onTitleChanged={refetch}
-        />
     </div>
   );
 }
