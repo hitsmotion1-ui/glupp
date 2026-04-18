@@ -80,6 +80,7 @@ export interface Profile {
   photos_taken: number;
   created_at: string;
   is_banned?: boolean;
+  custom_title: string | null;
 }
 
 // ─── Admin: détail utilisateur ───

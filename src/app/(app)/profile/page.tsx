@@ -1,5 +1,7 @@
 "use client";
 
+import { TopBeerWidget } from "@/components/profile/TopBeerWidget";
+import { TitleSelector } from "@/components/profile/TitleSelector";
 import { useState, useEffect } from "react"; // 🆕 useEffect ajouté ici
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useProfile } from "@/lib/hooks/useProfile";
@@ -58,6 +60,7 @@ export default function ProfilePage() {
   const [optimisticAvatarId, setOptimisticAvatarId] = useState<string | null>(null);
   const [optimisticBgColor, setOptimisticBgColor] = useState<string | null>(null);
 
+  const [isTitleSelectorOpen, setIsTitleSelectorOpen] = useState(false);
   // Clear optimistic quand le profil rattrape la valeur
   useEffect(() => {
     if (optimisticAvatarId && profile?.avatar_id === optimisticAvatarId) {
@@ -237,6 +240,18 @@ export default function ProfilePage() {
         </h2>
         <p className="text-sm text-glupp-text-muted">@{profile.username}</p>
 
+        {/* Title — cliquable pour changer */}
+        <button
+          onClick={() => setIsTitleSelectorOpen(true)}
+          className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-glupp-card border border-glupp-border hover:border-glupp-accent/50 transition-colors group"
+        >
+          <span className="text-sm">{level.icon}</span>
+          <span className="text-xs font-medium text-glupp-text-soft group-hover:text-glupp-cream transition-colors">
+            {(profile as any).custom_title || level.title}
+          </span>
+          <span className="text-[8px] text-glupp-text-muted">✏️</span>
+        </button>
+
         {/* Level */}
         <div className="mt-2">
           <LevelBadge xp={profile.xp} />
@@ -288,6 +303,9 @@ export default function ProfilePage() {
           <p className="text-[10px] text-glupp-text-muted">Photos</p>
         </Card>
       </div>
+
+      {/* Bière #1 */}
+      <TopBeerWidget userId={profile.id} />
 
       {/* Inviter un ami */}
       <InviteButton userId={profile.id} />
@@ -462,6 +480,15 @@ function CollapsibleSection({
         )}
       </button>
       {isOpen && <div className="pb-2">{children}</div>}
+      {/* Title Selector */}
+        <TitleSelector
+          isOpen={isTitleSelectorOpen}
+          onClose={() => setIsTitleSelectorOpen(false)}
+          userId={profile.id}
+          currentXp={profile.xp}
+          currentTitle={(profile as any).custom_title || null}
+          onTitleChanged={refetch}
+        />
     </div>
   );
 }
