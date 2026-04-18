@@ -245,17 +245,15 @@ export default function ProfilePage() {
           onClick={() => setIsTitleSelectorOpen(true)}
           className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-glupp-card border border-glupp-border hover:border-glupp-accent/50 transition-colors group"
         >
-          <span className="text-sm">{level.icon}</span>
+          <span className="text-sm">{(profile as any).custom_title_icon || level.icon}</span>
           <span className="text-xs font-medium text-glupp-text-soft group-hover:text-glupp-cream transition-colors">
             {(profile as any).custom_title || level.title}
           </span>
+          </span>&&
           <span className="text-[8px] text-glupp-text-muted">✏️</span>
         </button>
 
         {/* Level */}
-        <div className="mt-2">
-          <LevelBadge xp={profile.xp} />
-        </div>
       </div>
 
       {/* XP Progress */}

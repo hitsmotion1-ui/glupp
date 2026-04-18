@@ -391,6 +391,11 @@ export function UserProfileModal() {
             />
           </motion.div>
 
+          {/* Bière #1 */}
+          {selectedUserId && (
+            <TopBeerWidget userId={selectedUserId} />
+          )}
+
           {/* Member since */}
           <div className="flex items-center justify-center gap-1.5 text-xs text-glupp-text-muted">
             <Calendar size={12} />

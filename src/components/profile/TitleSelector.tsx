@@ -79,10 +79,12 @@ export function TitleSelector({ isOpen, onClose, userId, currentXp, currentTitle
     try {
       // null = revenir au titre de niveau par défaut
       const titleToSave = selectedTitle === currentLevel.title ? null : selectedTitle;
+      const selectedOption = titles.find(t => t.title === selectedTitle);
+      const iconToSave = titleToSave ? (selectedOption?.icon || null) : null;
       
       const { error } = await supabase
         .from("profiles")
-        .update({ custom_title: titleToSave })
+        .update({ custom_title: titleToSave, custom_title_icon: iconToSave })
         .eq("id", userId);
 
       if (error) throw error;

@@ -161,9 +161,10 @@ export function FriendList() {
                       }}
                       className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
                     >
-                      <Avatar
+                     <Avatar
                         url={data.avatar_url}
                         name={data.display_name || data.username}
+                        fileName={data.avatar_id ? `avatar-${data.avatar_id}` : undefined}
                         size="md"
                       />
                       <div className="min-w-0">
