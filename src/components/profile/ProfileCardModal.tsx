@@ -70,15 +70,17 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
         </div>
 
         {/* Title */}
-        <div style={{
-          display: "inline-flex", alignItems: "center",
-          padding: "5px 14px",
-          borderRadius: 20,
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.1)",
-        }}>
-          <span style={{ fontSize: 14, marginRight: 6 }}>{data.customTitleIcon || level.icon}</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#E08840" }}>{data.customTitle || level.title}</span>
+        <div style={{ marginTop: 10, textAlign: "center" }}>
+          <span style={{
+            display: "inline-block",
+            padding: "5px 14px",
+            borderRadius: 20,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            fontSize: 12, fontWeight: 600, color: "#E08840",
+          }}>
+            {data.customTitleIcon || level.icon} {data.customTitle || level.title}
+          </span>
         </div>
       </div>
 
