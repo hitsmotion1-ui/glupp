@@ -220,11 +220,16 @@ export function ProfileCardModal({ isOpen, onClose, data }: ProfileCardModalProp
     }
 
     // ── compute dynamic height ────────────────────────────────────────────────
-    let H = 32 + 80 + 12 + 28 + 4 + 20 + 16 + 28 + 16; // header top + avatar + gap + name + gap + @user + gap + badge + gap
-    H += 16 + 72 + 16;   // stats section
-    if (data.topBeer) H += 80 + 16; // top beer card
-    H += 16 + 32 + 16;   // xp bar section
-    H += 44;             // footer
+    // header: paddingTop(32) + avatar(80) + gap(14) + name(22) + @user(20) + badge(26) + gap(16)
+    let H = 32 + 80 + 14 + 22 + 20 + 26 + 16;
+    // stats: height(72) + gap(16)
+    H += 72 + 16;
+    // top beer
+    if (data.topBeer) H += 72 + 16;
+    // xp label(16) + bar(6) + gap(16)
+    H += 16 + 6 + 16;
+    // footer: separator(1) + paddingTop(12) + text(16) + paddingBottom(12)
+    H += 1 + 12 + 16 + 12;
 
     const canvas = document.createElement("canvas");
     canvas.width = W * DPR;
@@ -405,12 +410,13 @@ export function ProfileCardModal({ isOpen, onClose, data }: ProfileCardModalProp
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
     ctx.stroke();
-    y += 14;
+    y += 1; // après la ligne de séparation
 
-    drawText(ctx, "Glupp", 20, y + 8, "900 14px system-ui", "#E08840");
-    drawText(ctx, "·", 56, y + 8, "400 8px system-ui", "rgba(255,255,255,0.2)", "center");
-    drawText(ctx, "glupp.fr", 66, y + 8, "400 8px system-ui", "rgba(255,255,255,0.2)");
-    drawText(ctx, "Every glupp counts.", W - 20, y + 8, "italic 400 8px system-ui", "rgba(255,255,255,0.12)", "right");
+    const footerTextY = y + 12 + 8; // paddingTop(12) + demi-hauteur texte(8)
+    drawText(ctx, "Glupp", 20, footerTextY, "900 14px system-ui", "#E08840");
+    drawText(ctx, "·", 57, footerTextY, "400 8px system-ui", "rgba(255,255,255,0.2)", "center");
+    drawText(ctx, "glupp.fr", 65, footerTextY, "400 8px system-ui", "rgba(255,255,255,0.2)");
+    drawText(ctx, "Every glupp counts.", W - 20, footerTextY, "italic 400 8px system-ui", "rgba(255,255,255,0.12)", "right");
 
     return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
   }, [data]);
