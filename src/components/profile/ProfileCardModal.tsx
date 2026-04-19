@@ -43,7 +43,7 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
         {/* Avatar */}
         <div className="w-20 h-20 rounded-full bg-[#E08840]/15 border-2 border-[#E08840]/30 flex items-center justify-center overflow-hidden mb-3">
           {data.avatarFileName ? (
-            <img src={`/avatars/${data.avatarFileName}.webp`} alt="" className="w-full h-full object-cover" />
+            <img src={`https://glupp.fr/avatars/${data.avatarFileName}.png`} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
           ) : data.avatarUrl ? (
             <img src={data.avatarUrl} alt="" className="w-full h-full object-cover" />
           ) : (
