@@ -42,14 +42,20 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
       }}
     >
       {/* Header */}
-      <div style={{ padding: "32px 24px 16px" }}>
+      <div style={{
+        padding: "32px 24px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}>
         {/* Avatar */}
         <div style={{
           width: 80, height: 80, borderRadius: "50%",
           border: "2px solid rgba(224,136,64,0.3)",
           background: "rgba(224,136,64,0.15)",
-          marginLeft: "auto", marginRight: "auto", marginBottom: 12,
+          marginBottom: 12,
           overflow: "hidden",
+          flexShrink: 0,
         }}>
           {data.avatarFileName ? (
             <img src={`https://glupp.fr/avatars/${data.avatarFileName}.png`} alt="" style={{ width: 80, height: 80, objectFit: "cover", display: "block" }} crossOrigin="anonymous" />
@@ -70,23 +76,21 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
           @{data.username}
         </div>
 
-        {/* Title */}
-        <table style={{ marginLeft: "auto", marginRight: "auto" }}>
-          <tbody>
-            <tr>
-              <td style={{
-                padding: "5px 14px",
-                borderRadius: 20,
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                fontSize: 12, fontWeight: 600, color: "#E08840",
-                textAlign: "center",
-              }}>
-                {data.customTitleIcon || level.icon} {data.customTitle || level.title}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        {/* Title badge — inline-flex pour centrage parfait dans html2canvas */}
+        <div style={{
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "5px 14px",
+          borderRadius: 20,
+          background: "rgba(255,255,255,0.05)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#E08840",
+          whiteSpace: "nowrap",
+        }}>
+          {data.customTitleIcon || level.icon} {data.customTitle || level.title}
+        </div>
       </div>
 
       {/* Stats */}
