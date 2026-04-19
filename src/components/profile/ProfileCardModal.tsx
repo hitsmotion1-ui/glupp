@@ -72,13 +72,18 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
           @{data.username}
         </div>
 
-        {/* Title badge — wrappé dans un div block full-width avec textAlign center.
-            Le span intérieur a display:inline-block ce qui est le mieux supporté par html2canvas
-            pour simuler un "shrink-to-fit" centré sans flex */}
-        <div style={{ textAlign: "center", lineHeight: 1 }}>
-          <span style={{
-            display: "inline-block",
-            padding: "5px 14px",
+        {/* Title badge — hauteur fixe + flex pour centrage vertical parfait dans html2canvas */}
+        <div style={{ textAlign: "center" }}>
+          <div style={{
+            display: "inline-flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            height: 28,
+            paddingLeft: 14,
+            paddingRight: 14,
+            paddingTop: 0,
+            paddingBottom: 0,
             borderRadius: 20,
             background: "rgba(255,255,255,0.05)",
             border: "1px solid rgba(255,255,255,0.1)",
@@ -86,10 +91,17 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
             fontWeight: 600,
             color: "#E08840",
             whiteSpace: "nowrap",
-            lineHeight: 1.5,
+            lineHeight: "28px",
+            verticalAlign: "middle",
+            boxSizing: "border-box" as const,
           }}>
-            {data.customTitleIcon || level.icon}&nbsp;{data.customTitle || level.title}
-          </span>
+            <span style={{ display: "inline-block", verticalAlign: "middle", lineHeight: 1, marginTop: 0, marginBottom: 0 }}>
+              {data.customTitleIcon || level.icon}
+            </span>
+            <span style={{ display: "inline-block", verticalAlign: "middle", lineHeight: 1, marginLeft: 5, marginTop: 0, marginBottom: 0 }}>
+              {data.customTitle || level.title}
+            </span>
+          </div>
         </div>
 
       </div>
