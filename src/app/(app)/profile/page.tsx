@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { formatNumber } from "@/lib/utils/xp";
 import { InviteButton } from "@/components/social/InviteButton";
+import { ProfileCardModal, type ProfileCardData } from "@/components/profile/ProfileCardModal";
 
 
 type Section = "progression" | "trophies" | "friends" | "crews" | "passport";
@@ -60,6 +61,9 @@ export default function ProfilePage() {
   // État local pour avatar + couleur de fond (optimistic update uniquement)
   const [optimisticAvatarId, setOptimisticAvatarId] = useState<string | null>(null);
   const [optimisticBgColor, setOptimisticBgColor] = useState<string | null>(null);
+
+  const [showProfileCard, setShowProfileCard] = useState(false);
+  const [profileCardData, setProfileCardData] = useState<ProfileCardData | null>(null);
 
   // Clear optimistic quand le profil rattrape la valeur
   useEffect(() => {
@@ -303,7 +307,39 @@ export default function ProfilePage() {
 
       {/* Bière #1 */}
       <TopBeerWidget userId={profile.id} />
+      {/* Partager mon profil */}
+      <button
+        onClick={async () => {
+          // Charger la top beer et le nombre de trophées
+          const { data: topBeer } = await supabase.rpc("get_user_top_beer", { p_user_id: profile.id });
+          const { count: trophyCount } = await supabase
+            .from("user_trophies")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", profile.id)
+            .eq("completed", true);
 
+          setProfileCardData({
+            username: profile.username,
+            displayName: profile.display_name,
+            avatarUrl: profile.avatar_url,
+            avatarFileName: currentFileName || null,
+            xp: profile.xp,
+            beersTasted: profile.beers_tasted,
+            duelsPlayed: profile.duels_played,
+            photosTaken: profile.photos_taken,
+            customTitle: (profile as any).custom_title || null,
+            customTitleIcon: (profile as any).custom_title_icon || null,
+            trophyCount: trophyCount || 0,
+            topBeer: topBeer ? { name: topBeer.name, brewery: topBeer.brewery, elo: topBeer.elo } : null,
+          });
+          setShowProfileCard(true);
+        }}
+        className="w-full flex items-center justify-center gap-2 py-3 bg-glupp-card border border-glupp-border rounded-glupp-lg text-sm font-medium text-glupp-text-soft hover:border-glupp-accent/50 hover:text-glupp-cream transition-colors"
+      >
+        <Share2 size={16} className="text-glupp-accent" />
+        Partager mon profil
+      </button>
+      
       {/* Inviter un ami */}
       <InviteButton userId={profile.id} />
 
