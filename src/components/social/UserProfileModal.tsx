@@ -29,6 +29,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { Rarity } from "@/types";
+import { TopBeerWidget } from "@/components/profile/TopBeerWidget";
 
 const RARITY_CONFIG: Record<Rarity, { label: string; color: string }> = {
   common: { label: "Commune", color: "#8D7C6C" },
