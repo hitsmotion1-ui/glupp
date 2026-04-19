@@ -41,21 +41,17 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
         position: "relative",
       }}
     >
-      {/* Header */}
-      <div style={{
-        padding: "32px 24px 16px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}>
-        {/* Avatar */}
+      {/* Header — block layout, pas de flex column pour éviter les bugs html2canvas */}
+      <div style={{ padding: "32px 24px 16px" }}>
+
+        {/* Avatar — centré via block + margin auto */}
         <div style={{
           width: 80, height: 80, borderRadius: "50%",
           border: "2px solid rgba(224,136,64,0.3)",
           background: "rgba(224,136,64,0.15)",
-          marginBottom: 12,
+          marginLeft: "auto", marginRight: "auto", marginBottom: 12,
           overflow: "hidden",
-          flexShrink: 0,
+          display: "block",
         }}>
           {data.avatarFileName ? (
             <img src={`https://glupp.fr/avatars/${data.avatarFileName}.png`} alt="" style={{ width: 80, height: 80, objectFit: "cover", display: "block" }} crossOrigin="anonymous" />
@@ -68,29 +64,34 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
           )}
         </div>
 
-        {/* Name */}
-        <div style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 2, textAlign: "center" }}>
+        {/* Name — textAlign center sur des block divs, le plus stable dans html2canvas */}
+        <div style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 2, textAlign: "center", lineHeight: 1.2 }}>
           {data.displayName || data.username}
         </div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12, textAlign: "center" }}>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12, textAlign: "center", lineHeight: 1.2 }}>
           @{data.username}
         </div>
 
-        {/* Title badge — inline-flex pour centrage parfait dans html2canvas */}
-        <div style={{
-          display: "inline-flex",
-          alignItems: "center",
-          padding: "5px 14px",
-          borderRadius: 20,
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          fontSize: 12,
-          fontWeight: 600,
-          color: "#E08840",
-          whiteSpace: "nowrap",
-        }}>
-          {data.customTitleIcon || level.icon} {data.customTitle || level.title}
+        {/* Title badge — wrappé dans un div block full-width avec textAlign center.
+            Le span intérieur a display:inline-block ce qui est le mieux supporté par html2canvas
+            pour simuler un "shrink-to-fit" centré sans flex */}
+        <div style={{ textAlign: "center", lineHeight: 1 }}>
+          <span style={{
+            display: "inline-block",
+            padding: "5px 14px",
+            borderRadius: 20,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#E08840",
+            whiteSpace: "nowrap",
+            lineHeight: 1.5,
+          }}>
+            {data.customTitleIcon || level.icon}&nbsp;{data.customTitle || level.title}
+          </span>
         </div>
+
       </div>
 
       {/* Stats */}
