@@ -249,7 +249,6 @@ export default function ProfilePage() {
           <span className="text-xs font-medium text-glupp-text-soft group-hover:text-glupp-cream transition-colors">
             {(profile as any).custom_title || level.title}
           </span>
-          </span>
           <span className="text-[8px] text-glupp-text-muted">✏️</span>
         </button>
 
