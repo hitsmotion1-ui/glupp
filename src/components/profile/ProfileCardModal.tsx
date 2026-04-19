@@ -42,46 +42,51 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
       }}
     >
       {/* Header */}
-      <div style={{ padding: "32px 24px 16px", textAlign: "center" }}>
+      <div style={{ padding: "32px 24px 16px" }}>
         {/* Avatar */}
         <div style={{
           width: 80, height: 80, borderRadius: "50%",
           border: "2px solid rgba(224,136,64,0.3)",
           background: "rgba(224,136,64,0.15)",
-          margin: "0 auto 12px",
+          marginLeft: "auto", marginRight: "auto", marginBottom: 12,
           overflow: "hidden",
-          display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           {data.avatarFileName ? (
-            <img src={`https://glupp.fr/avatars/${data.avatarFileName}.png`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+            <img src={`https://glupp.fr/avatars/${data.avatarFileName}.png`} alt="" style={{ width: 80, height: 80, objectFit: "cover", display: "block" }} crossOrigin="anonymous" />
           ) : data.avatarUrl ? (
-            <img src={data.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+            <img src={data.avatarUrl} alt="" style={{ width: 80, height: 80, objectFit: "cover", display: "block" }} crossOrigin="anonymous" />
           ) : (
-            <span style={{ fontSize: 28, fontWeight: 900, color: "#E08840" }}>{(data.displayName || data.username)[0]?.toUpperCase()}</span>
+            <div style={{ width: 80, height: 80, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 28, fontWeight: 900, color: "#E08840" }}>{(data.displayName || data.username)[0]?.toUpperCase()}</span>
+            </div>
           )}
         </div>
 
         {/* Name */}
-        <div style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 2 }}>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 2, textAlign: "center" }}>
           {data.displayName || data.username}
         </div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12, textAlign: "center" }}>
           @{data.username}
         </div>
 
         {/* Title */}
-        <div style={{ marginTop: 10, textAlign: "center" }}>
-          <span style={{
-            display: "inline-block",
-            padding: "5px 14px",
-            borderRadius: 20,
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            fontSize: 12, fontWeight: 600, color: "#E08840",
-          }}>
-            {data.customTitleIcon || level.icon} {data.customTitle || level.title}
-          </span>
-        </div>
+        <table style={{ marginLeft: "auto", marginRight: "auto" }}>
+          <tbody>
+            <tr>
+              <td style={{
+                padding: "5px 14px",
+                borderRadius: 20,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                fontSize: 12, fontWeight: 600, color: "#E08840",
+                textAlign: "center",
+              }}>
+                {data.customTitleIcon || level.icon} {data.customTitle || level.title}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       {/* Stats */}
