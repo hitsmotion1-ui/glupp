@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Download, Share2, Check, Beer, Swords, Camera, Trophy, Crown } from "lucide-react";
+import { X, Download, Share2, Check } from "lucide-react";
 import { getLevel } from "@/lib/utils/xp";
-import { supabase } from "@/lib/supabase/client";
 
 interface ProfileCardData {
   username: string;
@@ -32,93 +31,132 @@ function ProfileCardVisual({ data }: { data: ProfileCardData }) {
 
   return (
     <div
-      className="relative w-[340px] overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#1E1B16] via-[#1A1714] to-[#141210] shadow-2xl"
-      style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}
+      style={{
+        width: 340,
+        borderRadius: 16,
+        border: "1px solid rgba(255,255,255,0.1)",
+        background: "linear-gradient(180deg, #1E1B16 0%, #1A1714 50%, #141210 100%)",
+        overflow: "hidden",
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
+        position: "relative",
+      }}
     >
-      {/* Background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-[#E08840]/8 rounded-full blur-[100px]" />
-
       {/* Header */}
-      <div className="relative px-6 pt-8 pb-4 flex flex-col items-center text-center">
+      <div style={{ padding: "32px 24px 16px", textAlign: "center" }}>
         {/* Avatar */}
-        <div className="w-20 h-20 rounded-full bg-[#E08840]/15 border-2 border-[#E08840]/30 flex items-center justify-center overflow-hidden mb-3">
+        <div style={{
+          width: 80, height: 80, borderRadius: "50%",
+          border: "2px solid rgba(224,136,64,0.3)",
+          background: "rgba(224,136,64,0.15)",
+          margin: "0 auto 12px",
+          overflow: "hidden",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
           {data.avatarFileName ? (
-            <img src={`https://glupp.fr/avatars/${data.avatarFileName}.png`} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
+            <img src={`https://glupp.fr/avatars/${data.avatarFileName}.png`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
           ) : data.avatarUrl ? (
-            <img src={data.avatarUrl} alt="" className="w-full h-full object-cover" />
+            <img src={data.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
           ) : (
-            <span className="text-2xl font-black text-[#E08840]">{(data.displayName || data.username)[0]?.toUpperCase()}</span>
+            <span style={{ fontSize: 28, fontWeight: 900, color: "#E08840" }}>{(data.displayName || data.username)[0]?.toUpperCase()}</span>
           )}
         </div>
 
         {/* Name */}
-        <h2 className="text-xl font-black text-white">{data.displayName || data.username}</h2>
-        <p className="text-xs text-white/40">@{data.username}</p>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 2 }}>
+          {data.displayName || data.username}
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>
+          @{data.username}
+        </div>
 
         {/* Title */}
-        <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10">
-          <span className="text-sm">{data.customTitleIcon || level.icon}</span>
-          <span className="text-xs font-medium text-[#E08840]">{data.customTitle || level.title}</span>
+        <div style={{
+          display: "inline-flex", alignItems: "center",
+          padding: "5px 14px",
+          borderRadius: 20,
+          background: "rgba(255,255,255,0.05)",
+          border: "1px solid rgba(255,255,255,0.1)",
+        }}>
+          <span style={{ fontSize: 14, marginRight: 6 }}>{data.customTitleIcon || level.icon}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#E08840" }}>{data.customTitle || level.title}</span>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="px-5 pb-4">
-        <div className="grid grid-cols-4 gap-2">
-          <div className="flex flex-col items-center gap-0.5 p-2.5 rounded-xl bg-white/5">
-            <Beer size={14} className="text-[#E08840]" />
-            <p className="text-lg font-black text-white">{data.beersTasted}</p>
-            <p className="text-[8px] text-white/30 uppercase">Bieres</p>
+      <div style={{ padding: "0 20px 16px", display: "flex", gap: 8 }}>
+        {[
+          { icon: "🍺", value: data.beersTasted, label: "BIERES" },
+          { icon: "⚔️", value: data.duelsPlayed, label: "DUELS" },
+          { icon: "📸", value: data.photosTaken, label: "PHOTOS" },
+          { icon: "🏆", value: data.trophyCount, label: "TROPHEES" },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            flex: 1, textAlign: "center",
+            padding: "10px 4px",
+            borderRadius: 12,
+            background: "rgba(255,255,255,0.04)",
+          }}>
+            <div style={{ fontSize: 14, marginBottom: 2 }}>{stat.icon}</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "white" }}>{stat.value}</div>
+            <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", letterSpacing: 1, marginTop: 2 }}>{stat.label}</div>
           </div>
-          <div className="flex flex-col items-center gap-0.5 p-2.5 rounded-xl bg-white/5">
-            <Swords size={14} className="text-[#A78BFA]" />
-            <p className="text-lg font-black text-white">{data.duelsPlayed}</p>
-            <p className="text-[8px] text-white/30 uppercase">Duels</p>
-          </div>
-          <div className="flex flex-col items-center gap-0.5 p-2.5 rounded-xl bg-white/5">
-            <Camera size={14} className="text-[#4ECDC4]" />
-            <p className="text-lg font-black text-white">{data.photosTaken}</p>
-            <p className="text-[8px] text-white/30 uppercase">Photos</p>
-          </div>
-          <div className="flex flex-col items-center gap-0.5 p-2.5 rounded-xl bg-white/5">
-            <Trophy size={14} className="text-[#F0C460]" />
-            <p className="text-lg font-black text-white">{data.trophyCount}</p>
-            <p className="text-[8px] text-white/30 uppercase">Trophees</p>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Top beer */}
       {data.topBeer && (
-        <div className="mx-5 mb-4 px-4 py-3 rounded-xl bg-[#F0C460]/8 border border-[#F0C460]/15">
-          <div className="flex items-center gap-2 mb-1">
-            <Crown size={10} className="text-[#F0C460]" />
-            <span className="text-[9px] font-bold uppercase tracking-wider text-[#F0C460]">Ma biere #1</span>
+        <div style={{
+          margin: "0 20px 16px",
+          padding: "12px 16px",
+          borderRadius: 12,
+          background: "rgba(240,196,96,0.06)",
+          border: "1px solid rgba(240,196,96,0.12)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
+            <span style={{ fontSize: 10, marginRight: 4 }}>👑</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: "#F0C460", letterSpacing: 1, textTransform: "uppercase" as const }}>Ma biere #1</span>
           </div>
-          <p className="text-sm font-bold text-white truncate">{data.topBeer.name}</p>
-          <p className="text-[10px] text-white/40 truncate">{data.topBeer.brewery} · ELO {data.topBeer.elo}</p>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "white", lineHeight: 1.3 }}>
+            {data.topBeer.name}
+          </div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+            {data.topBeer.brewery}
+          </div>
         </div>
       )}
 
       {/* XP bar */}
-      <div className="mx-5 mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[9px] text-white/30">Niveau {level.level}</span>
-          <span className="text-[9px] text-[#E08840] font-bold">{data.xp} XP</span>
+      <div style={{ margin: "0 20px 16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>Niveau {level.level}</span>
+          <span style={{ fontSize: 9, color: "#E08840", fontWeight: 700 }}>{data.xp} XP</span>
         </div>
-        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-          <div className="h-full bg-[#E08840] rounded-full" style={{ width: `${Math.min(100, (data.xp % 1000) / 10)}%` }} />
+        <div style={{
+          width: "100%", height: 6,
+          background: "rgba(255,255,255,0.05)",
+          borderRadius: 3, overflow: "hidden",
+        }}>
+          <div style={{
+            height: "100%",
+            background: "#E08840",
+            borderRadius: 3,
+            width: `${Math.min(100, (data.xp % 1000) / 10)}%`,
+          }} />
         </div>
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-black tracking-tight text-[#E08840]">Glupp</span>
-          <span className="text-[8px] text-white/20">·</span>
-          <span className="text-[8px] text-white/20">glupp.fr</span>
+      <div style={{
+        padding: "12px 20px",
+        borderTop: "1px solid rgba(255,255,255,0.05)",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <span style={{ fontSize: 14, fontWeight: 900, color: "#E08840", letterSpacing: -0.5 }}>Glupp</span>
+          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", margin: "0 6px" }}>·</span>
+          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.2)" }}>glupp.fr</span>
         </div>
-        <p className="text-[8px] text-white/15 italic">Every glupp counts.</p>
+        <span style={{ fontSize: 8, color: "rgba(255,255,255,0.12)", fontStyle: "italic" }}>Every glupp counts.</span>
       </div>
     </div>
   );
@@ -137,6 +175,7 @@ export function ProfileCardModal({ isOpen, onClose, data }: ProfileCardModalProp
         backgroundColor: "#141210",
         scale: 2,
         useCORS: true,
+        allowTaint: true,
       });
       return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     } catch { return null; }

@@ -22,94 +22,54 @@ interface MilestoneModalProps {
 
 function MilestoneVisual({ data }: { data: MilestoneData }) {
   return (
-    <div
-      className="relative w-[340px] overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#1E1B16] to-[#141210] shadow-2xl"
-      style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}
-    >
-      {/* Background glow */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full blur-3xl opacity-20"
-        style={{ backgroundColor: data.color }}
-      />
-
+    <div style={{
+      width: 340, borderRadius: 16,
+      border: "1px solid rgba(255,255,255,0.1)",
+      background: "linear-gradient(180deg, #1E1B16 0%, #141210 100%)",
+      overflow: "hidden", position: "relative",
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+    }}>
       {/* Content */}
-      <div className="relative px-6 pt-10 pb-8 flex flex-col items-center text-center">
+      <div style={{ padding: "48px 24px 40px", textAlign: "center", position: "relative" }}>
         {/* Icon */}
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
-          className="text-6xl mb-4"
-        >
-          {data.icon}
-        </motion.div>
+        <div style={{ fontSize: 56, marginBottom: 16 }}>{data.icon}</div>
 
         {/* Value */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <p
-            className="text-5xl font-black tracking-tight"
-            style={{ color: data.color }}
-          >
-            {data.value}
-          </p>
-        </motion.div>
+        <div style={{ fontSize: 48, fontWeight: 900, color: data.color, letterSpacing: -1, lineHeight: 1 }}>
+          {data.value}
+        </div>
 
         {/* Title */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-3"
-        >
-          <h3 className="text-lg font-bold text-white">{data.title}</h3>
-          <p className="text-xs text-white/40 mt-1">{data.subtitle}</p>
-        </motion.div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "white", marginTop: 14 }}>
+          {data.title}
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>
+          {data.subtitle}
+        </div>
 
         {/* Username */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-6 px-4 py-1.5 rounded-full border border-white/10 bg-white/5"
-        >
-          <p className="text-xs text-white/50">
-            <span className="font-semibold text-white/70">@{data.username}</span> sur Glupp
-          </p>
-        </motion.div>
+        <div style={{
+          display: "inline-flex", alignItems: "center",
+          padding: "6px 16px", borderRadius: 20,
+          border: "1px solid rgba(255,255,255,0.1)",
+          background: "rgba(255,255,255,0.05)",
+          marginTop: 24,
+        }}>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
+            <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>@{data.username}</span> sur Glupp
+          </span>
+        </div>
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between">
-        <span className="text-sm font-black tracking-tight text-[#E08840]">Glupp</span>
-        <p className="text-[9px] text-white/20 italic">Every glupp counts.</p>
+      <div style={{
+        padding: "12px 24px",
+        borderTop: "1px solid rgba(255,255,255,0.05)",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 900, color: "#E08840", letterSpacing: -0.5 }}>Glupp</span>
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.15)", fontStyle: "italic" }}>Every glupp counts.</span>
       </div>
-
-      {/* Decorative particles */}
-      {["🍺", "⭐", "🏆", "🎖️"].map((emoji, i) => (
-        <motion.div
-          key={i}
-          className="absolute text-lg opacity-10"
-          style={{
-            top: `${15 + i * 20}%`,
-            left: i % 2 === 0 ? "8%" : "85%",
-          }}
-          animate={{
-            y: [0, -8, 0],
-            rotate: [0, 10, -10, 0],
-          }}
-          transition={{
-            duration: 3 + i * 0.5,
-            repeat: Infinity,
-            delay: i * 0.3,
-          }}
-        >
-          {emoji}
-        </motion.div>
-      ))}
     </div>
   );
 }
@@ -129,9 +89,7 @@ export function MilestoneModal({ isOpen, onClose, data }: MilestoneModalProps) {
         useCORS: true,
       });
       return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }, []);
 
   const handleDownload = async () => {
@@ -184,10 +142,7 @@ export function MilestoneModal({ isOpen, onClose, data }: MilestoneModalProps) {
             onClick={(e) => e.stopPropagation()}
             className="flex flex-col items-center gap-5 max-w-sm w-full"
           >
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 text-white/50 hover:text-white bg-white/10 rounded-full transition-colors"
-            >
+            <button onClick={onClose} className="absolute top-4 right-4 p-2 text-white/50 hover:text-white bg-white/10 rounded-full transition-colors">
               <X size={20} />
             </button>
 
@@ -196,26 +151,17 @@ export function MilestoneModal({ isOpen, onClose, data }: MilestoneModalProps) {
             </div>
 
             <div className="flex items-center gap-3 w-full max-w-[340px]">
-              <button
-                onClick={handleShare}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#E08840] text-white font-bold text-sm hover:bg-[#E08840]/90 transition-colors"
-              >
+              <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#E08840] text-white font-bold text-sm hover:bg-[#E08840]/90 transition-colors">
                 {copied ? <Check size={16} /> : <Share2 size={16} />}
-                {copied ? "Copié !" : "Partager"}
+                {copied ? "Copie !" : "Partager"}
               </button>
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/10 text-white/80 font-medium text-sm hover:bg-white/15 transition-colors border border-white/10"
-              >
+              <button onClick={handleDownload} disabled={downloading} className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/10 text-white/80 font-medium text-sm hover:bg-white/15 transition-colors border border-white/10">
                 <Download size={16} />
                 {downloading ? "..." : "Sauver"}
               </button>
             </div>
 
-            <button onClick={onClose} className="text-xs text-white/30 hover:text-white/50 transition-colors">
-              Passer
-            </button>
+            <button onClick={onClose} className="text-xs text-white/30 hover:text-white/50 transition-colors">Fermer</button>
           </motion.div>
         </motion.div>
       )}
@@ -223,7 +169,6 @@ export function MilestoneModal({ isOpen, onClose, data }: MilestoneModalProps) {
   );
 }
 
-// Helper pour créer les milestones standards
 export const MILESTONE_CONFIGS = {
   beers: (count: number, username: string): MilestoneData => ({
     type: "beers", value: count, username,
@@ -241,7 +186,7 @@ export const MILESTONE_CONFIGS = {
   }),
   trophy: (name: string, emoji: string, username: string): MilestoneData => ({
     type: "trophy", value: emoji, username,
-    title: `Trophee debloque !`,
+    title: "Trophee debloque !",
     subtitle: name,
     icon: "🏆",
     color: "#F0C460",
