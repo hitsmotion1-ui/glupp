@@ -35,6 +35,7 @@ import {
   Globe,
   Settings,
   MessageSquarePlus,
+  Share2,
 } from "lucide-react";
 import { formatNumber } from "@/lib/utils/xp";
 import { InviteButton } from "@/components/social/InviteButton";
@@ -339,7 +340,7 @@ export default function ProfilePage() {
         <Share2 size={16} className="text-glupp-accent" />
         Partager mon profil
       </button>
-      
+        
       {/* Inviter un ami */}
       <InviteButton userId={profile.id} />
 
@@ -478,6 +479,15 @@ export default function ProfilePage() {
             </div>
          </div>
       )}
+      {/* Profile Card */}
+      {profileCardData && (
+        <ProfileCardModal
+          isOpen={showProfileCard}
+          onClose={() => setShowProfileCard(false)}
+          data={profileCardData}
+        />
+      )}
+
       {/* Title Selector */}
       <TitleSelector
         isOpen={isTitleSelectorOpen}
