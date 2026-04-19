@@ -192,18 +192,228 @@ export function ProfileCardModal({ isOpen, onClose, data }: ProfileCardModalProp
   const [downloading, setDownloading] = useState(false);
 
   const generateImage = useCallback(async (): Promise<Blob | null> => {
-    if (!cardRef.current) return null;
-    try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: "#141210",
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-      });
-      return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-    } catch { return null; }
-  }, []);
+    const level = getLevel(data.xp);
+    const DPR = 2;
+    const W = 340;
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+    function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+      ctx.lineTo(x + r, y + h);
+      ctx.arcTo(x, y + h, x, y + h - r, r);
+      ctx.lineTo(x, y + r);
+      ctx.arcTo(x, y, x + r, y, r);
+      ctx.closePath();
+    }
+
+    function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, font: string, color: string, align: CanvasTextAlign = "left") {
+      ctx.font = font;
+      ctx.fillStyle = color;
+      ctx.textAlign = align;
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y);
+    }
+
+    // ── compute dynamic height ────────────────────────────────────────────────
+    let H = 32 + 80 + 12 + 28 + 4 + 20 + 16 + 28 + 16; // header top + avatar + gap + name + gap + @user + gap + badge + gap
+    H += 16 + 72 + 16;   // stats section
+    if (data.topBeer) H += 80 + 16; // top beer card
+    H += 16 + 32 + 16;   // xp bar section
+    H += 44;             // footer
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(DPR, DPR);
+
+    // ── background gradient ───────────────────────────────────────────────────
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#1E1B16");
+    bg.addColorStop(0.5, "#1A1714");
+    bg.addColorStop(1, "#141210");
+    roundRect(ctx, 0, 0, W, H, 16);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    // card border
+    roundRect(ctx, 0, 0, W, H, 16);
+    ctx.strokeStyle = "rgba(255,255,255,0.1)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    let y = 32;
+
+    // ── avatar ────────────────────────────────────────────────────────────────
+    const avatarSize = 80;
+    const avatarX = (W - avatarSize) / 2;
+    // circle clip
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarX + avatarSize / 2, y + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+    ctx.clip();
+
+    // try to load avatar image
+    let avatarLoaded = false;
+    const avatarSrc = data.avatarFileName
+      ? `https://glupp.fr/avatars/${data.avatarFileName}.png`
+      : data.avatarUrl || null;
+
+    if (avatarSrc) {
+      try {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => { ctx.drawImage(img, avatarX, y, avatarSize, avatarSize); avatarLoaded = true; resolve(); };
+          img.onerror = () => resolve();
+          img.src = avatarSrc;
+        });
+      } catch { /* fallback */ }
+    }
+
+    if (!avatarLoaded) {
+      ctx.fillStyle = "rgba(224,136,64,0.15)";
+      ctx.fillRect(avatarX, y, avatarSize, avatarSize);
+      drawText(ctx, (data.displayName || data.username)[0]?.toUpperCase() || "?",
+        avatarX + avatarSize / 2, y + avatarSize / 2, "bold 28px system-ui", "#E08840", "center");
+    }
+    ctx.restore();
+
+    // avatar ring
+    ctx.beginPath();
+    ctx.arc(avatarX + avatarSize / 2, y + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(224,136,64,0.3)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    y += avatarSize + 14;
+
+    // ── display name ──────────────────────────────────────────────────────────
+    drawText(ctx, data.displayName || data.username, W / 2, y, "900 20px system-ui", "#ffffff", "center");
+    y += 22;
+    drawText(ctx, `@${data.username}`, W / 2, y, "400 12px system-ui", "rgba(255,255,255,0.4)", "center");
+    y += 20;
+
+    // ── title badge ───────────────────────────────────────────────────────────
+    const badgeText = `${data.customTitleIcon || level.icon} ${data.customTitle || level.title}`;
+    ctx.font = "600 12px system-ui";
+    const badgeTextW = ctx.measureText(badgeText).width;
+    const badgePadX = 14;
+    const badgeH = 26;
+    const badgeW = badgeTextW + badgePadX * 2;
+    const badgeX = (W - badgeW) / 2;
+
+    roundRect(ctx, badgeX, y, badgeW, badgeH, 13);
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.fill();
+    roundRect(ctx, badgeX, y, badgeW, badgeH, 13);
+    ctx.strokeStyle = "rgba(255,255,255,0.1)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // text centered inside badge — textBaseline middle = parfait
+    ctx.font = "600 12px system-ui";
+    ctx.fillStyle = "#E08840";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(badgeText, W / 2, y + badgeH / 2);
+
+    y += badgeH + 16;
+
+    // ── stats ─────────────────────────────────────────────────────────────────
+    const stats = [
+      { icon: "🍺", value: data.beersTasted, label: "BIERES" },
+      { icon: "⚔️", value: data.duelsPlayed, label: "DUELS" },
+      { icon: "📸", value: data.photosTaken, label: "PHOTOS" },
+      { icon: "🏆", value: data.trophyCount, label: "TROPHEES" },
+    ];
+    const statPad = 20;
+    const statGap = 8;
+    const statW = (W - statPad * 2 - statGap * 3) / 4;
+    const statH = 72;
+
+    stats.forEach((stat, i) => {
+      const sx = statPad + i * (statW + statGap);
+      roundRect(ctx, sx, y, statW, statH, 12);
+      ctx.fillStyle = "rgba(255,255,255,0.04)";
+      ctx.fill();
+
+      const cx = sx + statW / 2;
+      ctx.font = "14px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(stat.icon, cx, y + 14);
+
+      drawText(ctx, String(stat.value), cx, y + 34, "900 18px system-ui", "#ffffff", "center");
+      drawText(ctx, stat.label, cx, y + 56, "400 7px system-ui", "rgba(255,255,255,0.3)", "center");
+    });
+
+    y += statH + 16;
+
+    // ── top beer ──────────────────────────────────────────────────────────────
+    if (data.topBeer) {
+      const beerCardH = 72;
+      roundRect(ctx, 20, y, W - 40, beerCardH, 12);
+      ctx.fillStyle = "rgba(240,196,96,0.06)";
+      ctx.fill();
+      roundRect(ctx, 20, y, W - 40, beerCardH, 12);
+      ctx.strokeStyle = "rgba(240,196,96,0.12)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.font = "10px system-ui";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText("👑", 32, y + 16);
+
+      drawText(ctx, "MA BIERE #1", 47, y + 16, "700 9px system-ui", "#F0C460");
+      drawText(ctx, data.topBeer.name, 32, y + 38, "700 14px system-ui", "#ffffff");
+      drawText(ctx, data.topBeer.brewery, 32, y + 57, "400 10px system-ui", "rgba(255,255,255,0.4)");
+
+      y += beerCardH + 16;
+    }
+
+    // ── XP bar ────────────────────────────────────────────────────────────────
+    drawText(ctx, `Niveau ${level.level}`, 20, y + 6, "400 9px system-ui", "rgba(255,255,255,0.3)");
+    drawText(ctx, `${data.xp} XP`, W - 20, y + 6, "700 9px system-ui", "#E08840", "right");
+    y += 16;
+
+    const barH = 6;
+    roundRect(ctx, 20, y, W - 40, barH, 3);
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.fill();
+
+    const barFill = Math.min(1, (data.xp % 1000) / 1000) * (W - 40);
+    if (barFill > 0) {
+      roundRect(ctx, 20, y, barFill, barH, 3);
+      ctx.fillStyle = "#E08840";
+      ctx.fill();
+    }
+
+    y += barH + 16;
+
+    // ── footer ────────────────────────────────────────────────────────────────
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+    y += 14;
+
+    drawText(ctx, "Glupp", 20, y + 8, "900 14px system-ui", "#E08840");
+    drawText(ctx, "·", 56, y + 8, "400 8px system-ui", "rgba(255,255,255,0.2)", "center");
+    drawText(ctx, "glupp.fr", 66, y + 8, "400 8px system-ui", "rgba(255,255,255,0.2)");
+    drawText(ctx, "Every glupp counts.", W - 20, y + 8, "italic 400 8px system-ui", "rgba(255,255,255,0.12)", "right");
+
+    return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  }, [data]);
 
   const handleDownload = async () => {
     setDownloading(true);
