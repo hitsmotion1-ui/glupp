@@ -24,6 +24,7 @@ import { motion } from "framer-motion";
 import { ShareModal, type BeerCardData } from "@/components/social/ShareModal";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { useMilestones } from "@/lib/hooks/useMilestones";
+import { PostGluppDebrief } from "@/components/beer/PostGluppDebrief";
 
 
 type LocationType = "bar" | "home" | "other" | null;
@@ -58,6 +59,9 @@ export function GluppModal() {
   const [newBarName, setNewBarName] = useState("");
   const [newBarCity, setNewBarCity] = useState("");
   const [barsLoading, setBarsLoading] = useState(false);
+
+  const [showDebrief, setShowDebrief] = useState(false);
+  const [debriefData, setDebriefData] = useState<{ beerId: string; beerName: string; barName: string | null } | null>(null);
 
   const [shareData, setShareData] = useState<BeerCardData | null>(null);
   const { profile } = useProfile();
@@ -350,6 +354,13 @@ export function GluppModal() {
         username: profile?.username || "Glupper",
         avatarUrl: profile?.avatar_url || null,
         level: getLevel(profile?.xp || 0),
+      });
+
+      // Préparer le débrief post-glupp
+      setDebriefData({
+        beerId: beer.id,
+        beerName: beer.name,
+        barName: barName,
       });
 
       // Cascade invalidation
@@ -692,7 +703,28 @@ export function GluppModal() {
           isOpen={!!shareData}
           onClose={() => {
             setShareData(null);
-            // Déclencher le milestone maintenant que la Beer Card est fermée
+            if (debriefData) {
+              setShowDebrief(true);
+            } else {
+              // Pas de débrief → déclencher le milestone et fermer
+              if (pendingMilestone) {
+                const { username, prevBeers, newBeers, prevXp, newXp, trophies } = pendingMilestone;
+                checkAfterGlupp(username, prevBeers, newBeers, prevXp, newXp, trophies);
+                setPendingMilestone(null);
+              }
+              closeGluppModal();
+            }
+          }}
+          data={shareData}
+        />
+      )}
+
+      {debriefData && (
+        <PostGluppDebrief
+          isOpen={showDebrief}
+          onClose={() => {
+            setShowDebrief(false);
+            setDebriefData(null);
             if (pendingMilestone) {
               const { username, prevBeers, newBeers, prevXp, newXp, trophies } = pendingMilestone;
               checkAfterGlupp(username, prevBeers, newBeers, prevXp, newXp, trophies);
@@ -700,7 +732,9 @@ export function GluppModal() {
             }
             closeGluppModal();
           }}
-          data={shareData}
+          beerId={debriefData.beerId}
+          beerName={debriefData.beerName}
+          barName={debriefData.barName}
         />
       )}
     </Modal>
