@@ -448,6 +448,11 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
                 {filteredStyles.map((s) => (
                   <button key={s} type="button" onClick={() => { setStyle(s); setShowStylePicker(false); setStyleSearch(""); }} className={`w-full text-left px-3 py-2 text-sm transition-colors ${style === s ? "bg-glupp-accent/10 text-glupp-accent" : "text-glupp-cream hover:bg-glupp-border/30"}`}>{s}</button>
                 ))}
+                {styleSearch.trim() && !filteredStyles.some((s) => s.toLowerCase() === styleSearch.toLowerCase()) && (
+                  <button type="button" onClick={() => { setStyle(styleSearch.trim()); setShowStylePicker(false); setStyleSearch(""); }} className="w-full text-left px-3 py-2 text-sm text-glupp-accent hover:bg-glupp-accent/10 transition-colors flex items-center gap-1.5">
+                    + Creer &quot;{styleSearch.trim()}&quot;
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -480,13 +485,26 @@ export function AddBeerModal({ isOpen, onClose, prefillName, prefillBarcode }: A
 
         <div>
           <label className="text-xs text-glupp-text-muted block mb-1">Region (optionnel)</label>
-          <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Ex: Vendee, Baviere..." className={inputClass} />
-          {regionSuggestions.length > 0 && !region && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {regionSuggestions.slice(0, 8).map((r) => (
-                <button key={r} type="button" onClick={() => setRegion(r)} className="px-2.5 py-1 rounded-full bg-glupp-card-alt border border-glupp-border text-xs text-glupp-text-soft hover:border-glupp-accent hover:text-glupp-accent transition-colors">{r}</button>
-              ))}
+          {regionSuggestions.length > 0 ? (
+            <div className="relative">
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className={`${inputClass} appearance-none`}
+              >
+                <option value="">-- Choisir une region --</option>
+                {regionSuggestions.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+                <option value="__other__">Autre...</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-glupp-text-muted pointer-events-none" />
             </div>
+          ) : (
+            <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Ex: Vendee, Baviere..." className={inputClass} />
+          )}
+          {region === "__other__" && (
+            <input type="text" value="" onChange={(e) => setRegion(e.target.value)} placeholder="Saisir la region..." className={`${inputClass} mt-2`} autoFocus />
           )}
         </div>
 
