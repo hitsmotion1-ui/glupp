@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { StarRating } from "@/components/ui/StarRating";
-import { X, ChevronRight, MapPin, Beer, Sparkles } from "lucide-react";
+import { X, ChevronRight, MapPin, Sparkles } from "lucide-react";
 
 interface PostGluppDebriefProps {
   isOpen: boolean;
@@ -26,9 +26,10 @@ const TASTE_DIMS = [
 ];
 
 const BAR_CRITERIA = [
-  { key: "ambiance", label: "Ambiance", emoji: "🎶" },
+  { key: "ambiance", label: "Ambiance", emoji: "🎵" },
+  { key: "beer_selection", label: "Bières", emoji: "🍺" },
+  { key: "price", label: "Prix", emoji: "💰" },
   { key: "service", label: "Service", emoji: "🤝" },
-  { key: "selection", label: "Sélection bières", emoji: "🍺" },
 ];
 
 export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }: PostGluppDebriefProps) {
@@ -45,13 +46,17 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
   const [savingBeer, setSavingBeer] = useState(false);
 
   // Bar rating state
-  const [barRating, setBarRating] = useState<number | null>(null);
   const [barCriteria, setBarCriteria] = useState<Record<string, number | null>>({
-    ambiance: null, service: null, selection: null,
+    ambiance: null, beer_selection: null, price: null, service: null,
   });
   const [savingBar, setSavingBar] = useState(false);
 
-  const totalXpEarned = (beerRating ? 5 : 0) + (barRating ? 5 : 0);
+  // Note globale calculée
+  const barGlobalRating = (() => {
+    const values = Object.values(barCriteria).filter((v): v is number => v !== null);
+    if (values.length === 0) return null;
+    return Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10;
+  })();
 
   const handleSaveBeerRating = async () => {
     if (!beerRating) { goNext(); return; }
@@ -60,19 +65,15 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Note étoiles
       const { data } = await supabase.rpc("rate_beer", {
         p_user_id: user.id, p_beer_id: beerId, p_rating: beerRating,
       });
       if (data?.xp_bonus > 0) showXPToast(data.xp_bonus, "Note !");
 
-      // Profil gustatif si rempli
       if (showTaste) {
         await supabase.from("user_beers").update({
-          user_taste_bitter: taste.bitter,
-          user_taste_sweet: taste.sweet,
-          user_taste_fruity: taste.fruity,
-          user_taste_body: taste.body,
+          user_taste_bitter: taste.bitter, user_taste_sweet: taste.sweet,
+          user_taste_fruity: taste.fruity, user_taste_body: taste.body,
         }).eq("user_id", user.id).eq("beer_id", beerId);
       }
 
@@ -85,24 +86,63 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
   };
 
   const handleSaveBarRating = async () => {
-    if (!barRating || !barName) { handleFinish(); return; }
+    const filledCriteria = Object.values(barCriteria).filter((v) => v !== null);
+    if (filledCriteria.length === 0 || !barName) { handleFinish(); return; }
     setSavingBar(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase.rpc("rate_bar", {
-        p_user_id: user.id,
-        p_bar_name: barName,
-        p_rating: barRating,
-        p_ambiance: barCriteria.ambiance,
-        p_service: barCriteria.service,
-        p_selection: barCriteria.selection,
-      });
-      if (data?.xp_bonus > 0) showXPToast(data.xp_bonus, "Bar noté !");
+      // Trouver le bar_id à partir du nom
+      const { data: bar } = await supabase
+        .from("bars")
+        .select("id")
+        .eq("name", barName)
+        .maybeSingle();
+
+      if (!bar) { handleFinish(); return; }
+
+      // Vérifier si un avis existe déjà
+      const { data: existing } = await supabase
+        .from("bar_reviews")
+        .select("id")
+        .eq("bar_id", bar.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const reviewData = {
+        ambiance: barCriteria.ambiance || 3,
+        beer_selection: barCriteria.beer_selection || 3,
+        price: barCriteria.price || 3,
+        service: barCriteria.service || 3,
+      };
+
+      if (existing) {
+        await supabase.from("bar_reviews").update(reviewData).eq("id", existing.id);
+      } else {
+        await supabase.from("bar_reviews").insert({
+          user_id: user.id,
+          bar_id: bar.id,
+          ...reviewData,
+        });
+        // XP bonus première fois
+        showXPToast(5, "Bar noté !");
+        await supabase.from("profiles").update({
+          xp: supabase.rpc ? undefined : undefined, // handled below
+        });
+        // Incrémenter XP manuellement
+        const { data: profile } = await supabase.from("profiles").select("xp").eq("id", user.id).single();
+        if (profile) {
+          await supabase.from("profiles").update({ xp: profile.xp + 5, updated_at: new Date().toISOString() }).eq("id", user.id);
+        }
+      }
 
       queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
-    } catch { /* ignore */ }
+      queryClient.invalidateQueries({ queryKey: ["bar-reviews", bar.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    } catch (err) {
+      console.error("Bar rating error:", err);
+    }
     setSavingBar(false);
     handleFinish();
   };
@@ -114,22 +154,12 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
 
   const handleFinish = () => {
     setStep("done");
-    setTimeout(onClose, 600);
+    setTimeout(onClose, 300);
   };
 
   const handleSkip = () => {
     if (step === "beer") goNext();
     else handleFinish();
-  };
-
-  // Calculer la note globale du bar depuis les critères
-  const updateBarGlobal = (key: string, value: number) => {
-    const updated = { ...barCriteria, [key]: value };
-    setBarCriteria(updated);
-    const values = Object.values(updated).filter((v): v is number => v !== null);
-    if (values.length > 0) {
-      setBarRating(Math.round(values.reduce((a, b) => a + b, 0) / values.length));
-    }
   };
 
   return (
@@ -191,7 +221,6 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
                     )}
                   </div>
 
-                  {/* Toggle profil gustatif */}
                   {beerRating && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
                       <button
@@ -237,7 +266,6 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
                     </motion.div>
                   )}
 
-                  {/* Actions */}
                   <div className="flex gap-2">
                     <button onClick={handleSkip} className="flex-1 py-2.5 text-xs text-[#6B6050] hover:text-[#A89888] transition-colors">
                       Passer
@@ -274,7 +302,6 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
                     <p className="text-xs text-[#A89888]">{barName}</p>
                   </div>
 
-                  {/* Critères détaillés */}
                   <div className="space-y-3">
                     {BAR_CRITERIA.map((c) => (
                       <div key={c.key} className="flex items-center justify-between">
@@ -283,29 +310,27 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
                         </span>
                         <StarRating
                           value={barCriteria[c.key]}
-                          onChange={(v) => updateBarGlobal(c.key, v)}
+                          onChange={(v) => setBarCriteria((prev) => ({ ...prev, [c.key]: v }))}
                           size={20}
                         />
                       </div>
                     ))}
                   </div>
 
-                  {/* Note globale calculée */}
-                  {barRating && (
+                  {barGlobalRating && (
                     <div className="flex items-center justify-between p-3 bg-[#141210] rounded-xl border border-[#3A3530]/50">
                       <span className="text-xs font-semibold text-[#F5E6D3]">Note globale</span>
                       <div className="flex items-center gap-2">
-                        <StarRating value={barRating} readonly size={18} />
-                        <span className="text-sm font-bold text-[#E08840]">{barRating}/5</span>
+                        <StarRating value={Math.round(barGlobalRating)} readonly size={18} />
+                        <span className="text-sm font-bold text-[#E08840]">{barGlobalRating.toFixed(1)}/5</span>
                       </div>
                     </div>
                   )}
 
-                  {!barRating && (
+                  {!barGlobalRating && (
                     <p className="text-[10px] text-[#6B6050] text-center">+5 XP pour ta premiere note de bar !</p>
                   )}
 
-                  {/* Actions */}
                   <div className="flex gap-2">
                     <button onClick={handleSkip} className="flex-1 py-2.5 text-xs text-[#6B6050] hover:text-[#A89888] transition-colors">
                       Passer
