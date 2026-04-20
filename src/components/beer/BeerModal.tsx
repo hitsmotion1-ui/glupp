@@ -10,22 +10,15 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { RarityBadge } from "./RarityBadge";
 import { TasteProfile } from "./TasteProfile";
+import { StarRating } from "@/components/ui/StarRating";
+import { BarRatingPrompt } from "@/components/beer/BarRatingPrompt";
 import { beerEmoji, formatNumber, RARITY_CONFIG } from "@/lib/utils/xp";
 import {
-  Lock,
-  Zap,
-  Calendar,
-  MapPin,
-  Camera,
-  RotateCcw,
-  Beer as BeerIcon,
-  Pencil,
-  Check,
-  Loader2,
+  Lock, Zap, Calendar, MapPin, Camera, RotateCcw,
+  Beer as BeerIcon, Pencil, Check, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// ── Taste dimensions for user rating ──
 const TASTE_DIMS = [
   { key: "bitter" as const, label: "Amertume", color: "#E08840", emoji: "🍺" },
   { key: "sweet" as const, label: "Sucre", color: "#DCB04C", emoji: "🍯" },
@@ -33,61 +26,39 @@ const TASTE_DIMS = [
   { key: "body" as const, label: "Corps", color: "#8D7C6C", emoji: "💪" },
 ];
 
-interface UserTasteRating {
-  bitter: number;
-  sweet: number;
-  fruity: number;
-  body: number;
-}
+interface UserTasteRating { bitter: number; sweet: number; fruity: number; body: number; }
 
 export function BeerModal() {
   const queryClient = useQueryClient();
   const { selectedBeerId, closeBeerModal, openGluppModal, showXPToast } = useAppStore();
-  
   const [regluppLoading, setRegluppLoading] = useState(false);
   const [regluppDone, setRegluppDone] = useState(false);
-
-  // ── User taste rating state ──
   const [editingTaste, setEditingTaste] = useState(false);
-  const [tasteDraft, setTasteDraft] = useState<UserTasteRating>({
-    bitter: 3,
-    sweet: 3,
-    fruity: 3,
-    body: 3,
-  });
+  const [tasteDraft, setTasteDraft] = useState<UserTasteRating>({ bitter: 3, sweet: 3, fruity: 3, body: 3 });
   const [savingTaste, setSavingTaste] = useState(false);
+  const [barRated, setBarRated] = useState(false);
 
-  // 1. 🚀 REQUÊTE MISE EN CACHE : Les détails de la bière
   const { data: beer, isLoading: loadingBeer } = useQuery({
     queryKey: ["beer", selectedBeerId],
     enabled: !!selectedBeerId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("beers")
-        .select("*")
-        .eq("id", selectedBeerId)
-        .single();
+      const { data, error } = await supabase.from("beers").select("*").eq("id", selectedBeerId).single();
       if (error) throw error;
       return data as Beer;
     },
   });
 
-  // 2. 🚀 REQUÊTE MISE EN CACHE : Les données de l'utilisateur pour cette bière
   const { data: userBeerData, isLoading: loadingUserBeer, refetch: refetchUserBeer } = useQuery({
     queryKey: ["userBeer", selectedBeerId],
     enabled: !!selectedBeerId,
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-
       const { data, error } = await supabase
         .from("user_beers")
-        .select("id, tasted_at, photo_url, bar_name, glupp_count, user_taste_bitter, user_taste_sweet, user_taste_fruity, user_taste_body")
-        .eq("user_id", user.id)
-        .eq("beer_id", selectedBeerId)
-        .maybeSingle();
-      
+        .select("id, tasted_at, photo_url, bar_name, glupp_count, rating, user_taste_bitter, user_taste_sweet, user_taste_fruity, user_taste_body")
+        .eq("user_id", user.id).eq("beer_id", selectedBeerId).maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -96,91 +67,63 @@ export function BeerModal() {
   const loading = loadingBeer || loadingUserBeer;
   const tasted = !!userBeerData;
 
-  // Réinitialiser les états éphémères à la fermeture
   useEffect(() => {
-    if (!selectedBeerId) {
-      setRegluppDone(false);
-      setEditingTaste(false);
-    }
+    if (!selectedBeerId) { setRegluppDone(false); setEditingTaste(false); setBarRated(false); }
   }, [selectedBeerId]);
 
-  // ── Save user taste rating ──
   const handleSaveTaste = useCallback(async () => {
     if (!beer || !userBeerData) return;
     setSavingTaste(true);
-
     try {
-      const { data, error } = await supabase
-        .from("user_beers")
-        .update({
-          user_taste_bitter: tasteDraft.bitter,
-          user_taste_sweet: tasteDraft.sweet,
-          user_taste_fruity: tasteDraft.fruity,
-          user_taste_body: tasteDraft.body,
-        })
-        .eq("id", userBeerData.id) 
-        .select();
-
+      const { data, error } = await supabase.from("user_beers").update({
+        user_taste_bitter: tasteDraft.bitter, user_taste_sweet: tasteDraft.sweet,
+        user_taste_fruity: tasteDraft.fruity, user_taste_body: tasteDraft.body,
+      }).eq("id", userBeerData.id).select();
       if (error) throw error;
-
       if (!data || data.length === 0) {
-        console.error("Sauvegarde ignorée. Problème RLS ?");
-        alert("Attention : Supabase a bloqué la sauvegarde. Vérifie tes règles de sécurité (RLS) pour autoriser l'UPDATE sur la table user_beers !");
+        alert("Attention : Supabase a bloqué la sauvegarde.");
       } else {
         setEditingTaste(false);
         await queryClient.invalidateQueries({ queryKey: ["userBeer", selectedBeerId] });
-        await queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });        
+        await queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
         await refetchUserBeer();
       }
     } catch (err: any) {
-      console.error("Erreur de sauvegarde :", err);
-      alert("Une erreur est survenue lors de la sauvegarde : " + err.message);
-    } finally {
-      setSavingTaste(false);
-    }
+      alert("Erreur : " + err.message);
+    } finally { setSavingTaste(false); }
   }, [beer, userBeerData, tasteDraft, selectedBeerId, refetchUserBeer, queryClient]);
 
-  // Re-Glupp handler
+  const handleRateBeer = async (rating: number) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !beer) return;
+    const { data } = await supabase.rpc("rate_beer", { p_user_id: user.id, p_beer_id: beer.id, p_rating: rating });
+    if (data?.xp_bonus > 0) showXPToast(data.xp_bonus, "Note !");
+    await refetchUserBeer();
+    queryClient.invalidateQueries({ queryKey: ["beer", selectedBeerId] });
+    queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
+  };
+
   const handleReglupp = async () => {
     if (!beer) return;
     setRegluppLoading(true);
-
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setRegluppLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase.rpc("register_reglupp", {
-      p_user_id: user.id,
-      p_beer_id: beer.id,
-    });
-
+    if (!user) { setRegluppLoading(false); return; }
+    const { data, error } = await supabase.rpc("register_reglupp", { p_user_id: user.id, p_beer_id: beer.id });
     if (!error && data) {
       const result = data as { xp_gained: number; glupp_count: number };
-      if (result.xp_gained > 0) {
-        showXPToast(result.xp_gained, "Re-Glupp !");
-      }
+      if (result.xp_gained > 0) showXPToast(result.xp_gained, "Re-Glupp !");
       setRegluppDone(true);
-
-      refetchUserBeer(); 
+      refetchUserBeer();
       queryClient.invalidateQueries({ queryKey: queryKeys.collection.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.me });
-      
-      setTimeout(() => {
-        closeBeerModal();
-      }, 2000);
+      setTimeout(() => closeBeerModal(), 2000);
     }
-
     setRegluppLoading(false);
   };
 
   const regluppXP = (count: number): number => {
-    if (count <= 1) return 5;
-    if (count <= 3) return 3;
-    if (count <= 6) return 2;
-    if (count <= 10) return 1;
-    return 0;
+    if (count <= 1) return 5; if (count <= 3) return 3;
+    if (count <= 6) return 2; if (count <= 10) return 1; return 0;
   };
 
   if (!selectedBeerId) return null;
@@ -192,37 +135,25 @@ export function BeerModal() {
   const nextRegluppXP = regluppXP(gluppCount);
 
   return (
-    <Modal
-      isOpen={!!selectedBeerId}
-      onClose={closeBeerModal}
-      title={beer?.name || "Bière"}
-    >
+    <Modal isOpen={!!selectedBeerId} onClose={closeBeerModal} title={beer?.name || "Bière"}>
       {loading || !beer ? (
         <div className="py-12 flex flex-col items-center justify-center text-glupp-text-muted space-y-3">
-           <Loader2 size={24} className="animate-spin text-glupp-accent" />
-           <p className="text-sm">Décapsulage en cours...</p>
+          <Loader2 size={24} className="animate-spin text-glupp-accent" />
+          <p className="text-sm">Décapsulage en cours...</p>
         </div>
       ) : !tasted ? (
         // ═══ LOCKED STATE ═══
         <div className="flex flex-col items-center text-center py-2 space-y-4">
           <div className="relative">
-            <span className="text-6xl grayscale opacity-50">
-              {beerEmoji(beer.style)}
-            </span>
+            <span className="text-6xl grayscale opacity-50">{beerEmoji(beer.style)}</span>
             <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-glupp-card-alt border border-glupp-border flex items-center justify-center">
               <Lock size={14} className="text-glupp-text-muted" />
             </div>
           </div>
-
           <div>
-            <p className="text-lg font-display font-bold text-glupp-cream">
-              {beer.name}
-            </p>
-            <p className="text-sm text-glupp-text-muted">
-              {beer.brewery}
-            </p>
+            <p className="text-lg font-display font-bold text-glupp-cream">{beer.name}</p>
+            <p className="text-sm text-glupp-text-muted">{beer.brewery}</p>
           </div>
-
           <div className="w-full bg-glupp-card-alt rounded-glupp p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-glupp-text-soft">Style</span>
@@ -238,62 +169,36 @@ export function BeerModal() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-glupp-text-soft">ABV</span>
-              <span className="text-sm text-glupp-text-muted blur-[3px] select-none">
-                {beer.abv || "5.2"}%
-              </span>
+              <span className="text-sm text-glupp-text-muted blur-[3px] select-none">{beer.abv || "5.2"}%</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-glupp-text-soft">ELO</span>
-              <span className="text-sm text-glupp-text-muted blur-[3px] select-none">
-                {beer.elo}
-              </span>
+              <span className="text-sm text-glupp-text-muted blur-[3px] select-none">{beer.elo}</span>
             </div>
+            {(beer as any).avg_rating && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-glupp-text-soft">Note</span>
+                <StarRating value={Number((beer as any).avg_rating)} readonly size={14} showValue count={(beer as any).rating_count} />
+              </div>
+            )}
             <div>
               <p className="text-xs text-glupp-text-soft mb-2">Profil gustatif</p>
               <div className="blur-[4px] select-none pointer-events-none">
-                <TasteProfile
-                  bitter={beer.taste_bitter}
-                  sweet={beer.taste_sweet}
-                  fruity={beer.taste_fruity}
-                  body={beer.taste_body}
-                />
+                <TasteProfile bitter={beer.taste_bitter} sweet={beer.taste_sweet} fruity={beer.taste_fruity} body={beer.taste_body} />
               </div>
             </div>
           </div>
-
           <div className="w-full bg-glupp-card-alt rounded-glupp p-3 flex items-center gap-2">
             <Lock size={14} className="text-glupp-text-muted shrink-0" />
-            <p className="text-xs text-glupp-text-muted italic">
-              Anecdote secrète
-            </p>
+            <p className="text-xs text-glupp-text-muted italic">Anecdote secrète</p>
           </div>
-
-          <p className="text-sm text-glupp-text-soft max-w-xs leading-relaxed">
-            Gluppe cette bière pour débloquer ses stats et son anecdote !
-          </p>
-
+          <p className="text-sm text-glupp-text-soft max-w-xs leading-relaxed">Gluppe cette bière pour débloquer ses stats et son anecdote !</p>
           {isHighRarity && rarityConfig && (
-            <div
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{
-                backgroundColor: `${rarityConfig.color}20`,
-                color: rarityConfig.color,
-              }}
-            >
-              <Zap size={14} />
-              <span>+{xpBonus} XP bonus rareté !</span>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: `${rarityConfig.color}20`, color: rarityConfig.color }}>
+              <Zap size={14} /><span>+{xpBonus} XP bonus rareté !</span>
             </div>
           )}
-
-          <Button
-            variant="primary"
-            size="lg"
-            className="w-full"
-            onClick={() => {
-              closeBeerModal();
-              openGluppModal(beer.id);
-            }}
-          >
+          <Button variant="primary" size="lg" className="w-full" onClick={() => { closeBeerModal(); openGluppModal(beer.id); }}>
             🍺 Glupper cette bière !
           </Button>
         </div>
@@ -306,16 +211,11 @@ export function BeerModal() {
               <p className="text-sm text-glupp-text-soft">{beer.brewery}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span>{beer.country}</span>
-                <span className="text-xs text-glupp-text-muted">
-                  {beer.style}
-                </span>
+                <span className="text-xs text-glupp-text-muted">{beer.style}</span>
                 <RarityBadge rarity={beer.rarity} />
               </div>
               {beer.region && (
-                <p className="text-xs text-glupp-text-muted mt-1">
-                  <MapPin size={10} className="inline mr-1" />
-                  {beer.region}
-                </p>
+                <p className="text-xs text-glupp-text-muted mt-1"><MapPin size={10} className="inline mr-1" />{beer.region}</p>
               )}
             </div>
           </div>
@@ -336,167 +236,126 @@ export function BeerModal() {
 
           <div>
             <h3 className="text-sm font-semibold text-glupp-cream mb-3">Profil gustatif de la communauté</h3>
-            <TasteProfile
-              bitter={beer.taste_bitter}
-              sweet={beer.taste_sweet}
-              fruity={beer.taste_fruity}
-              body={beer.taste_body}
-            />
+            <TasteProfile bitter={beer.taste_bitter} sweet={beer.taste_sweet} fruity={beer.taste_fruity} body={beer.taste_body} />
           </div>
 
-          {/* ── User Taste Rating ("Mon ressenti") ── */}
+          {/* ── Ma note (étoiles) ── */}
+          <div className="bg-glupp-card-alt rounded-glupp p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-glupp-cream flex items-center gap-1.5">
+                <span>⭐</span> Ma note
+              </h3>
+              {(beer as any).avg_rating && (
+                <span className="text-[10px] text-glupp-text-muted">
+                  Moyenne : {Number((beer as any).avg_rating).toFixed(1)}/5 ({(beer as any).rating_count} avis)
+                </span>
+              )}
+            </div>
+            <StarRating value={userBeerData?.rating || null} onChange={handleRateBeer} size={28} />
+            {!userBeerData?.rating && (
+              <p className="text-[10px] text-glupp-text-muted mt-1.5">Note cette biere pour gagner +5 XP !</p>
+            )}
+          </div>
+
+          {/* ── Mon ressenti (sliders) ── */}
           <div className="bg-glupp-card-alt rounded-glupp p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-glupp-cream flex items-center gap-1.5">
                 <span>🎯</span> Mon ressenti
               </h3>
               {!editingTaste ? (
-                <button
-                  onClick={() => {
-                    // On remet le comportement que tu préférais : on copie la communauté s'il n'y a pas de note
-                    if (userBeerData?.user_taste_bitter != null) {
-                      setTasteDraft({
-                        bitter: userBeerData.user_taste_bitter,
-                        sweet: userBeerData.user_taste_sweet ?? 3,
-                        fruity: userBeerData.user_taste_fruity ?? 3,
-                        body: userBeerData.user_taste_body ?? 3,
-                      });
-                    } else {
-                      setTasteDraft({
-                        bitter: beer.taste_bitter,
-                        sweet: beer.taste_sweet,
-                        fruity: beer.taste_fruity,
-                        body: beer.taste_body,
-                      });
-                    }
-                    setEditingTaste(true);
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-glupp-accent hover:bg-glupp-accent/10 transition-colors"
-                >
-                  <Pencil size={10} />
-                  {userBeerData?.user_taste_bitter != null ? "Modifier" : "Noter"}
+                <button onClick={() => {
+                  if (userBeerData?.user_taste_bitter != null) {
+                    setTasteDraft({ bitter: userBeerData.user_taste_bitter, sweet: userBeerData.user_taste_sweet ?? 3, fruity: userBeerData.user_taste_fruity ?? 3, body: userBeerData.user_taste_body ?? 3 });
+                  } else {
+                    setTasteDraft({ bitter: beer.taste_bitter, sweet: beer.taste_sweet, fruity: beer.taste_fruity, body: beer.taste_body });
+                  }
+                  setEditingTaste(true);
+                }} className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-glupp-accent hover:bg-glupp-accent/10 transition-colors">
+                  <Pencil size={10} />{userBeerData?.user_taste_bitter != null ? "Modifier" : "Noter"}
                 </button>
               ) : (
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setEditingTaste(false)}
-                    className="px-2 py-1 rounded-md text-[10px] text-glupp-text-muted hover:bg-glupp-border/50 transition-colors"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={handleSaveTaste}
-                    disabled={savingTaste}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] bg-glupp-accent text-glupp-bg font-medium hover:bg-glupp-accent/90 transition-colors disabled:opacity-50"
-                  >
-                    {savingTaste ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
-                    Sauver
+                  <button onClick={() => setEditingTaste(false)} className="px-2 py-1 rounded-md text-[10px] text-glupp-text-muted hover:bg-glupp-border/50 transition-colors">Annuler</button>
+                  <button onClick={handleSaveTaste} disabled={savingTaste} className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] bg-glupp-accent text-glupp-bg font-medium hover:bg-glupp-accent/90 transition-colors disabled:opacity-50">
+                    {savingTaste ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}Sauver
                   </button>
                 </div>
               )}
             </div>
-
             {editingTaste ? (
               <div className="space-y-2.5 mt-4">
                 {TASTE_DIMS.map((dim) => (
                   <div key={dim.key}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[11px] text-glupp-text-soft flex items-center gap-1">
-                        <span>{dim.emoji}</span> {dim.label}
-                      </span>
-                      <span className="text-[11px] font-bold tabular-nums" style={{ color: dim.color }}>
-                        {tasteDraft[dim.key].toFixed(1)}
-                      </span>
+                      <span className="text-[11px] text-glupp-text-soft flex items-center gap-1"><span>{dim.emoji}</span> {dim.label}</span>
+                      <span className="text-[11px] font-bold tabular-nums" style={{ color: dim.color }}>{tasteDraft[dim.key].toFixed(1)}</span>
                     </div>
-                    {/* 🛠️ L'ASTUCE ICI : min est à 0 pour que 1 se place à 20%, et on utilise Math.max(1, value) */}
-                    <input
-                      type="range"
-                      min={0} max={5} step={0.5}
-                      value={tasteDraft[dim.key]}
-                      onChange={(e) => {
-                        const newValue = Math.max(1, parseFloat(e.target.value));
-                        setTasteDraft((prev) => ({ ...prev, [dim.key]: newValue }));
-                      }}
+                    <input type="range" min={0} max={5} step={0.5} value={tasteDraft[dim.key]}
+                      onChange={(e) => { const v = Math.max(1, parseFloat(e.target.value)); setTasteDraft((p) => ({ ...p, [dim.key]: v })); }}
                       className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                      style={{
-                        background: `linear-gradient(to right, ${dim.color} 0%, ${dim.color} ${(tasteDraft[dim.key] / 5) * 100}%, rgba(58,53,48,0.6) ${(tasteDraft[dim.key] / 5) * 100}%, rgba(58,53,48,0.6) 100%)`,
-                      }}
-                    />
+                      style={{ background: `linear-gradient(to right, ${dim.color} 0%, ${dim.color} ${(tasteDraft[dim.key] / 5) * 100}%, rgba(58,53,48,0.6) ${(tasteDraft[dim.key] / 5) * 100}%, rgba(58,53,48,0.6) 100%)` }} />
                   </div>
                 ))}
               </div>
             ) : userBeerData?.user_taste_bitter != null ? (
               <div className="mt-4">
-                <TasteProfile
-                  bitter={userBeerData.user_taste_bitter}
-                  sweet={userBeerData.user_taste_sweet!}
-                  fruity={userBeerData.user_taste_fruity!}
-                  body={userBeerData.user_taste_body!}
-                />
+                <TasteProfile bitter={userBeerData.user_taste_bitter} sweet={userBeerData.user_taste_sweet!} fruity={userBeerData.user_taste_fruity!} body={userBeerData.user_taste_body!} />
               </div>
             ) : (
-              <p className="text-xs text-glupp-text-muted text-center py-2 mt-2">
-                Partage ton ressenti sur cette bière !
-              </p>
+              <p className="text-xs text-glupp-text-muted text-center py-2 mt-2">Partage ton ressenti sur cette bière !</p>
             )}
           </div>
 
+          {/* ── Note le bar ── */}
+          {userBeerData?.bar_name && !barRated && !userBeerData.bar_name.startsWith("Sur place") && (
+            <BarRatingPrompt
+              barName={userBeerData.bar_name}
+              userId=""
+              onDone={(xp) => {
+                if (xp > 0) showXPToast(xp, "Bar noté !");
+                setBarRated(true);
+                queryClient.invalidateQueries({ queryKey: ["daily-challenges"] });
+              }}
+            />
+          )}
+
           {beer.fun_fact && (
             <div className="bg-glupp-card-alt rounded-glupp p-3">
-              <p className="text-xs text-glupp-text-soft">
-                <span className="mr-1">{beer.fun_fact_icon}</span>
-                {beer.fun_fact}
-              </p>
+              <p className="text-xs text-glupp-text-soft"><span className="mr-1">{beer.fun_fact_icon}</span>{beer.fun_fact}</p>
             </div>
           )}
 
           <div className="bg-glupp-card-alt rounded-glupp p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-glupp-success text-sm font-medium">
-                <span>✓</span>
-                <span>Dans ta collection</span>
-              </div>
-              {gluppCount > 1 && (
-                <span className="text-xs text-glupp-accent font-mono">×{gluppCount}</span>
-              )}
+              <div className="flex items-center gap-2 text-glupp-success text-sm font-medium"><span>✓</span><span>Dans ta collection</span></div>
+              {gluppCount > 1 && <span className="text-xs text-glupp-accent font-mono">×{gluppCount}</span>}
             </div>
             {userBeerData?.tasted_at && (
               <div className="flex items-center gap-2 text-xs text-glupp-text-muted">
-                <Calendar size={12} />
-                <span>Gluppé le {new Date(userBeerData.tasted_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span>
+                <Calendar size={12} /><span>Gluppé le {new Date(userBeerData.tasted_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span>
               </div>
             )}
             {userBeerData?.bar_name && (
               <div className="flex items-center gap-2 text-xs text-glupp-text-muted">
-                <MapPin size={12} />
-                <span>{userBeerData.bar_name}</span>
+                <MapPin size={12} /><span>{userBeerData.bar_name}</span>
               </div>
             )}
           </div>
 
           <AnimatePresence mode="wait">
             {regluppDone ? (
-              <motion.div
-                key="done"
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-glupp bg-glupp-success/15 border border-glupp-success/30 text-glupp-success text-sm font-medium"
-              >
-                <BeerIcon size={16} />
-                <span>Re-Glupp enregistré ! ×{gluppCount}</span>
+              <motion.div key="done" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-glupp bg-glupp-success/15 border border-glupp-success/30 text-glupp-success text-sm font-medium">
+                <BeerIcon size={16} /><span>Re-Glupp enregistré ! ×{gluppCount}</span>
               </motion.div>
             ) : (
               <motion.div key="btn" initial={{ opacity: 1 }}>
-                <button
-                  onClick={handleReglupp}
-                  disabled={regluppLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-glupp bg-glupp-card border border-glupp-border hover:border-glupp-accent text-glupp-cream text-sm font-medium transition-all disabled:opacity-50 active:scale-[0.97]"
-                >
+                <button onClick={handleReglupp} disabled={regluppLoading}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-glupp bg-glupp-card border border-glupp-border hover:border-glupp-accent text-glupp-cream text-sm font-medium transition-all disabled:opacity-50 active:scale-[0.97]">
                   <RotateCcw size={16} className={regluppLoading ? "animate-spin" : ""} />
-                  <span>{regluppLoading ? "En cours..." : `Re-Glupper cette bière`}</span>
-                  {nextRegluppXP > 0 && (
-                    <span className="text-xs text-glupp-accent font-mono ml-1">+{nextRegluppXP} XP</span>
-                  )}
+                  <span>{regluppLoading ? "En cours..." : "Re-Glupper cette bière"}</span>
+                  {nextRegluppXP > 0 && <span className="text-xs text-glupp-accent font-mono ml-1">+{nextRegluppXP} XP</span>}
                 </button>
               </motion.div>
             )}

@@ -55,12 +55,15 @@ function ChallengeRow({ challenge, index }: { challenge: Challenge; index: numbe
 export function DailyChallengesWidget() {
   const { dailyChallenges, weeklyChallenges, streak, allDailyCompleted, isLoading, checkChallenges } = useDailyChallenges();
 
-  // Vérifier automatiquement les défis au chargement
+  // Vérifier automatiquement les défis au chargement et après chaque changement
   useEffect(() => {
-    if (dailyChallenges.length > 0) {
-      checkChallenges().catch(() => {});
+    if (dailyChallenges.length > 0 && !allDailyCompleted) {
+      const timer = setTimeout(() => {
+        checkChallenges().catch(() => {});
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [dailyChallenges.length]);
+  }, [dailyChallenges]);
 
   if (isLoading) {
     return (
