@@ -1022,7 +1022,7 @@ function TasteSliders({
               max={5}
               step={0.5}
               value={values[dim.key]}
-              onChange={(e) => onChange(dim.key, parseInt(e.target.value))}
+              onChange={(e) => onChange(dim.key, parseFloat(e.target.value))}
               className="flex-1 h-2 rounded-full appearance-none cursor-pointer"
               style={{
                 background: `linear-gradient(to right, ${dim.color} 0%, ${dim.color} ${((values[dim.key] - 1) / 4) * 100}%, #3A3530 ${((values[dim.key] - 1) / 4) * 100}%, #3A3530 100%)`,
