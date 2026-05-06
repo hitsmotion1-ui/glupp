@@ -23,6 +23,7 @@ import {
   Clock,
 } from "lucide-react";
 import { BeerImportExport } from "@/components/admin/BeerImportExport";
+import { getRegionSuggestions } from "@/lib/utils/regionSuggestions";
 
 // ═══════════════════════════════════════════
 // Country Emoji Picker Data
@@ -1126,13 +1127,42 @@ function BeerForm({
             </div>
             <div>
               <label className={labelClass}>Region</label>
-              <input
-                type="text"
-                value={form.region}
-                onChange={(e) => onChange("region", e.target.value)}
-                placeholder="Ex: Bretagne, Bavaria, California..."
-                className={inputClass}
-              />
+              {getRegionSuggestions(form.country_code).length > 0 ? (
+                <div className="space-y-2">
+                  <select
+                    value={getRegionSuggestions(form.country_code).includes(form.region) ? form.region : (form.region ? "__other__" : "")}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "__other__") onChange("region", "");
+                      else onChange("region", v);
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">-- Choisir une region --</option>
+                    {getRegionSuggestions(form.country_code).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                    <option value="__other__">Autre...</option>
+                  </select>
+                  {!getRegionSuggestions(form.country_code).includes(form.region) && form.region !== "" && (
+                    <input
+                      type="text"
+                      value={form.region}
+                      onChange={(e) => onChange("region", e.target.value)}
+                      placeholder="Saisir la region..."
+                      className={inputClass}
+                    />
+                  )}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={form.region}
+                  onChange={(e) => onChange("region", e.target.value)}
+                  placeholder="Ex: Bretagne, Bavaria, California..."
+                  className={inputClass}
+                />
+              )}
             </div>
           </div>
 
