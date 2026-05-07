@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { Search, Plus, MapPin } from "lucide-react";
 
+
 interface Brewery {
   id: string;
   name: string;
@@ -127,8 +128,12 @@ export function BrewerySelect({ value, onChange, onCityChange, placeholder, clas
           {query.length >= 2 && !exactMatch && (
             <button
               type="button"
-              onClick={() => {
-                onChange(query);
+              onClick={async () => {
+                // Créer la brasserie en base
+                const { data } = await supabase.rpc("get_or_create_brewery", {
+                  p_name: query.trim(),
+                });
+                onChange(query.trim(), data || undefined);
                 setShowSuggestions(false);
               }}
               className="w-full text-left px-3 py-2 text-sm text-glupp-accent hover:bg-glupp-accent/10 transition-colors flex items-center gap-1.5"

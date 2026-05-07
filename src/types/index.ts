@@ -28,6 +28,8 @@ export interface Beer {
   fun_fact: string | null;
   fun_fact_icon: string;
   region: string | null;
+  avg_rating: number | null;
+  rating_count: number;
   is_active: boolean;
   added_by: string | null;
   status: "pending" | "approved" | "rejected";

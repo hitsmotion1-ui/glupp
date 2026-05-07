@@ -250,6 +250,10 @@ export function GluppModal() {
   // Main submit
   const handleGlupp = async () => {
     if (!beer) return;
+    if (!photoFile) {
+      setError("La photo est obligatoire pour glupper !");
+      return;
+    }
     setLoading(true);
     setError(null);
 

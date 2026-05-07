@@ -203,6 +203,7 @@ export function useDuel() {
       queryClient.invalidateQueries({ queryKey: ["past_duels_history"] });
       queryClient.invalidateQueries({ queryKey: ["duel_history_details"] });
       queryClient.invalidateQueries({ queryKey: ["duel_history_details"] });
+      queryClient.invalidateQueries({ queryKey: ["top-beer"] });
 
       setTimeout(() => {
         // Ne pas générer un nouveau duel si on vient d'atteindre la limite
