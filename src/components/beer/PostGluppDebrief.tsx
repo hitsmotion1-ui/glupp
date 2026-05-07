@@ -126,14 +126,10 @@ export function PostGluppDebrief({ isOpen, onClose, beerId, beerName, barName }:
           ...reviewData,
         });
         // XP bonus première fois
-        showXPToast(5, "Bar noté !");
-        await supabase.from("profiles").update({
-          xp: supabase.rpc ? undefined : undefined, // handled below
-        });
-        // Incrémenter XP manuellement
         const { data: profile } = await supabase.from("profiles").select("xp").eq("id", user.id).single();
         if (profile) {
           await supabase.from("profiles").update({ xp: profile.xp + 5, updated_at: new Date().toISOString() }).eq("id", user.id);
+          showXPToast(5, "Bar noté !");
         }
       }
 
