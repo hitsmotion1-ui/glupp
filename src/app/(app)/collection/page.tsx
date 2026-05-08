@@ -18,7 +18,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { LevelBadge } from "@/components/gamification/LevelBadge";
-import { RARITY_CONFIG, type Rarity, formatNumber } from "@/lib/utils/xp";
+import { RARITY_CONFIG, type Rarity, formatNumber, beerEmoji } from "@/lib/utils/xp";
 import { Search, ChevronDown, Trophy, BookOpen, Globe, Crown, Swords, Clock, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWishlist } from "@/lib/hooks/useWishlist";
