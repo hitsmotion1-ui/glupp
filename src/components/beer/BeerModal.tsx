@@ -18,6 +18,8 @@ import {
   Beer as BeerIcon, Pencil, Check, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useWishlist } from "@/lib/hooks/useWishlist";
+import { Bookmark, BookmarkCheck } from "lucide-react";
 
 const TASTE_DIMS = [
   { key: "bitter" as const, label: "Amertume", color: "#E08840", emoji: "🍺" },
@@ -201,6 +203,7 @@ export function BeerModal() {
           <Button variant="primary" size="lg" className="w-full" onClick={() => { closeBeerModal(); openGluppModal(beer.id); }}>
             🍺 Glupper cette bière !
           </Button>
+          <WishlistButton beerId={beer.id} />
         </div>
       ) : (
         // ═══ UNLOCKED STATE ═══
@@ -363,5 +366,27 @@ export function BeerModal() {
         </div>
       )}
     </Modal>
+  );
+}
+function WishlistButton({ beerId }: { beerId: string }) {
+  const { wishlistBeerIds, addToWishlist, removeFromWishlist, adding, removing } = useWishlist();
+  const isInWishlist = wishlistBeerIds.has(beerId);
+
+  return (
+    <button
+      onClick={async () => {
+        if (isInWishlist) await removeFromWishlist(beerId);
+        else await addToWishlist(beerId);
+      }}
+      disabled={adding || removing}
+      className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-glupp border text-sm font-medium transition-all mt-2 ${
+        isInWishlist
+          ? "border-glupp-accent/30 bg-glupp-accent/10 text-glupp-accent"
+          : "border-glupp-border bg-glupp-card text-glupp-text-muted hover:border-glupp-accent/30"
+      }`}
+    >
+      {isInWishlist ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+      {isInWishlist ? "Dans ma liste a tester" : "Ajouter a ma liste"}
+    </button>
   );
 }

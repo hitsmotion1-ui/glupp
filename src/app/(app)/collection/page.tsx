@@ -21,6 +21,8 @@ import { LevelBadge } from "@/components/gamification/LevelBadge";
 import { RARITY_CONFIG, type Rarity, formatNumber } from "@/lib/utils/xp";
 import { Search, ChevronDown, Trophy, BookOpen, Globe, Crown, Swords, Clock, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useWishlist } from "@/lib/hooks/useWishlist";
+import { Bookmark, BookmarkCheck, Trash2 } from "lucide-react";
 
 const RARITY_FILTERS: { key: Rarity | "all"; label: string }[] = [
   { key: "all", label: "Toutes" },
@@ -33,7 +35,7 @@ const RARITY_FILTERS: { key: Rarity | "all"; label: string }[] = [
 const RARITY_ORDER: Rarity[] = ["common", "rare", "epic", "legendary"];
 const PAGE_SIZE = 60;
 
-type ViewMode = "top" | "beerdex" | "mondial";
+type ViewMode = "top" | "beerdex" | "wishlist" | "mondial";
 type SortMode = "tasted_first" | "rarity" | "name";
 
 export default function CollectionPage() {
@@ -49,6 +51,7 @@ export default function CollectionPage() {
         {([
           { key: "top" as const, label: "Mon Top", icon: Trophy },
           { key: "beerdex" as const, label: "Beerdex", icon: BookOpen },
+          { key: "wishlist" as const, label: "A tester", icon: Bookmark },
           { key: "mondial" as const, label: "Mondial", icon: Globe },
         ]).map(({ key, label, icon: Icon }) => (
           <button
@@ -88,6 +91,11 @@ export default function CollectionPage() {
             transition={{ duration: 0.2 }}
           >
             <BeerdexView />
+          </motion.div>
+        )}
+        {viewMode === "wishlist" && (
+          <motion.div key="wishlist" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <WishlistView />
           </motion.div>
         )}
         {viewMode === "mondial" && (
@@ -498,6 +506,72 @@ function MondialView() {
         </ul>
       </div>
 
+    </div>
+  );
+}
+
+/* ─── Wishlist View ─── */
+function WishlistView() {
+  const { wishlist, isLoading, removeFromWishlist } = useWishlist();
+  const openBeerModal = useAppStore((s) => s.openBeerModal);
+  const openGluppModal = useAppStore((s) => s.openGluppModal);
+
+  if (isLoading) {
+    return (
+      <div className="px-4 space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (wishlist.length === 0) {
+    return (
+      <div className="text-center py-12 px-4">
+        <Bookmark className="w-10 h-10 text-glupp-text-muted mx-auto mb-3" />
+        <p className="text-sm text-glupp-text-muted">Ta liste est vide</p>
+        <p className="text-xs text-glupp-text-muted mt-1">
+          Ajoute des bieres depuis le Beerdex pour les retrouver ici !
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 space-y-2">
+      <p className="text-xs text-glupp-text-muted mb-2">{wishlist.length} biere{wishlist.length > 1 ? "s" : ""} a tester</p>
+      {wishlist.map((item) => (
+        <div key={item.id} className="flex items-center gap-3 p-3 bg-glupp-card border border-glupp-border rounded-glupp">
+          <button
+            onClick={() => openBeerModal(item.beer.id)}
+            className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+          >
+            <span className="text-2xl">{beerEmoji(item.beer.style)}</span>
+            <div className="min-w-0">
+              <p className="font-medium text-sm text-glupp-cream truncate">{item.beer.name}</p>
+              <p className="text-xs text-glupp-text-muted truncate">{item.beer.brewery} {item.beer.country}</p>
+            </div>
+          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => openGluppModal(item.beer.id)}
+              className="px-3 py-1.5 bg-glupp-accent text-glupp-bg text-xs font-semibold rounded-glupp hover:bg-glupp-accent/90 transition-colors"
+            >
+              Glupper
+            </button>
+            <button
+              onClick={async () => {
+                await removeFromWishlist(item.beer_id);
+              }}
+              className="p-1.5 text-glupp-text-muted hover:text-red-400 transition-colors"
+              title="Retirer de la liste"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
