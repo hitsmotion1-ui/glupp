@@ -429,6 +429,7 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
 }
 
 function BarBeers({ barName }: { barName: string }) {
+  const openBeerModal = useAppStore((s) => s.openBeerModal);
   const { data: beers, isLoading } = useQuery({
     queryKey: ["bar-beers", barName],
     queryFn: async () => {
@@ -442,8 +443,6 @@ function BarBeers({ barName }: { barName: string }) {
   });
 
   if (isLoading || !beers || beers.length === 0) return null;
-
-  const openBeerModal = useAppStore((s) => s.openBeerModal);
 
   return (
     <div className="mt-4">
