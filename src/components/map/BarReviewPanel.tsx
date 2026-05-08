@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Bar } from "@/types";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
+import { useAppStore } from "@/lib/store/useAppStore";
 
 interface BarReviewPanelProps {
   bar: Bar & { 
@@ -418,6 +421,51 @@ export function BarReviewPanel({ bar, onClose }: BarReviewPanelProps) {
           <Skeleton className="h-16" />
         </div>
       )}
+
+      {/* ── Bières gluppées dans ce bar ── */}
+      <BarBeers barName={bar.name} />
+    </div>
+  );
+}
+
+function BarBeers({ barName }: { barName: string }) {
+  const { data: beers, isLoading } = useQuery({
+    queryKey: ["bar-beers", barName],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_bar_beers", { p_bar_name: barName });
+      return (data || []) as Array<{
+        id: string; name: string; brewery: string; style: string;
+        country: string; rarity: string; count: number; last_glupped: string;
+      }>;
+    },
+    staleTime: 60 * 1000,
+  });
+
+  if (isLoading || !beers || beers.length === 0) return null;
+
+  const openBeerModal = useAppStore((s) => s.openBeerModal);
+
+  return (
+    <div className="mt-4">
+      <h3 className="text-sm font-semibold text-glupp-cream flex items-center gap-1.5 mb-2">
+        🍺 Bieres gluppees ici ({beers.length})
+      </h3>
+      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+        {beers.map((beer) => (
+          <button
+            key={beer.id}
+            onClick={() => openBeerModal(beer.id)}
+            className="w-full flex items-center gap-2 p-2 bg-glupp-card-alt rounded-glupp hover:bg-glupp-border/30 transition-colors text-left"
+          >
+            <span className="text-lg">{beer.country}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-glupp-cream truncate">{beer.name}</p>
+              <p className="text-[10px] text-glupp-text-muted truncate">{beer.brewery} · {beer.style}</p>
+            </div>
+            <span className="text-[10px] text-glupp-accent shrink-0">×{beer.count}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -329,6 +329,9 @@ export function BeerModal() {
             </div>
           )}
 
+          {/* ── Où cette bière a été gluppée ── */}
+          <BeerLocations beerId={beer.id} />
+
           <div className="bg-glupp-card-alt rounded-glupp p-3 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-glupp-success text-sm font-medium"><span>✓</span><span>Dans ta collection</span></div>
@@ -388,5 +391,38 @@ function WishlistButton({ beerId }: { beerId: string }) {
       {isInWishlist ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
       {isInWishlist ? "Dans ma liste a tester" : "Ajouter a ma liste"}
     </button>
+  );
+}
+
+function BeerLocations({ beerId }: { beerId: string }) {
+  const { data: locations, isLoading } = useQuery({
+    queryKey: ["beer-locations", beerId],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_beer_locations", { p_beer_id: beerId });
+      return (data || []) as Array<{
+        bar_name: string; tasted_at: string; photo_url: string | null;
+        username: string; display_name: string | null; avatar_id: string | null;
+      }>;
+    },
+    staleTime: 60 * 1000,
+  });
+
+  if (isLoading || !locations || locations.length === 0) return null;
+
+  return (
+    <div className="bg-glupp-card-alt rounded-glupp p-3">
+      <h3 className="text-sm font-semibold text-glupp-cream flex items-center gap-1.5 mb-2">
+        <MapPin size={14} className="text-glupp-accent" /> Ou cette biere a ete gluppee
+      </h3>
+      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+        {locations.map((loc, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <span className="text-glupp-text-muted shrink-0">📍</span>
+            <span className="text-glupp-cream truncate flex-1">{loc.bar_name}</span>
+            <span className="text-glupp-text-muted shrink-0">@{loc.username}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
