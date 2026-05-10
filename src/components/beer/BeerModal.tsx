@@ -446,7 +446,7 @@ function BeerLocations({ beerId }: { beerId: string }) {
         </div>
       )}
 
-      {hasBreweryUrl && (
+        {hasBreweryUrl && (
         
           href={locations.brewery_url!}
           target="_blank"
