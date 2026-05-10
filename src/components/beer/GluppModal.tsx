@@ -68,6 +68,8 @@ export function GluppModal() {
   const { checkAfterGlupp } = useMilestones();
   // Home city
   const [homeCity, setHomeCity] = useState("");
+  const [purchasedAt, setPurchasedAt] = useState("");
+  const [storeSuggestions, setStoreSuggestions] = useState<Array<{ name: string; count: number }>>([]);
   const [pendingMilestone, setPendingMilestone] = useState<{
     username: string; prevBeers: number; newBeers: number;
     prevXp: number; newXp: number; trophies: string[];
@@ -90,6 +92,8 @@ export function GluppModal() {
       setLocationType(null);
       setHomeCity("");
       setError(null);
+      setPurchasedAt("");
+      setStoreSuggestions([]);
       return;
     }
 
@@ -334,6 +338,11 @@ export function GluppModal() {
         return;
       }
 
+      if (purchasedAt.trim()) {
+        await supabase.from("user_beers").update({ purchased_at: purchasedAt.trim() })
+          .eq("user_id", user.id).eq("beer_id", beer.id);
+      }
+
       const result = data as { xp_gained: number; rarity: string; trophies_awarded?: string[] };
       showXPToast(result.xp_gained, "Glupp !");
       triggerCelebration();
@@ -482,20 +491,54 @@ export function GluppModal() {
 
           {/* Location detail — when "Sur place" selected */}
           {locationType === "home" && (
-            <div className="flex items-center gap-2">
-              <MapPin size={14} className="text-glupp-text-muted shrink-0" />
-              <input
-                type="text"
-                value={homeCity || geoCity || ""}
-                onChange={(e) => setHomeCity(e.target.value)}
-                placeholder="Lieu / Ville (optionnel)"
-                className="flex-1 px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
-              />
-              {geoCity && !homeCity && (
-                <span className="text-[10px] text-glupp-success whitespace-nowrap">
-                  Auto
-                </span>
-              )}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MapPin size={14} className="text-glupp-text-muted shrink-0" />
+                <input
+                  type="text"
+                  value={homeCity || geoCity || ""}
+                  onChange={(e) => setHomeCity(e.target.value)}
+                  placeholder="Lieu / Ville (optionnel)"
+                  className="flex-1 px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
+                />
+                {geoCity && !homeCity && <span className="text-[10px] text-glupp-success whitespace-nowrap">Auto</span>}
+              </div>
+              <div>
+                <label className="text-[10px] text-glupp-text-muted block mb-1">🏪 Ou as-tu achete cette biere ? (optionnel)</label>
+                <input
+                  type="text"
+                  value={purchasedAt}
+                  onChange={async (e) => {
+                    setPurchasedAt(e.target.value);
+                    if (e.target.value.length >= 2) {
+                      const { data } = await supabase.rpc("get_store_suggestions", { p_query: e.target.value });
+                      setStoreSuggestions(data || []);
+                    } else { setStoreSuggestions([]); }
+                  }}
+                  placeholder="Ex: Carrefour, Cave du coin, En ligne..."
+                  className="w-full px-3 py-2 bg-glupp-bg border border-glupp-border rounded-glupp text-sm text-glupp-cream placeholder:text-glupp-text-muted focus:outline-none focus:border-glupp-accent transition-colors"
+                />
+                {storeSuggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {storeSuggestions.map((s) => (
+                      <button key={s.name} type="button" onClick={() => { setPurchasedAt(s.name); setStoreSuggestions([]); }}
+                        className="px-2 py-0.5 rounded-full bg-glupp-card-alt border border-glupp-border text-[10px] text-glupp-text-soft hover:border-glupp-accent hover:text-glupp-accent transition-colors">
+                        {s.name} ({s.count})
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!purchasedAt && storeSuggestions.length === 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {["Supermarche", "Cave a bieres", "En ligne", "Brasserie", "Cadeau"].map((s) => (
+                      <button key={s} type="button" onClick={() => setPurchasedAt(s)}
+                        className="px-2 py-0.5 rounded-full bg-glupp-card-alt border border-glupp-border text-[10px] text-glupp-text-soft hover:border-glupp-accent hover:text-glupp-accent transition-colors">
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

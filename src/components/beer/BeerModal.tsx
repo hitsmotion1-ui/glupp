@@ -399,30 +399,63 @@ function BeerLocations({ beerId }: { beerId: string }) {
     queryKey: ["beer-locations", beerId],
     queryFn: async () => {
       const { data } = await supabase.rpc("get_beer_locations", { p_beer_id: beerId });
-      return (data || []) as Array<{
-        bar_name: string; tasted_at: string; photo_url: string | null;
-        username: string; display_name: string | null; avatar_id: string | null;
-      }>;
+      return data as { bars: Array<{ name: string; count: number }>; stores: Array<{ name: string; count: number }>; brewery_url: string | null } | null;
     },
     staleTime: 60 * 1000,
   });
 
-  if (isLoading || !locations || locations.length === 0) return null;
+  if (isLoading || !locations) return null;
+
+  const hasBars = locations.bars && locations.bars.length > 0;
+  const hasStores = locations.stores && locations.stores.length > 0;
+  const hasBreweryUrl = !!locations.brewery_url;
+
+  if (!hasBars && !hasStores && !hasBreweryUrl) return null;
 
   return (
-    <div className="bg-glupp-card-alt rounded-glupp p-3">
-      <h3 className="text-sm font-semibold text-glupp-cream flex items-center gap-1.5 mb-2">
-        <MapPin size={14} className="text-glupp-accent" /> Ou cette biere a ete gluppee
+    <div className="bg-glupp-card-alt rounded-glupp p-3 space-y-3">
+      <h3 className="text-sm font-semibold text-glupp-cream flex items-center gap-1.5">
+        <MapPin size={14} className="text-glupp-accent" /> Ou la trouver
       </h3>
-      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-        {locations.map((loc, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs">
-            <span className="text-glupp-text-muted shrink-0">📍</span>
-            <span className="text-glupp-cream truncate flex-1">{loc.bar_name}</span>
-            <span className="text-glupp-text-muted shrink-0">@{loc.username}</span>
+
+      {hasBars && (
+        <div>
+          <p className="text-[10px] text-glupp-text-muted mb-1">🍻 Bars</p>
+          <div className="space-y-1">
+            {locations.bars.map((b, i) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="text-glupp-cream truncate">{b.name}</span>
+                <span className="text-glupp-text-muted shrink-0 ml-2">×{b.count}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {hasStores && (
+        <div>
+          <p className="text-[10px] text-glupp-text-muted mb-1">🏪 Magasins</p>
+          <div className="space-y-1">
+            {locations.stores.map((s, i) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="text-glupp-cream truncate">{s.name}</span>
+                <span className="text-glupp-text-muted shrink-0 ml-2">×{s.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasBreweryUrl && (
+        
+          href={locations.brewery_url!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-glupp-accent hover:underline"
+        >
+          🌐 Site du brasseur →
+        </a>
+      )}
     </div>
   );
 }
