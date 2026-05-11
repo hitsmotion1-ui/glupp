@@ -452,7 +452,7 @@ function BeerLocations({ beerId }: { beerId: string }) {
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-xs text-glupp-accent hover:underline"
-      
+      >
           🌐 Site du brasseur →
         </a>
       )}
